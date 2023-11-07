@@ -1,7 +1,4 @@
-import time
 import duckdb
-import pandas as pd
-from loguru import logger
 
 from pathlib import Path
 
@@ -18,5 +15,4 @@ class DuckDB:
 
 if __name__ == '__main__':
     db = DuckDB(Path(r'D:\DuckDB'))
-
     print(1)
