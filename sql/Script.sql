@@ -1,0 +1,1 @@
+SELECT * from read_parquet('D:\DuckDB\stock\trades\20230504.parquet');
