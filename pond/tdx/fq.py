@@ -21,8 +21,8 @@ from tqdm import tqdm
 from gulf.dolphindb.tables import StockBasicTable
 from mootdx.reader import Reader
 from gulf.dolphindb.stock import StockDB
-from gulf.tdx.finance_cw import get_cw_dict_acc
-from gulf.tdx.path import gbbq_path, tdx_path
+from pond.tdx.finance_cw import get_cw_dict_acc
+from pond.tdx.path import gbbq_path, tdx_path
 
 
 def update_res_dict(

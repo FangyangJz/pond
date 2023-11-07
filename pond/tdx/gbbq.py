@@ -14,8 +14,8 @@ import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
-from gulf.tdx.gbbq_hexdump_keys import hexdump_keys
-from gulf.tdx.path import gbbq_path
+from pond.tdx.gbbq_hexdump_keys import hexdump_keys
+from pond.tdx.path import gbbq_path
 
 
 # take ref this article :http://blog.csdn.net/fangle6688/article/details/50956609
