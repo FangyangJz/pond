@@ -44,7 +44,7 @@ class DuckDB:
         compress = 'ZSTD'
 
         (self.con.sql('select * from bond_basic_df')
-            .write_parquet(str(self.path_bond_info / f'basic.parquet'), compression=compress))
+         .write_parquet(str(self.path_bond_info / f'basic.parquet'), compression=compress))
         logger.success(f'Update basic.parquet cost: {time.perf_counter() - start_time}s')
 
         (self.con.sql('select * from bond_redeem_df')
@@ -53,15 +53,25 @@ class DuckDB:
 
     def update_stock_info(self):
         from pond.akshare.stock import get_all_stocks_df
+        from akshare import tool_trade_date_hist_sina
 
         start_time = time.perf_counter()
+
         stock_basic_df = get_all_stocks_df()
+
+        calender_df = tool_trade_date_hist_sina().astype('str')
+        calender_df['trade_date'] = pd.to_datetime(calender_df['trade_date'])
+        calender_df.reset_index(inplace=True)
 
         compress = 'ZSTD'
 
         (self.con.sql('select * from stock_basic_df')
-            .write_parquet(str(self.path_stock_info / f'basic.parquet'), compression=compress))
+         .write_parquet(str(self.path_stock_info / f'basic.parquet'), compression=compress))
         logger.success(f'Update basic.parquet cost: {time.perf_counter() - start_time}s')
+
+        (self.con.sql('select * from calender_df')
+         .write_parquet(str(self.path_stock_info / f'calender.parquet'), compression=compress))
+        logger.success(f'Update calender.parquet cost: {time.perf_counter() - start_time}s')
 
     def update_stock_trades(self):
         from pond.stock.trades import get_trade_df_with_multiprocess
@@ -84,9 +94,10 @@ if __name__ == '__main__':
     db.update_bond_info()
     # db.update_stock_trades()
     r1 = db.con.sql(
-        rf"SELECT * from read_parquet('{str(db.path_stock_trades/'20230504.parquet')}')")  # order by jj_code, datetime
+        rf"SELECT * from read_parquet('{str(db.path_stock_trades / '20230504.parquet')}')")  # order by jj_code, datetime
 
     r2 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_bond_info / 'basic.parquet')}')")
     r3 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_bond_info / 'redeem.parquet')}')")
     r4 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'basic.parquet')}')")
+    r5 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'calender.parquet')}')")
     print(1)
