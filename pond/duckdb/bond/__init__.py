@@ -34,14 +34,13 @@ class BondDB(DuckDB):
         bond_basic_df['转股起始日'] = pd.to_datetime(bond_basic_df['转股起始日'])
         bond_redeem_df['转股起始日'] = pd.to_datetime(bond_redeem_df['转股起始日'])
 
-        compress = 'ZSTD'
 
         (self.con.sql('select * from bond_basic_df')
-         .write_parquet(str(self.path_bond_info / f'basic.parquet'), compression=compress))
+         .write_parquet(str(self.path_bond_info / f'basic.parquet'), compression=self.compress))
         logger.success(f'Update basic.parquet cost: {time.perf_counter() - start_time}s')
 
         (self.con.sql('select * from bond_redeem_df')
-         .write_parquet(str(self.path_bond_info / f'redeem.parquet'), compression=compress))
+         .write_parquet(str(self.path_bond_info / f'redeem.parquet'), compression=self.compress))
         logger.success(f'Update redeem.parquet cost: {time.perf_counter() - start_time}s')
 
 
