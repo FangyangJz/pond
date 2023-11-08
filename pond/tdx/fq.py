@@ -18,9 +18,7 @@ from loguru import logger
 
 from tqdm import tqdm
 
-from gulf.dolphindb.tables import StockBasicTable
 from mootdx.reader import Reader
-from gulf.dolphindb.stock import StockDB
 from pond.tdx.finance_cw import get_cw_dict_acc
 from pond.tdx.path import gbbq_path, tdx_path
 
@@ -51,7 +49,10 @@ def update_res_dict(
         res_dict[stock_code] = df_qfq
 
 
-def qfq_acc(gbbq_df: pd.DataFrame, cw_dict: Dict[str, pd.DataFrame], pool: PoolType = None) -> Dict[str, pd.DataFrame]:
+def qfq_acc(
+        stock_basic_df: pd.DataFrame, gbbq_df: pd.DataFrame,
+        cw_dict: Dict[str, pd.DataFrame], offset: int = 1, pool: PoolType = None
+) -> Dict[str, pd.DataFrame]:
     build_in_pool = False
     if not isinstance(pool, PoolType):
         logger.info(f'Not pass multiprocess pool in parameter, build in function.')
@@ -62,12 +63,6 @@ def qfq_acc(gbbq_df: pd.DataFrame, cw_dict: Dict[str, pd.DataFrame], pool: PoolT
 
     logger.info(
         f'Start to update_res_dict with multiprocess. Process nums:{pool._processes}, state:{pool._state}')
-
-    # set database and get stock basic data
-    offset = 1
-    db = StockDB()
-    # Tips: For debug use dataframe slice
-    stock_basic_df = db.get_dimension_table_df(StockBasicTable, from_db=True)  # .iloc[:1000]
 
     # set progress bar
     step = int(len(stock_basic_df) / (4 * pool._processes))  # tune coe 4 get best speed
@@ -94,13 +89,9 @@ def qfq_acc(gbbq_df: pd.DataFrame, cw_dict: Dict[str, pd.DataFrame], pool: PoolT
     return res_dict
 
 
-def qfq(gbbq_df: pd.DataFrame, cw_dict: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-    # set database and get stock basic data
-    offset = 1
-    db = StockDB()
-    # Tips: For debug use dataframe slice
-    stock_basic_df = db.get_dimension_table_df(StockBasicTable, from_db=True)  # .iloc[:1000]
-
+def qfq(
+        stock_basic_df: pd.DataFrame, gbbq_df: pd.DataFrame, cw_dict: Dict[str, pd.DataFrame], offset: int = 1
+) -> Dict[str, pd.DataFrame]:
     logger.info('Function qfq with 1 process...')
     res_dict = dict()
     update_res_dict(stock_basic_df, gbbq_df, cw_dict, res_dict, offset)
@@ -318,16 +309,16 @@ def make_fq(
                         * data['配股价-前总股本']) / (10 + data['配股-后总股本'] + data['送转股-后流通盘'])
     # 计算每日复权因子 前复权最近一次股本变迁的复权因子为1
     data['adj'] = (data['preclose'].shift(-1) / data['close']).fillna(1)[::-1].cumprod()
-    data['open'] = data['open'] * data['adj']
-    data['high'] = data['high'] * data['adj']
-    data['low'] = data['low'] * data['adj']
-    data['close'] = data['close'] * data['adj']
+    data['open_qfq'] = data['open'] * data['adj']
+    data['high_qfq'] = data['high'] * data['adj']
+    data['low_qfq'] = data['low'] * data['adj']
+    data['close_qfq'] = data['close'] * data['adj']
     # data['preclose'] = data['preclose'] * data['adj']  # 这行没用了
     data = data[data['if_trade']]  # 重建整个表，只保存if_trade列=true的行
 
     # 抛弃过程处理行，且open值不等于0的行, 复权处理完成
     data = data.drop(['分红-前流通盘', '配股-后总股本', '配股价-前总股本',
-                      '送转股-后流通盘', 'if_trade', 'category', 'preclose'], axis=1)[data['open'] != 0]
+                      '送转股-后流通盘', 'if_trade', 'category', 'preclose'], axis=1)[data['open_qfq'] != 0]
 
     # 计算换手率
     # 财报数据公开后，股本才变更。因此有效时间是“当前财报日至未来日期”。故将结束日期设置为2099年。每次财报更新后更新对应的日期时间段
@@ -355,9 +346,9 @@ def make_fq(
 
     data = data.fillna(method='ffill')  # 向下填充无效值
     data = data.fillna(method='bfill')  # 向上填充无效值  为了弥补开始几行的空值
-    data = data.round({'open': 2, 'high': 2, 'low': 2, 'close': 2, })  # 指定列四舍五入
+    data = data.round({'open_qfq': 2, 'high_qfq': 2, 'low_qfq': 2, 'close_qfq': 2, })  # 指定列四舍五入
     if '流通股' in data.columns.to_list():
-        data['流通市值'] = data['流通股'] * data['close']
+        data['流通市值'] = data['流通股'] * data['close_qfq']
         data['换手率'] = data['volume'] / data['流通股'] * 100
         data = data.round({'流通市值': 2, '换手率': 5, })  # 指定列四舍五入
     if flag_attach:  # 追加模式，则附加最新处理的数据
@@ -372,13 +363,15 @@ def make_fq(
     elif len(start_date) != 0 and len(end_date) != 0:
         data = data[start_date:end_date]
     data.reset_index(drop=False, inplace=True)  # 重置索引行，数字索引，date列到第1列，保存为str '1991-01-01' 格式
-    # 最后调整列顺序
-    # data = data.reindex(
-    # columns=['code', 'date', 'open', 'high', 'low', 'close', 'vol', 'amount', 'adj', '流通股', '流通市值', '换手率'])
+
     return data
 
 
 if __name__ == '__main__':
+    from pond.duckdb.stock import StockDB
+    from pathlib import Path
+
+    db = StockDB(Path(r'D:\DuckDB'))
     df_gbbq = pd.read_csv(gbbq_path / 'gbbq.csv', dtype={'code': str})
 
     #########################
@@ -386,15 +379,15 @@ if __name__ == '__main__':
 
     cw_dict = get_cw_dict_acc()
 
-    qfq_acc_start_time = time.perf_counter()
-    res_dict1 = qfq_acc(df_gbbq, cw_dict)
-    qfq_acc_cost_time = time.perf_counter() - qfq_acc_start_time
-
-    build_in_pool_cost_time = time.perf_counter() - build_in_pool_start_time
+    # qfq_acc_start_time = time.perf_counter()
+    # res_dict1 = qfq_acc(db.stock_basic_df, df_gbbq, cw_dict)
+    # qfq_acc_cost_time = time.perf_counter() - qfq_acc_start_time
+    #
+    # build_in_pool_cost_time = time.perf_counter() - build_in_pool_start_time
 
     ########################
     qfq_start_time = time.perf_counter()
-    res_dict2 = qfq(df_gbbq, cw_dict)
+    res_dict2 = qfq(db.stock_basic_df, df_gbbq, cw_dict)
     qfq_cost_time = time.perf_counter() - qfq_start_time
 
     logger.success(f'qfq_acc_cost_time:{qfq_acc_cost_time:.4f}s')

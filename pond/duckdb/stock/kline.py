@@ -13,8 +13,29 @@ import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
+from pond.tdx.finance_cw import update_cw_data, get_cw_dict_acc
+from pond.tdx.fq import qfq_acc
+from pond.tdx.path import gbbq_path
 
-def get_kline_1d_nfq_df(stock_basic_df: pd.DataFrame, offset: int=0) -> pd.DataFrame:
+
+def get_kline_1d_qfq_df(stock_basic_df: pd.DataFrame, offset: int = 1) -> pd.DataFrame:
+    # 更新本地财务数据
+    update_cw_data()
+    # 读取财务数据, 获取流通股本数据
+    cw_dict = get_cw_dict_acc()
+    # 股本变迁数据 tdx 客户端会自动更新
+    df_gbbq = pd.read_csv(gbbq_path / 'gbbq.csv', dtype={'code': str})
+    res_dict1 = qfq_acc(stock_basic_df, df_gbbq, cw_dict, offset)
+
+    concat_start_time = time.perf_counter()
+    logger.info('Start to concat all stocks qfq history dataframe ...')
+    df = pd.concat(res_dict1.values()).reset_index(drop=True)
+    logger.success(f'Concat all stocks qfq history dataframe cost: {time.perf_counter() - concat_start_time:.2f}s')
+
+    return df
+
+
+def get_kline_1d_nfq_df(stock_basic_df: pd.DataFrame, offset: int = 1) -> pd.DataFrame:
     pool = Pool(os.cpu_count() - 1)
     step = int(len(stock_basic_df) / (4 * pool._processes))  # tune coe 4 get best speed
     _manager = Manager()
@@ -69,8 +90,8 @@ if __name__ == '__main__':
     from pathlib import Path
 
     db = StockDB(Path(r'D:\DuckDB'))
-    stock_basic_df = (
-        db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'basic.parquet')}')").df())
 
-    df = get_kline_1d_nfq_df(stock_basic_df)
+    qfq_df = get_kline_1d_qfq_df(db.stock_basic_df)
+
+    nfq_df = get_kline_1d_nfq_df(db.stock_basic_df)
     print(1)

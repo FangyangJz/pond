@@ -35,6 +35,14 @@ class StockDB(DuckDB):
     def init_db_path(self):
         [f.mkdir() for f in self.path_stock_list if not f.exists()]
 
+    @property
+    def stock_basic_df(self):
+        return self.con.sql(rf"SELECT * from read_parquet('{str(self.path_stock_info / 'basic.parquet')}')").df()
+
+    @property
+    def calender_df(self):
+        return self.con.sql(rf"SELECT * from read_parquet('{str(self.path_stock_info / 'calender.parquet')}')").df()
+
     def update_stock_info(self):
         from pond.akshare.stock import get_all_stocks_df
         from akshare import tool_trade_date_hist_sina
@@ -78,27 +86,65 @@ class StockDB(DuckDB):
 
         start_time = time.perf_counter()
 
-        stock_basic_df = (
-            self.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'basic.parquet')}')").df())
-
         logger.info('Start to read local tdx stock 1d data ...')
-        df = get_kline_1d_nfq_df(stock_basic_df=stock_basic_df, offset=offset)
+        df = get_kline_1d_nfq_df(stock_basic_df=self.stock_basic_df, offset=offset)
 
+        files = [f.stem for f in self.path_stock_kline_1d_nfq.iterdir()]
         logger.info('Start to write parquet file by date ...')
         for idx, group_df in (pbar2 := tqdm(df.groupby('trade_date'), position=0, leave=True)):
             file_name = str(idx.date()).replace('-', '')
             pbar2.set_postfix_str(file_name)
 
-            (self.con.sql('select * from group_df')
-             .write_parquet(str(self.path_stock_kline_1d_nfq / f'{file_name}.parquet'), compression=self.compress))
+            if file_name not in files:
+                (self.con.sql('select * from group_df')
+                 .write_parquet(str(self.path_stock_kline_1d_nfq / f'{file_name}.parquet'), compression=self.compress))
 
         pbar2.close()
+        logger.success(f'Update all parquet file cost: {time.perf_counter() - start_time:.2f}s')
+
+    def get_kline_1d_qfq_df(self):
+
+        return (
+            self.con
+            .sql(
+                rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_1d_qfq.iterdir()]})"
+            )
+            .df()
+        )
+
+    def update_kline_1d_qfq(self):
+        """
+        读取本地数据, 写入db, mootdx reader 目前代码不涵盖 bj 路径, 故没有北交所数据
+        """
+        from pond.duckdb.stock.kline import get_kline_1d_qfq_df
+
+        start_time = time.perf_counter()
+
+        logger.info('Start to read local tdx stock 1d data ...')
+        qfq_df = get_kline_1d_qfq_df(stock_basic_df=self.stock_basic_df, offset=1)
+        filename = f'{qfq_df["date"].min().strftime("%Y%m%d")}_{qfq_df["date"].max().strftime("%Y%m%d")}'
+
+        for f in self.path_stock_kline_1d_qfq.iterdir():
+            if f.stem == filename:
+                logger.info(f'{filename}.parquet has been created, not save memory df to disk.')
+                return
+            else:
+                # clear existing file
+                f.unlink()
+
+        logger.info('Start to write parquet file ...')
+        (self.con.sql('select * from qfq_df')
+         .write_parquet(str(self.path_stock_kline_1d_qfq / f'{filename}.parquet'), compression=self.compress))
+
         logger.success(f'Update all parquet file cost: {time.perf_counter() - start_time:.2f}s')
 
 
 if __name__ == '__main__':
     db = StockDB(Path(r'D:\DuckDB'))
-    db.update_kline_1d_nfq()
+    df = db.get_kline_1d_qfq_df()
+
+    # db.update_kline_1d_qfq()
+    # db.update_kline_1d_nfq()
     # db.update_stock_info()
 
     # db.update_stock_trades()
