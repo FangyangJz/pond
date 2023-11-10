@@ -33,7 +33,6 @@ class BondDB(DuckDB):
     def bond_redeem_df(self):
         return self.con.sql(rf"SELECT * from read_parquet('{str(self.path_bond_info / 'redeem.parquet')}')").df()
 
-    @property
     def kline_1d_df(self):
         return (
             self.con
@@ -85,7 +84,7 @@ class BondDB(DuckDB):
 if __name__ == '__main__':
     db = BondDB(Path(r'D:\DuckDB'))
 
-    dd = db.kline_1d_df
+    dd = db.kline_1d_df()
 
     db.update_bond_info()
     db.update_bond_kline_1d()
