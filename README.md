@@ -56,6 +56,10 @@ db.update_kline_1d_nfq()
 # save restoration stock daily kilne by reading local data
 db.update_kline_1d_qfq()
 
+# need csv file in D:\DuckDB\stock\trades\origin
+# transform csv to parquet file reduct for reducting file size
+db.update_stock_trades()
+
 # read stock basic info from disk
 df1 = db.stock_basic_df
 
@@ -75,9 +79,11 @@ from pond.duckdb.crypto import CryptoDB
 # db = CryptoDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
 db = CryptoDB(Path(r'D:\DuckDB'))
 
+# extract csv file in D:\DuckDB\crypto\trades\origin
 # update crypto trade data from csv file to parquet
 db.update_crypto_trades()
 
+# extract csv file in D:\DuckDB\crypto\agg_trades\origin
 # update crypto aggTrade data from csv file to parquet
 db.update_crypto_agg_trades()
 ```
