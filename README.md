@@ -23,7 +23,7 @@ pip install -e .
 ### 1. BondDB
 ```python
 from pathlib import Path
-from pond.duckdb.bond import StockDB
+from pond.duckdb.bond import BondDB
 
 # assign a directory of path and init BondDB 
 db = BondDB(Path(r'D:\DuckDB'))
@@ -69,7 +69,7 @@ df3 = db.get_kline_1d_qfq_df()
 ### 3. CryptoDB
 ```python
 from pathlib import Path
-from pond.duckdb.bond import StockDB
+from pond.duckdb.crypto import CryptoDB
 
 # assign a directory of path and init BondDB 
 # db = CryptoDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
