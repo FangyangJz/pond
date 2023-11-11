@@ -10,7 +10,7 @@ pond
 
 ### Installation
 
-If you plan to develop gulf yourself, or want to be on the cutting edge, you can use an editable install:
+If you plan to develop pond yourself, or want to be on the cutting edge, you can use an editable install:
 ```bash
 git clone https://github.com/FangyangJz/pond.git
 pip install -e .
@@ -18,7 +18,7 @@ pip install -e .
 
 ## Quickstart
 
->Note: Initial DB path need mkdir first manually.
+>Note: Initial DB path need mkdir manually first.
 
 ### 1. BondDB
 ```python
