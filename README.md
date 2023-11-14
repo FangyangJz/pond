@@ -57,7 +57,7 @@ db.update_kline_1d_nfq()
 db.update_kline_1d_qfq()
 
 # need csv file in D:\DuckDB\stock\trades\origin
-# transform csv to parquet file reduct for reducting file size
+# transform csv to parquet file for reducting file size
 db.update_stock_trades()
 
 # read stock basic info from disk

@@ -82,13 +82,13 @@ class BondDB(DuckDB):
 
 
 if __name__ == '__main__':
-    db = BondDB(Path(r'D:\DuckDB'))
+    db = BondDB(Path(r'E:\DuckDB'))
 
-    dd = db.kline_1d_df()
 
     db.update_bond_info()
     db.update_bond_kline_1d()
 
+    dd = db.kline_1d_df()
     r2 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_bond_info / 'basic.parquet')}')")
     r3 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_bond_info / 'redeem.parquet')}')")
     print(1)

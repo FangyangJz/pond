@@ -63,18 +63,49 @@ class StockDB(DuckDB):
          .write_parquet(str(self.path_stock_info / f'calender.parquet'), compression=self.compress))
         logger.success(f'Update calender.parquet cost: {time.perf_counter() - start_time}s')
 
-    def update_stock_trades(self):
-        from pond.duckdb.stock.trades import get_trade_df_with_multiprocess
+    def update_stock_orders(self):
+        from pond.duckdb.stock.trades import get_order_df
 
         for dir_path in self.path_stock_trades_origin.glob('*'):
             if dir_path.is_dir():
                 date_str = dir_path.stem
-                trades_df = get_trade_df_with_multiprocess(dir_path)
+                files_list = list(dir_path.glob('*\逐笔委托.csv'))
+                dd = self.con.sql(f'select * from read_csv("{str(files_list[0])}")')
+                print(1)
+
+    def update_stock_trades2(self):
+        """
+        No use duckdb read csv file directly because duckdb doesn't support GBK encoding.
+        Need to read by pandas and then map to duckdb.
+        """
+        from pond.duckdb.stock.trades import get_level2_df_with_multiprocess
+
+        for dir_path in self.path_stock_trades_origin.glob('*'):
+            if dir_path.is_dir():
+                date_str = dir_path.stem
+                trades_df = get_level2_df_with_multiprocess(dir_path)
 
                 start_time = time.perf_counter()
                 (self.con.sql('select * from trades_df')
                  .write_parquet(str(self.path_stock_trades / f'{date_str}.parquet'), compression=self.compress))
                 logger.success(f'Update {date_str}.parquet cost: {time.perf_counter() - start_time}s')
+
+    def update_stock_trades(self):
+        """
+        No use duckdb read csv file directly because duckdb doesn't support GBK encoding.
+        Need to read by pandas and then map to duckdb.
+        """
+        from pond.duckdb.stock.trades import get_level2_df_with_multiprocess, get_trade_script
+
+        for dir_path in self.path_stock_trades_origin.glob('*'):
+            if dir_path.is_dir():
+                date_str = dir_path.stem
+                df = get_level2_df_with_multiprocess(dir_path)
+
+                start_time = time.perf_counter()
+                (self.con.sql(get_trade_script())
+                 .write_parquet(str(self.path_stock_trades / f'{date_str}.parquet'), compression=self.compress))
+                logger.success(f'Update {date_str}.parquet cost: {time.perf_counter() - start_time:.4f}s')
 
     def update_kline_1d_nfq(self, offset: int = 0):
         """
@@ -140,17 +171,21 @@ class StockDB(DuckDB):
 
 
 if __name__ == '__main__':
-    db = StockDB(Path(r'D:\DuckDB'))
-    df = db.get_kline_1d_qfq_df()
+    db = StockDB(Path(r'E:\DuckDB'))
+    # db.update_stock_orders()
 
-    # db.update_kline_1d_qfq()
-    # db.update_kline_1d_nfq()
+    # df = db.get_kline_1d_qfq_df()
+
     # db.update_stock_info()
+    # db.update_kline_1d_nfq()
+    # db.update_kline_1d_qfq()
 
     # db.update_stock_trades()
-    r1 = db.con.sql(
-        rf"SELECT * from read_parquet('{str(db.path_stock_trades / '20230504.parquet')}')")  # order by jj_code, datetime
+    db.update_stock_trades2()
 
-    r4 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'basic.parquet')}')")
-    r5 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'calender.parquet')}')")
+    # r1 = db.con.sql(
+    #     rf"SELECT * from read_parquet('{str(db.path_stock_trades / '20230504.parquet')}')")  # order by jj_code, datetime
+    #
+    # r4 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'basic.parquet')}')")
+    # r5 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'calender.parquet')}')")
     print(1)
