@@ -172,6 +172,7 @@ class StockDB(DuckDB):
 
 if __name__ == '__main__':
     db = StockDB(Path(r'E:\DuckDB'))
+    # db = StockDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
     # db.update_stock_orders()
 
     # df = db.get_kline_1d_qfq_df()
@@ -181,7 +182,7 @@ if __name__ == '__main__':
     # db.update_kline_1d_qfq()
 
     # db.update_stock_trades()
-    db.update_stock_trades2()
+    # db.update_stock_trades2()
 
     # r1 = db.con.sql(
     #     rf"SELECT * from read_parquet('{str(db.path_stock_trades / '20230504.parquet')}')")  # order by jj_code, datetime

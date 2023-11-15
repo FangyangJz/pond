@@ -206,7 +206,7 @@ class TaskConfig:
     def __init__(self, dir_path: Path, file_name: str, func: Callable[[Path], pd.DataFrame]):
         self.dir_path = dir_path
         self.file_name = file_name
-        self.glob_file = fr'*\{file_name}.csv'
+        self.glob_file = fr'*/{file_name}.csv'
         self.func = func
 
     @property
@@ -277,7 +277,8 @@ if __name__ == '__main__':
 
     con = duckdb.connect()
 
-    dir_path = Path(rf'E:\DuckDB\stock\trades\origin\20230508')
+    # dir_path = Path(rf'E:\DuckDB\stock\trades\origin\20230508')
+    dir_path = Path(rf'/home/fangyang/zhitai5000/DuckDB/stock/trades/origin/20230508/')
     # df = get_trade_df(dir_path / '000001.SZ' / '逐笔成交.csv')
 
     df1 = get_level2_daily_df_with_multiprocess(
