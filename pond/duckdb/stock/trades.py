@@ -10,10 +10,10 @@ from typing import List, Callable
 
 import pandas as pd
 # import polars as pl
-from multiprocess.managers import ListProxy
 from tqdm import tqdm
 from pathlib import Path
 from multiprocessing import Pool, Manager
+from multiprocessing.managers import ListProxy
 from loguru import logger
 
 
