@@ -56,9 +56,11 @@ db.update_kline_1d_nfq()
 # save restoration stock daily kilne by reading local data
 db.update_kline_1d_qfq()
 
-# need csv file in D:\DuckDB\stock\trades\origin
+# need wind level2 csv file in D:\DuckDB\stock\level2\origin
 # transform csv to parquet file for reducting file size
-db.update_stock_trades()
+db.update_level2_trade()
+db.update_level2_order()
+db.update_level2_orderbook()
 
 # read stock basic info from disk
 df1 = db.stock_basic_df
