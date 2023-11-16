@@ -12,7 +12,7 @@ from loguru import logger
 from tqdm import tqdm
 
 from pond.duckdb import DuckDB
-from pond.duckdb.stock.trades import (
+from pond.duckdb.stock.level2 import (
     get_level2_daily_df_with_threading, get_trade_script, get_order_script, get_orderbook_script, Task, TaskConfig
 )
 
