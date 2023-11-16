@@ -5,19 +5,22 @@
 # @Software : PyCharm
 import gc
 import os
+import threading
 import time
 from typing import List, Callable
 
-import pandas as pd
-# import polars as pl
 from tqdm import tqdm
 from pathlib import Path
+import pandas as pd
+from pandas._typing import CSVEngine
 from multiprocessing import Pool, Manager
 from multiprocessing.managers import ListProxy
 from loguru import logger
 
+csv_engine: CSVEngine = 'c'
 
-def get_trade_df(csv_file: Path) -> pd.DataFrame:
+
+def get_trade_df(csv_file: Path, df_list: List[pd.DataFrame] = None) -> pd.DataFrame:
     """
     From 海通证券 选股因子系列研究75 限价订单簿LOB的还原与应用
 
@@ -52,13 +55,20 @@ def get_trade_df(csv_file: Path) -> pd.DataFrame:
         '叫卖序号': int,  # keep as sell_id
         '叫买序号': int  # keep as buy_id
     }
-    return pd.read_csv(
-        csv_file, encoding='gbk',
+
+    df = pd.read_csv(
+        csv_file,
+        encoding='gbk',
         dtype=dtype_dict,
         usecols=list(dtype_dict.keys()),
-        engine='pyarrow'
+        engine=csv_engine,
         # truncate_ragged_lines=True  # polars needed. Don't forget change pandas param dtype -> polars dtypes
     )  # .dropna(axis=1)
+
+    if df_list is not None:
+        df_list.append(df)
+
+    return df
 
 
 def get_trade_script() -> str:
@@ -86,7 +96,7 @@ def get_trade_script() -> str:
 #
 #     return df[keep_cols]
 
-def get_order_df(csv_file: Path) -> pd.DataFrame:
+def get_order_df(csv_file: Path, df_list: List[pd.DataFrame] = None) -> pd.DataFrame:
     dtype_dict = {
         '万得代码': str,  # keep convert to jj_code
         # '交易所代码': int,
@@ -99,12 +109,18 @@ def get_order_df(csv_file: Path) -> pd.DataFrame:
         '委托价格': int,  # keep as price
         '委托数量': int,  # keep as volume
     }
-    return pd.read_csv(
+
+    df = pd.read_csv(
         csv_file, encoding='gbk',
         dtype=dtype_dict,
         usecols=list(dtype_dict.keys()),
-        engine='pyarrow'
+        engine=csv_engine
     )  # .dropna(axis=1)
+
+    if df_list is not None:
+        df_list.append(df)
+
+    return df
 
 
 def get_order_script() -> str:
@@ -115,7 +131,7 @@ def get_order_script() -> str:
         "   交易所委托号 as ex_order_id, 委托类型 as order_type, 委托代码 as BS, "
         "   委托价格/10000 as price, 委托数量 as volume "
         "from df"
-    ).dropna(axis=1)  # duckdb %-H 不好使, 得自己补0
+    )  # duckdb %-H 不好使, 得自己补0
 
 
 ask_bid_dtype_dict = {
@@ -134,7 +150,7 @@ ask_bid_dtype_dict = {
 }
 
 
-def get_orderbook_df(csv_file: Path) -> pd.DataFrame:
+def get_orderbook_df(csv_file: Path, df_list: List[pd.DataFrame] = None) -> pd.DataFrame:
     dtype_dict = {
         '万得代码': str,  # keep convert to jj_code
         # '交易所代码': int,
@@ -160,11 +176,16 @@ def get_orderbook_df(csv_file: Path) -> pd.DataFrame:
         '加权平均叫卖价': float, '加权平均叫买价': float,
     }
 
-    return pd.read_csv(
+    df = pd.read_csv(
         csv_file, encoding='gbk',
         dtype=dtype_dict, usecols=list(dtype_dict.keys()),
-        engine='pyarrow'
+        engine=csv_engine
     )  # .dropna(axis=1)
+
+    if df_list is not None:
+        df_list.append(df)
+
+    return df
 
 
 def get_orderbook_script() -> str:
@@ -197,11 +218,6 @@ def get_orderbook_script() -> str:
     )
 
 
-def update_res_list(file_path_list: List[Path], func: Callable[[Path], pd.DataFrame], res_list: ListProxy):
-    for file in file_path_list:
-        res_list.append(func(file))
-
-
 class TaskConfig:
     def __init__(self, dir_path: Path, file_name: str, func: Callable[[Path], pd.DataFrame]):
         self.dir_path = dir_path
@@ -221,6 +237,36 @@ class Task:
         self.orderbook = TaskConfig(dir_path=dir_path, file_name='行情', func=get_orderbook_df)
 
 
+def get_level2_daily_df_with_threading(task_cfg: TaskConfig) -> pd.DataFrame:
+    start_time = time.perf_counter()
+
+    files_list = task_cfg.files_list
+    df_list = []
+    t_list = []
+    for f in (pbar := tqdm(files_list)):
+        pbar.set_postfix_str(f)
+        t = threading.Thread(target=task_cfg.func, args=(f, df_list))
+        t.start()
+        t_list.append(t)
+
+    if t_list:
+        [t.join() for t in t_list]
+    logger.success(f'Thread df cost: {time.perf_counter() - start_time}s')
+
+    start_time = time.perf_counter()
+    df = pd.concat(df_list)
+    logger.success(f'Concat df cost: {time.perf_counter() - start_time}s')
+
+    gc.collect()
+
+    return df
+
+
+def update_res_list(file_path_list: List[Path], func: Callable[[Path], pd.DataFrame], res_list: ListProxy):
+    for file in file_path_list:
+        res_list.append(func(file))
+
+
 def get_level2_daily_df_with_multiprocess(task_cfg: TaskConfig) -> pd.DataFrame:
     pool = Pool(os.cpu_count() - 1)
 
@@ -229,7 +275,8 @@ def get_level2_daily_df_with_multiprocess(task_cfg: TaskConfig) -> pd.DataFrame:
     step = int(len(files_list) / (4 * pool._processes))  # tune coe 4 get best speed
     pbar = tqdm(total=int(len(files_list) / step))
     pbar.set_description(
-        f'Function get_level2_df_with_multiprocess {task_cfg.file_name} in {task_cfg.dir_path}, total {len(files_list)}, step {step}')
+        f'Function get_level2_df_with_multiprocess {task_cfg.file_name} in {task_cfg.dir_path}, '
+        f'total {len(files_list)}, step {step}')
 
     # set multiprocess
     _manager = Manager()
@@ -247,21 +294,6 @@ def get_level2_daily_df_with_multiprocess(task_cfg: TaskConfig) -> pd.DataFrame:
 
     logger.info(f'Start concat dataframe ... ')
     start_time = time.perf_counter()
-
-    # from itertools import chain
-    #
-    # def fast_flatten(input_list):
-    #     return list(chain.from_iterable(input_list))
-    #
-    # COLUMN_NAMES = res_list[0].columns
-    # df_dict = dict.fromkeys(COLUMN_NAMES, [])
-    # for col in COLUMN_NAMES:
-    #     extracted = (frame[col] for frame in res_list)
-    #
-    #     # Flatten and save to df_dict
-    #     df_dict[col] = fast_flatten(extracted)
-    # total_df = pd.DataFrame.from_dict(df_dict)[COLUMN_NAMES]
-
     # total_df = pl.concat(res_list)  # 57.6s
     total_df = pd.concat(res_list)  # with dropna col, time cost 57.3s -> 37.3s
     logger.success(f'Concat df cost: {time.perf_counter() - start_time}s')
@@ -277,21 +309,17 @@ if __name__ == '__main__':
 
     con = duckdb.connect()
 
-    # dir_path = Path(rf'E:\DuckDB\stock\trades\origin\20230508')
-    dir_path = Path(rf'/home/fangyang/zhitai5000/DuckDB/stock/trades/origin/20230508/')
+    dir_path = Path(rf'E:\DuckDB\stock\trades\origin\20230508')
+    # dir_path = Path(rf'/home/fangyang/zhitai5000/DuckDB/stock/trades/origin/20230508/')
     # df = get_trade_df(dir_path / '000001.SZ' / '逐笔成交.csv')
 
-    df1 = get_level2_daily_df_with_multiprocess(
-        Task(dir_path).trade
-    )
+    df11 = get_level2_daily_df_with_threading(Task(dir_path).trade)
+    df12 = get_level2_daily_df_with_threading(Task(dir_path).order)
+    df13 = get_level2_daily_df_with_threading(Task(dir_path).orderbook)
 
-    df2 = get_level2_daily_df_with_multiprocess(
-        Task(dir_path).order
-    )
-
-    df3 = get_level2_daily_df_with_multiprocess(
-        Task(dir_path).orderbook
-    )
+    df21 = get_level2_daily_df_with_multiprocess(Task(dir_path).trade)
+    df22 = get_level2_daily_df_with_multiprocess(Task(dir_path).order)
+    df23 = get_level2_daily_df_with_multiprocess(Task(dir_path).orderbook)
 
     compress = 'ZSTD'
     start_time = time.perf_counter()
