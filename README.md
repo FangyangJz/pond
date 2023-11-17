@@ -89,3 +89,13 @@ db.update_crypto_trades()
 # update crypto aggTrade data from csv file to parquet
 db.update_crypto_agg_trades()
 ```
+
+## About Install cuDF
+
+In my `python3.9` case, use Nvidia `rapids` products `[cuDF, cuML, cuxfilter]` in windows WSL2 or Linux. Conda virtual environment share between in Windows and WSL2. 
+
+Modify offical installation below:
+```bash
+(Your_conda_env)$ conda install --solver=libmamba -c rapidsai -c conda-forge -c nvidia cudf=23.10 cuml=23.10 cuxfilter=23.10 python=3.9 cuda-version=12.0
+```
+> Note: create -> install
