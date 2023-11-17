@@ -92,7 +92,7 @@ db.update_crypto_agg_trades()
 
 ## About Install cuDF
 
-In my `python3.9` case, use Nvidia `rapids` products `[cuDF, cuML, cuxfilter]` in windows WSL2 or Linux. Conda virtual environment share between in Windows and WSL2. 
+In my `python3.9` case, use Nvidia `rapids` products `[cuDF, cuML, cuxfilter]` in windows WSL2 or Linux.
 
 Modify offical installation below:
 ```bash
