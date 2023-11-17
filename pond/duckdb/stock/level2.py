@@ -75,7 +75,7 @@ def get_trade_script() -> str:
     return (
         "select "
         "   concat(万得代码[-2:], 'SE.' , 万得代码[:6]) as jj_code, "
-        "   strptime(concat(自然日, lpad(时间, 9, '0')), '%Y%m%d%H%M%S%g') as 自然日,"
+        "   strptime(concat(自然日, lpad(时间, 9, '0')), '%Y%m%d%H%M%S%g') as datetime,"
         "   成交编号 as ex_order_id, 成交代码 as cancel, BS标志 as BS, 成交价格/10000 as price, 成交数量 as volume,"
         "   叫卖序号 as sell_id, 叫买序号 as buy_id "
         "from df"
@@ -127,7 +127,7 @@ def get_order_script() -> str:
     return (
         "select "
         "   concat(万得代码[-2:], 'SE.' , 万得代码[:6]) as jj_code, "
-        "   strptime(concat(自然日, lpad(时间, 9, '0')), '%Y%m%d%H%M%S%g') as 自然日,"
+        "   strptime(concat(自然日, lpad(时间, 9, '0')), '%Y%m%d%H%M%S%g') as datetime,"
         "   交易所委托号 as ex_order_id, 委托类型 as order_type, 委托代码 as BS, "
         "   委托价格/10000 as price, 委托数量 as volume "
         "from df"
@@ -208,7 +208,7 @@ def get_orderbook_script() -> str:
     return (
         "select "
         "   concat(万得代码[-2:], 'SE.' , 万得代码[:6]) as jj_code, "
-        "   strptime(concat(自然日, lpad(时间, 9, '0')), '%Y%m%d%H%M%S%g') as 自然日, "
+        "   strptime(concat(自然日, lpad(时间, 9, '0')), '%Y%m%d%H%M%S%g') as datetime, "
         "   成交价/10000 as price, 成交量 as volume, 成交额 as amount, 成交笔数 as trade_nums, "
         "   当日累计成交量 as cum_volume, 当日成交额 as cum_amount, "
         "   最高价/10000 as high, 最低价/10000 as low, 开盘价/10000 as open, 前收盘/10000 as pre_close, "
