@@ -15,10 +15,14 @@ from pond.duckdb import DuckDB
 
 class BondDB(DuckDB):
     def __init__(self, db_path: Path):
-        self.path_bond = db_path / 'bond'
-        self.path_bond_info = self.path_bond / 'info'
-        self.path_bond_kline_1d = self.path_bond / 'kline_1d'
-        self.path_bond_list = [self.path_bond, self.path_bond_info, self.path_bond_kline_1d]
+        self.path_bond = db_path / "bond"
+        self.path_bond_info = self.path_bond / "info"
+        self.path_bond_kline_1d = self.path_bond / "kline_1d"
+        self.path_bond_list = [
+            self.path_bond,
+            self.path_bond_info,
+            self.path_bond_kline_1d,
+        ]
 
         super().__init__(db_path)
 
@@ -27,37 +31,47 @@ class BondDB(DuckDB):
 
     @property
     def bond_basic_df(self):
-        return self.con.sql(rf"SELECT * from read_parquet('{str(self.path_bond_info / 'basic.parquet')}')").df()
+        return self.con.sql(
+            rf"SELECT * from read_parquet('{str(self.path_bond_info / 'basic.parquet')}')"
+        ).df()
 
     @property
     def bond_redeem_df(self):
-        return self.con.sql(rf"SELECT * from read_parquet('{str(self.path_bond_info / 'redeem.parquet')}')").df()
+        return self.con.sql(
+            rf"SELECT * from read_parquet('{str(self.path_bond_info / 'redeem.parquet')}')"
+        ).df()
 
     def kline_1d_df(self):
-        return (
-            self.con
-            .sql(
-                rf"SELECT * from read_parquet({[str(f) for f in self.path_bond_kline_1d.iterdir()]})"
-            )
-            .df()
-        )
+        return self.con.sql(
+            rf"SELECT * from read_parquet({[str(f) for f in self.path_bond_kline_1d.iterdir()]})"
+        ).df()
 
     def update_bond_info(self):
         from pond.akshare.bond import get_bond_basic_df
 
         start_time = time.perf_counter()
         bond_basic_df, bond_redeem_df = get_bond_basic_df()
-        bond_basic_df['上市时间'] = pd.to_datetime(bond_basic_df['上市时间'])
-        bond_basic_df['转股起始日'] = pd.to_datetime(bond_basic_df['转股起始日'])
-        bond_redeem_df['转股起始日'] = pd.to_datetime(bond_redeem_df['转股起始日'])
+        bond_basic_df["上市时间"] = pd.to_datetime(bond_basic_df["上市时间"])
+        bond_basic_df["转股起始日"] = pd.to_datetime(bond_basic_df["转股起始日"])
+        bond_redeem_df["转股起始日"] = pd.to_datetime(bond_redeem_df["转股起始日"])
 
-        (self.con.sql('select * from bond_basic_df')
-         .write_parquet(str(self.path_bond_info / f'basic.parquet'), compression=self.compress))
-        logger.success(f'Update basic.parquet cost: {time.perf_counter() - start_time}s')
+        (
+            self.con.sql("select * from bond_basic_df").write_parquet(
+                str(self.path_bond_info / f"basic.parquet"), compression=self.compress
+            )
+        )
+        logger.success(
+            f"Update basic.parquet cost: {time.perf_counter() - start_time}s"
+        )
 
-        (self.con.sql('select * from bond_redeem_df')
-         .write_parquet(str(self.path_bond_info / f'redeem.parquet'), compression=self.compress))
-        logger.success(f'Update redeem.parquet cost: {time.perf_counter() - start_time}s')
+        (
+            self.con.sql("select * from bond_redeem_df").write_parquet(
+                str(self.path_bond_info / f"redeem.parquet"), compression=self.compress
+            )
+        )
+        logger.success(
+            f"Update redeem.parquet cost: {time.perf_counter() - start_time}s"
+        )
 
     def update_bond_kline_1d(self):
         from pond.duckdb.bond.kline import get_bond_daily_df_by_reader
@@ -68,27 +82,38 @@ class BondDB(DuckDB):
 
         for f in self.path_bond_kline_1d.iterdir():
             if f.stem == filename:
-                logger.info(f'{filename}.parquet has been created, not save memory df to disk.')
+                logger.info(
+                    f"{filename}.parquet has been created, not save memory df to disk."
+                )
                 return
             else:
                 # clear existing file
                 f.unlink()
 
-        logger.info('Start to write parquet file ...')
-        (self.con.sql('select * from k1d_df')
-         .write_parquet(str(self.path_bond_kline_1d / f'{filename}.parquet'), compression=self.compress))
+        logger.info("Start to write parquet file ...")
+        (
+            self.con.sql("select * from k1d_df").write_parquet(
+                str(self.path_bond_kline_1d / f"{filename}.parquet"),
+                compression=self.compress,
+            )
+        )
 
-        logger.success(f'Update all parquet file cost: {time.perf_counter() - start_time:.2f}s')
+        logger.success(
+            f"Update all parquet file cost: {time.perf_counter() - start_time:.2f}s"
+        )
 
 
-if __name__ == '__main__':
-    db = BondDB(Path(r'E:\DuckDB'))
-
+if __name__ == "__main__":
+    db = BondDB(Path(r"E:\DuckDB"))
 
     db.update_bond_info()
     db.update_bond_kline_1d()
 
     dd = db.kline_1d_df()
-    r2 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_bond_info / 'basic.parquet')}')")
-    r3 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_bond_info / 'redeem.parquet')}')")
+    r2 = db.con.sql(
+        rf"SELECT * from read_parquet('{str(db.path_bond_info / 'basic.parquet')}')"
+    )
+    r3 = db.con.sql(
+        rf"SELECT * from read_parquet('{str(db.path_bond_info / 'redeem.parquet')}')"
+    )
     print(1)

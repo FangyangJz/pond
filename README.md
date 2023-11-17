@@ -15,6 +15,7 @@ If you plan to develop pond yourself, or want to be on the cutting edge, you can
 git clone https://github.com/FangyangJz/pond.git
 pip install -e .
 ```
+>Note: `Pycharm` and `vscode` use `Black` as code formatter.
 
 ## Quickstart
 

@@ -7,6 +7,6 @@ def get_lan_ip() -> str:
         return s.getsockname()[0]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     ip = get_lan_ip()
     print(ip)

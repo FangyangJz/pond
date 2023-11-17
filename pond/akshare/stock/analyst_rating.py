@@ -11,10 +11,12 @@ from pond.utils.crawler import request_session
 
 
 def request_data(
-        url: str, num: int, params: Dict[str, Any],
-        # headers: Dict[str, str],
-        columns: List[str],
-        res_dict: Dict[str, pd.DataFrame]
+    url: str,
+    num: int,
+    params: Dict[str, Any],
+    # headers: Dict[str, str],
+    columns: List[str],
+    res_dict: Dict[str, pd.DataFrame],
 ) -> dict[str, pd.DataFrame]:
     ses = request_session()
     r = ses.get(url=url, params=params)
@@ -25,11 +27,11 @@ def request_data(
     txt = r.text
     if "[]" in txt:
         print("页面已经到头")
-        res_dict['end'] = pd.DataFrame()
+        res_dict["end"] = pd.DataFrame()
         return res_dict
 
     txt = json.loads(txt)
-    rate_name_list = txt['data']
+    rate_name_list = txt["data"]
 
     res_dict[f"{num}"] = pd.DataFrame.from_records(rate_name_list)[columns]
 
@@ -37,8 +39,7 @@ def request_data(
 
 
 def get_stock_analyst_rating(
-        start: str = "2005-01-01",
-        end: str = datetime.now().date().strftime("%Y-%m-%d")
+    start: str = "2005-01-01", end: str = datetime.now().date().strftime("%Y-%m-%d")
 ):
     """
      点击翻页1就能看到url
@@ -52,25 +53,37 @@ def get_stock_analyst_rating(
     url = "https://reportapi.eastmoney.com/report/list"
 
     columns = [
-        'title', 'stockName', 'stockCode', 'orgSName', 'publishDate',
+        "title",
+        "stockName",
+        "stockCode",
+        "orgSName",
+        "publishDate",
         # 'orgCode', 'orgName', 'infoCode','column',
-        'predictNextTwoYearEps', 'predictNextTwoYearPe',
-        'predictNextYearEps', 'predictNextYearPe',
-        'predictThisYearEps', 'predictThisYearPe',
+        "predictNextTwoYearEps",
+        "predictNextTwoYearPe",
+        "predictNextYearEps",
+        "predictNextYearPe",
+        "predictThisYearEps",
+        "predictThisYearPe",
         # 'predictLastYearEps', 'predictLastYearPe',
         # 'actualLastTwoYearEps', 'actualLastYearEps',
         # 'industryCode', 'industryName', 'emIndustryCode',
-        'indvInduCode', 'indvInduName',
+        "indvInduCode",
+        "indvInduName",
         # 'emRatingCode', 'emRatingValue', 'lastEmRatingCode', 'lastEmRatingValue',
-        'emRatingName', 'lastEmRatingName',
+        "emRatingName",
+        "lastEmRatingName",
         # 'ratingChange', 'reportType', 'indvIsNew', 'author',
-        'researcher',
+        "researcher",
         # 'newListingDate', 'newPurchaseDate', 'newIssuePrice', 'newPeIssueA',
-        'indvAimPriceT', 'indvAimPriceL',
+        "indvAimPriceT",
+        "indvAimPriceL",
         # 'attachType', 'attachSize', 'attachPages', 'encodeUrl',
-        'sRatingName',
+        "sRatingName",
         # 'sRatingCode',
-        'market', 'authorID', 'count',
+        "market",
+        "authorID",
+        "count",
         # 'orgType'
     ]
 
@@ -96,11 +109,13 @@ def get_stock_analyst_rating(
             "p": f"{num}",
             "pageNum": f"{num}",
             "pageNumber": f"{num}",
-            "_": "1660628644570"
+            "_": "1660628644570",
         }
 
         # request_data(url, num, params, columns, res_dict)
-        t = threading.Thread(target=request_data, args=(url, num, params, columns, res_dict))
+        t = threading.Thread(
+            target=request_data, args=(url, num, params, columns, res_dict)
+        )
         t.start()
         t_list.append(t)
 
@@ -111,30 +126,35 @@ def get_stock_analyst_rating(
             if "end" in res_dict:
                 break
 
-    del res_dict['end']
+    del res_dict["end"]
 
-    all_data = pd.concat(list(res_dict.values())) \
-        .rename(columns={'publishDate': "trade_date"}) \
-        .sort_values(by="trade_date", ascending=False).reset_index(drop=True)
+    all_data = (
+        pd.concat(list(res_dict.values()))
+        .rename(columns={"publishDate": "trade_date"})
+        .sort_values(by="trade_date", ascending=False)
+        .reset_index(drop=True)
+    )
 
-    all_data["jj_code"] = all_data['stockCode'].apply(trans_to_juejin_code)
-    all_data['authorID'] = all_data['authorID'].apply(lambda x: str(x))
+    all_data["jj_code"] = all_data["stockCode"].apply(trans_to_juejin_code)
+    all_data["authorID"] = all_data["authorID"].apply(lambda x: str(x))
 
     return all_data
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import time
 
     start_time = time.perf_counter()
-    df:pd.DataFrame = get_stock_analyst_rating()
+    df: pd.DataFrame = get_stock_analyst_rating()
     print(f"Time cost: {time.perf_counter() - start_time:.2f}s")
     df.to_pickle("pingji.pkl")
 
-    df = pd.read_pickle('pingji.pkl')\
-        .rename(columns={'publishDate': "trade_date"})\
-        .sort_values(by="trade_date", ascending=False)\
+    df = (
+        pd.read_pickle("pingji.pkl")
+        .rename(columns={"publishDate": "trade_date"})
+        .sort_values(by="trade_date", ascending=False)
         .reset_index(drop=True)
-    df["jj_code"] = df['stockCode'].apply(trans_to_juejin_code)
-    df['authorID'] = df['authorID'].apply(lambda x: str(x))
+    )
+    df["jj_code"] = df["stockCode"].apply(trans_to_juejin_code)
+    df["authorID"] = df["authorID"].apply(lambda x: str(x))
     print(1)

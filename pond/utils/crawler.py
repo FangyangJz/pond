@@ -22,10 +22,7 @@ def request_session():
     ses = requests.session()
     ses.keep_alive = False
 
-    headers = {
-        'User-Agent': choice(user_agent_list),
-        'Connection': 'close'
-    }
+    headers = {"User-Agent": choice(user_agent_list), "Connection": "close"}
 
     # proxies = {
     #     "http": "http://127.0.0.1:1080",

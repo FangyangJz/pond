@@ -14,7 +14,10 @@ from datetime import datetime
 from tqdm import tqdm
 from loguru import logger
 
-from pond.akshare.const import AKSHARE_CRAWL_CONCURRENT_LIMIT, AKSHARE_CRAWL_STOP_INTERVEL
+from pond.akshare.const import (
+    AKSHARE_CRAWL_CONCURRENT_LIMIT,
+    AKSHARE_CRAWL_STOP_INTERVEL,
+)
 from pond.akshare.bond.cov_value_analysis import bond_zh_cov_value_analysis
 
 import akshare as ak
@@ -23,11 +26,14 @@ from pond.akshare.stock.migrate_func import stock_zh_a_hist
 
 
 def get_bond_daily_df(
-        bond_code: str, bond_name: str, bond_scale: float,
-        listing_date: datetime,
-        stock_code: str, stock_name: str,
-        market: str,
-        res_dict: Dict[str, pd.DataFrame]
+    bond_code: str,
+    bond_name: str,
+    bond_scale: float,
+    listing_date: datetime,
+    stock_code: str,
+    stock_name: str,
+    market: str,
+    res_dict: Dict[str, pd.DataFrame],
 ):
     """
     scale = row['发行规模'] if np.isnan(row['剩余规模']) else row['剩余规模']
@@ -49,73 +55,95 @@ def get_bond_daily_df(
     market_str = "sh" if market == "SHSE" else "sz"
     try:
         # 2. 获取单只债券 ohlcv 全部历史信息
-        bond_zh_hs_cov_daily_df = ak.bond_zh_hs_cov_daily(symbol=f"{market_str}{bond_code}")
+        bond_zh_hs_cov_daily_df = ak.bond_zh_hs_cov_daily(
+            symbol=f"{market_str}{bond_code}"
+        )
     except Exception as e:
-        logger.warning(f"[bond_zh_hs_cov_daily] {market_str}{bond_code} {bond_name},  retry change market. {e}")
+        logger.warning(
+            f"[bond_zh_hs_cov_daily] {market_str}{bond_code} {bond_name},  retry change market. {e}"
+        )
         market_str = "sz" if market == "SHSE" else "sh"
         try:
-            bond_zh_hs_cov_daily_df = ak.bond_zh_hs_cov_daily(symbol=f"{market_str}{bond_code}")
-            logger.success(f"[bond_zh_hs_cov_daily] {market_str}{bond_code} {bond_name},  retry change market pass")
+            bond_zh_hs_cov_daily_df = ak.bond_zh_hs_cov_daily(
+                symbol=f"{market_str}{bond_code}"
+            )
+            logger.success(
+                f"[bond_zh_hs_cov_daily] {market_str}{bond_code} {bond_name},  retry change market pass"
+            )
         except Exception as e1:
             logger.error(
-                f"[bond_zh_hs_cov_daily] {market_str}{bond_code} {bond_name},  retry change market fail. {e1}")
+                f"[bond_zh_hs_cov_daily] {market_str}{bond_code} {bond_name},  retry change market fail. {e1}"
+            )
             return
 
-    bond_zh_hs_cov_daily_df['bond_code'] = bond_code
-    bond_zh_hs_cov_daily_df['bond_name'] = bond_name
-    bond_zh_hs_cov_daily_df['stock_code'] = stock_code
-    bond_zh_hs_cov_daily_df['stock_name'] = stock_name
-    bond_zh_hs_cov_daily_df['bond_scale'] = bond_scale
-    bond_zh_hs_cov_daily_df['listing_date'] = listing_date
-    bond_zh_hs_cov_daily_df['market'] = market
+    bond_zh_hs_cov_daily_df["bond_code"] = bond_code
+    bond_zh_hs_cov_daily_df["bond_name"] = bond_name
+    bond_zh_hs_cov_daily_df["stock_code"] = stock_code
+    bond_zh_hs_cov_daily_df["stock_name"] = stock_name
+    bond_zh_hs_cov_daily_df["bond_scale"] = bond_scale
+    bond_zh_hs_cov_daily_df["listing_date"] = listing_date
+    bond_zh_hs_cov_daily_df["market"] = market
     # 不加了, 因为存在下修问题, 需要另做处理, 后续因为拿到溢价率了, 所以这里忽略
     # bond_zh_hs_cov_daily_df['trans_stock_price'] = row['转股价']
 
-    bond_zh_hs_cov_daily_df.rename(columns={'date': 'trade_date'}, inplace=True)
+    bond_zh_hs_cov_daily_df.rename(columns={"date": "trade_date"}, inplace=True)
 
     try:
         # 3. 获取单只债券历史 价值 和 溢价率
-        bond_hist_df = bond_zh_cov_value_analysis(symbol=bond_code) \
+        bond_hist_df = (
+            bond_zh_cov_value_analysis(symbol=bond_code)
             .rename(
-            columns={
-                '日期': 'trade_date',
-                '纯债价值': 'bond_value',
-                '转股价值': 'trans_stock_value',
-                '纯债溢价率': 'bond_premium',
-                '转股溢价率': 'trans_stock_premium',
-            }) \
-            .drop(["收盘价", 'bond_value', 'bond_premium'], axis=1)
+                columns={
+                    "日期": "trade_date",
+                    "纯债价值": "bond_value",
+                    "转股价值": "trans_stock_value",
+                    "纯债溢价率": "bond_premium",
+                    "转股溢价率": "trans_stock_premium",
+                }
+            )
+            .drop(["收盘价", "bond_value", "bond_premium"], axis=1)
+        )
     except Exception as e:
         logger.error(f"[bond_zh_cov_value_analysis] {bond_code} {bond_name}. {e}")
         return
 
         # 合并历史 ohclv 与 溢价率 表
-    bond_df = bond_zh_hs_cov_daily_df.merge(bond_hist_df, on='trade_date')
+    bond_df = bond_zh_hs_cov_daily_df.merge(bond_hist_df, on="trade_date")
 
     if bond_df.empty:
         return
 
-    bond_df['amount'] = (bond_df['close'] + bond_df['open'] + bond_df['high'] + bond_df['low']) * bond_df['volume'] / 4
-    bond_df['trade_date'] = pd.to_datetime(bond_df['trade_date'])
-    bond_df['jj_code'] = bond_df['market'] + "." + bond_df['bond_code']
-    bond_df['duallow'] = bond_df['close'] + bond_df['trans_stock_premium']
+    bond_df["amount"] = (
+        (bond_df["close"] + bond_df["open"] + bond_df["high"] + bond_df["low"])
+        * bond_df["volume"]
+        / 4
+    )
+    bond_df["trade_date"] = pd.to_datetime(bond_df["trade_date"])
+    bond_df["jj_code"] = bond_df["market"] + "." + bond_df["bond_code"]
+    bond_df["duallow"] = bond_df["close"] + bond_df["trans_stock_premium"]
 
     nfq_df_columns_dict = {
         # trade_date2 只为调试过程中检查数据, 写入数据库时被过滤掉了
-        '日期': "trade_date2",
-        '开盘': "stock_open", '收盘': "stock_close", '最高': "stock_high", '最低': "stock_low",
-        '成交量': "stock_volume", '成交额': "stock_amount",
+        "日期": "trade_date2",
+        "开盘": "stock_open",
+        "收盘": "stock_close",
+        "最高": "stock_high",
+        "最低": "stock_low",
+        "成交量": "stock_volume",
+        "成交额": "stock_amount",
         # '涨跌幅': "pct_chg",
         # 下面这俩字段在写数据库时被过滤掉了
         # '涨跌额': "pct_amount", '换手率': "turnover",
         # '振幅': 'amp'
     }
-    start_date, end_date = bond_df['trade_date'].dt.strftime('%Y%m%d').values[[0, -1]]
+    start_date, end_date = bond_df["trade_date"].dt.strftime("%Y%m%d").values[[0, -1]]
     try:
         nfq_df = stock_zh_a_hist(
-            symbol=stock_code, period="daily",
-            start_date=start_date, end_date=end_date,
-            adjust=""
+            symbol=stock_code,
+            period="daily",
+            start_date=start_date,
+            end_date=end_date,
+            adjust="",
         )
         nfq_df = nfq_df[nfq_df_columns_dict.keys()].rename(columns=nfq_df_columns_dict)
     except Exception as e:
@@ -128,17 +156,19 @@ def get_bond_daily_df(
     return bond_df
 
 
-def update_bond_daily_res_dict_thread(bond_basic_df: pd.DataFrame, res_dict: Dict[str, pd.DataFrame]):
+def update_bond_daily_res_dict_thread(
+    bond_basic_df: pd.DataFrame, res_dict: Dict[str, pd.DataFrame]
+):
     start_time = time.perf_counter()
     t_list = []
     for idx, row in tqdm(bond_basic_df.iterrows()):
-        bond_code = row['债券代码']
-        bond_name = row['债券简称']
-        listing_date = pd.to_datetime(row['上市时间'])
-        bond_scale = row['发行规模'] if np.isnan(row['剩余规模']) else row['剩余规模']
-        stock_code = row['正股代码']
-        stock_name = row['正股简称']
-        market = row['market']
+        bond_code = row["债券代码"]
+        bond_name = row["债券简称"]
+        listing_date = pd.to_datetime(row["上市时间"])
+        bond_scale = row["发行规模"] if np.isnan(row["剩余规模"]) else row["剩余规模"]
+        stock_code = row["正股代码"]
+        stock_name = row["正股简称"]
+        market = row["market"]
 
         # For debug
         # df = get_bond_daily_df(
@@ -149,9 +179,15 @@ def update_bond_daily_res_dict_thread(bond_basic_df: pd.DataFrame, res_dict: Dic
         t = threading.Thread(
             target=get_bond_daily_df,
             args=(
-                bond_code, bond_name, bond_scale, listing_date,
-                stock_code, stock_name, market, res_dict
-            )
+                bond_code,
+                bond_name,
+                bond_scale,
+                listing_date,
+                stock_code,
+                stock_name,
+                market,
+                res_dict,
+            ),
         )
         t.start()
         t_list.append(t)
@@ -204,19 +240,18 @@ def get_bond_index_daily():
     :return:
     """
     bond_cb_index_jsl_df = ak.bond_cb_index_jsl().rename(
-        columns={'price_dt': 'trade_date'}
+        columns={"price_dt": "trade_date"}
     )
     return bond_cb_index_jsl_df
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from gulf.akshare.bond import get_bond_basic_df
 
-    df1, df2 = get_bond_basic_df(data_delist_status='exclude')
+    df1, df2 = get_bond_basic_df(data_delist_status="exclude")
     res_dict = dict()
     update_bond_daily_res_dict_thread(
-        bond_basic_df=df1,  # .iloc[:70],
-        res_dict=res_dict
+        bond_basic_df=df1, res_dict=res_dict  # .iloc[:70],
     )
     print(1)
 

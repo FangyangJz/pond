@@ -23,12 +23,13 @@ def get_all_stocks_df():
     if "序号" in df.columns:
         df.drop("序号", inplace=True, axis=1)
 
-    df['jj_code'] = df['代码'].apply(trans_to_juejin_code)
+    df["jj_code"] = df["代码"].apply(trans_to_juejin_code)
     return df
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import time
+
     # # 这里测试确实cache生效了
     start_time = time.perf_counter()
     a1 = get_all_stocks_df()
@@ -40,4 +41,3 @@ if __name__ == '__main__':
     a3 = get_all_stocks_df()
     print(f"Time cost:{time.perf_counter()-start_time:.2f}s")
     print(1)
-

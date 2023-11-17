@@ -17,7 +17,7 @@ from multiprocessing import Pool, Manager
 from multiprocessing.managers import ListProxy
 from loguru import logger
 
-csv_engine: CSVEngine = 'c'
+csv_engine: CSVEngine = "c"
 
 
 def get_trade_df(csv_file: Path, df_list: List[pd.DataFrame] = None) -> pd.DataFrame:
@@ -42,23 +42,23 @@ def get_trade_df(csv_file: Path, df_list: List[pd.DataFrame] = None) -> pd.DataF
     而上交所的逐笔行情中，若某订单全部成交，则逐笔委托行情中无该订单信息。
     """
     dtype_dict = {
-        '万得代码': str,  # keep convert to jj_code
+        "万得代码": str,  # keep convert to jj_code
         # '交易所代码': int,
-        '自然日': int,
-        '时间': int,  # keep concat date to datetime
-        '成交编号': int,  # keep as ex_order_id
-        '成交代码': str,  # keep as cancel, 深市 C / 0, 沪市 nan
+        "自然日": int,
+        "时间": int,  # keep concat date to datetime
+        "成交编号": int,  # keep as ex_order_id
+        "成交代码": str,  # keep as cancel, 深市 C / 0, 沪市 nan
         # '委托代码': str,
-        'BS标志': str,  # keep as BS
-        '成交价格': float,  # keep as price
-        '成交数量': int,  # keep as volume
-        '叫卖序号': int,  # keep as sell_id
-        '叫买序号': int  # keep as buy_id
+        "BS标志": str,  # keep as BS
+        "成交价格": float,  # keep as price
+        "成交数量": int,  # keep as volume
+        "叫卖序号": int,  # keep as sell_id
+        "叫买序号": int,  # keep as buy_id
     }
 
     df = pd.read_csv(
         csv_file,
-        encoding='gbk',
+        encoding="gbk",
         dtype=dtype_dict,
         usecols=list(dtype_dict.keys()),
         engine=csv_engine,
@@ -96,25 +96,27 @@ def get_trade_script() -> str:
 #
 #     return df[keep_cols]
 
+
 def get_order_df(csv_file: Path, df_list: List[pd.DataFrame] = None) -> pd.DataFrame:
     dtype_dict = {
-        '万得代码': str,  # keep convert to jj_code
+        "万得代码": str,  # keep convert to jj_code
         # '交易所代码': int,
-        '自然日': str,
-        '时间': str,  # keep concat date to datetime
+        "自然日": str,
+        "时间": str,  # keep concat date to datetime
         # '委托编号': int,
-        '交易所委托号': int,  # keep as ex_order_id
-        '委托类型': str,  # keep as order_type. 沪市, A 委托订单(增加), D 委托订单(删除); 深市, 0 ??1-市价, 2-限价, U-本方最优
-        '委托代码': str,  # keep as BS
-        '委托价格': int,  # keep as price
-        '委托数量': int,  # keep as volume
+        "交易所委托号": int,  # keep as ex_order_id
+        "委托类型": str,  # keep as order_type. 沪市, A 委托订单(增加), D 委托订单(删除); 深市, 0 ??1-市价, 2-限价, U-本方最优
+        "委托代码": str,  # keep as BS
+        "委托价格": int,  # keep as price
+        "委托数量": int,  # keep as volume
     }
 
     df = pd.read_csv(
-        csv_file, encoding='gbk',
+        csv_file,
+        encoding="gbk",
         dtype=dtype_dict,
         usecols=list(dtype_dict.keys()),
-        engine=csv_engine
+        engine=csv_engine,
     )  # .dropna(axis=1)
 
     if df_list is not None:
@@ -136,50 +138,88 @@ def get_order_script() -> str:
 
 ask_bid_dtype_dict = {
     # keep as ask_p1...
-    '申卖价1': float, '申卖价2': float, '申卖价3': float, '申卖价4': float, '申卖价5': float,
-    '申卖价6': float, '申卖价7': float, '申卖价8': float, '申卖价9': float, '申卖价10': float,
+    "申卖价1": float,
+    "申卖价2": float,
+    "申卖价3": float,
+    "申卖价4": float,
+    "申卖价5": float,
+    "申卖价6": float,
+    "申卖价7": float,
+    "申卖价8": float,
+    "申卖价9": float,
+    "申卖价10": float,
     # keep as ask_v1...
-    '申卖量1': int, '申卖量2': int, '申卖量3': int, '申卖量4': int, '申卖量5': int,
-    '申卖量6': int, '申卖量7': int, '申卖量8': int, '申卖量9': int, '申卖量10': int,
+    "申卖量1": int,
+    "申卖量2": int,
+    "申卖量3": int,
+    "申卖量4": int,
+    "申卖量5": int,
+    "申卖量6": int,
+    "申卖量7": int,
+    "申卖量8": int,
+    "申卖量9": int,
+    "申卖量10": int,
     # keep as bid_p1...
-    '申买价1': float, '申买价2': float, '申买价3': float, '申买价4': float, '申买价5': float,
-    '申买价6': float, '申买价7': float, '申买价8': float, '申买价9': float, '申买价10': float,
+    "申买价1": float,
+    "申买价2": float,
+    "申买价3": float,
+    "申买价4": float,
+    "申买价5": float,
+    "申买价6": float,
+    "申买价7": float,
+    "申买价8": float,
+    "申买价9": float,
+    "申买价10": float,
     # keep as bid_v1...
-    '申买量1': int, '申买量2': int, '申买量3': int, '申买量4': int, '申买量5': int,
-    '申买量6': int, '申买量7': int, '申买量8': int, '申买量9': int, '申买量10': int,
+    "申买量1": int,
+    "申买量2": int,
+    "申买量3": int,
+    "申买量4": int,
+    "申买量5": int,
+    "申买量6": int,
+    "申买量7": int,
+    "申买量8": int,
+    "申买量9": int,
+    "申买量10": int,
 }
 
 
-def get_orderbook_df(csv_file: Path, df_list: List[pd.DataFrame] = None) -> pd.DataFrame:
+def get_orderbook_df(
+    csv_file: Path, df_list: List[pd.DataFrame] = None
+) -> pd.DataFrame:
     dtype_dict = {
-        '万得代码': str,  # keep convert to jj_code
+        "万得代码": str,  # keep convert to jj_code
         # '交易所代码': int,
-        '自然日': str,
-        '时间': str,  # keep concat date to datetime
-        '成交价': float,  # keep as price
-        '成交量': int,  # keep as volume
-        '成交额': int,  # keep as amount
-        '成交笔数': int,  # keep as trade_nums.
+        "自然日": str,
+        "时间": str,  # keep concat date to datetime
+        "成交价": float,  # keep as price
+        "成交量": int,  # keep as volume
+        "成交额": int,  # keep as amount
+        "成交笔数": int,  # keep as trade_nums.
         # 'IOPV': str,  # ETF实时申赎数据??
         # '成交标志': str,  # nan
         # 'BS标志': str,  # nan
-        '当日累计成交量': int,  # keep as cum_volume
-        '当日成交额': int,  # keep as cum_amount
-        '最高价': float,  # keep as high
-        '最低价': float,  # keep as low
-        '开盘价': float,  # keep as open
-        '前收盘': float,  # keep as pre_close
+        "当日累计成交量": int,  # keep as cum_volume
+        "当日成交额": int,  # keep as cum_amount
+        "最高价": float,  # keep as high
+        "最低价": float,  # keep as low
+        "开盘价": float,  # keep as open
+        "前收盘": float,  # keep as pre_close
         **ask_bid_dtype_dict,
         # keep as ask_volume, bid_volume
-        '叫卖总量': int, '叫买总量': int,
+        "叫卖总量": int,
+        "叫买总量": int,
         # keep as ask_avg_price, bid_avg_price
-        '加权平均叫卖价': float, '加权平均叫买价': float,
+        "加权平均叫卖价": float,
+        "加权平均叫买价": float,
     }
 
     df = pd.read_csv(
-        csv_file, encoding='gbk',
-        dtype=dtype_dict, usecols=list(dtype_dict.keys()),
-        engine=csv_engine
+        csv_file,
+        encoding="gbk",
+        dtype=dtype_dict,
+        usecols=list(dtype_dict.keys()),
+        engine=csv_engine,
     )  # .dropna(axis=1)
 
     if df_list is not None:
@@ -192,18 +232,18 @@ def get_orderbook_script() -> str:
     k_list = []
     for i, k in enumerate(ask_bid_dtype_dict.keys()):
         i = 10 if (i + 1) % 10 == 0 else (i + 1) % 10
-        if '价' in k:
-            p = f'{k}/10000'
-            if '卖' in k:
-                k_list.append(f'{p} as ask_p{i}')
-            elif '买' in k:
-                k_list.append(f'{p} as bid_p{i}')
-        elif '量' in k:
-            v = f'{k}'
-            if '卖' in k:
-                k_list.append(f'{v} as ask_v{i}')
-            elif '买' in k:
-                k_list.append(f'{v} as bid_v{i}')
+        if "价" in k:
+            p = f"{k}/10000"
+            if "卖" in k:
+                k_list.append(f"{p} as ask_p{i}")
+            elif "买" in k:
+                k_list.append(f"{p} as bid_p{i}")
+        elif "量" in k:
+            v = f"{k}"
+            if "卖" in k:
+                k_list.append(f"{v} as ask_v{i}")
+            elif "买" in k:
+                k_list.append(f"{v} as bid_v{i}")
 
     return (
         "select "
@@ -219,10 +259,12 @@ def get_orderbook_script() -> str:
 
 
 class TaskConfig:
-    def __init__(self, dir_path: Path, file_name: str, func: Callable[[Path], pd.DataFrame]):
+    def __init__(
+        self, dir_path: Path, file_name: str, func: Callable[[Path], pd.DataFrame]
+    ):
         self.dir_path = dir_path
         self.file_name = file_name
-        self.glob_file = fr'*/{file_name}.csv'
+        self.glob_file = rf"*/{file_name}.csv"
         self.func = func
 
     @property
@@ -232,9 +274,11 @@ class TaskConfig:
 
 class Task:
     def __init__(self, dir_path: Path):
-        self.trade = TaskConfig(dir_path=dir_path, file_name='逐笔成交', func=get_trade_df)
-        self.order = TaskConfig(dir_path=dir_path, file_name='逐笔委托', func=get_order_df)
-        self.orderbook = TaskConfig(dir_path=dir_path, file_name='行情', func=get_orderbook_df)
+        self.trade = TaskConfig(dir_path=dir_path, file_name="逐笔成交", func=get_trade_df)
+        self.order = TaskConfig(dir_path=dir_path, file_name="逐笔委托", func=get_order_df)
+        self.orderbook = TaskConfig(
+            dir_path=dir_path, file_name="行情", func=get_orderbook_df
+        )
 
 
 def get_level2_daily_df_with_threading(task_cfg: TaskConfig) -> pd.DataFrame:
@@ -251,11 +295,11 @@ def get_level2_daily_df_with_threading(task_cfg: TaskConfig) -> pd.DataFrame:
 
     if t_list:
         [t.join() for t in t_list]
-    logger.success(f'Thread df cost: {time.perf_counter() - start_time}s')
+    logger.success(f"Thread df cost: {time.perf_counter() - start_time}s")
 
     start_time = time.perf_counter()
     df = pd.concat(df_list)
-    logger.success(f'Concat df cost: {time.perf_counter() - start_time}s')
+    logger.success(f"Concat df cost: {time.perf_counter() - start_time}s")
 
     df_list = None
     t_list = None
@@ -264,7 +308,11 @@ def get_level2_daily_df_with_threading(task_cfg: TaskConfig) -> pd.DataFrame:
     return df
 
 
-def update_res_list(file_path_list: List[Path], func: Callable[[Path], pd.DataFrame], res_list: ListProxy):
+def update_res_list(
+    file_path_list: List[Path],
+    func: Callable[[Path], pd.DataFrame],
+    res_list: ListProxy,
+):
     for file in file_path_list:
         res_list.append(func(file))
 
@@ -277,8 +325,9 @@ def get_level2_daily_df_with_multiprocess(task_cfg: TaskConfig) -> pd.DataFrame:
     step = int(len(files_list) / (4 * pool._processes))  # tune coe 4 get best speed
     pbar = tqdm(total=int(len(files_list) / step))
     pbar.set_description(
-        f'Function get_level2_df_with_multiprocess {task_cfg.file_name} in {task_cfg.dir_path}, '
-        f'total {len(files_list)}, step {step}')
+        f"Function get_level2_df_with_multiprocess {task_cfg.file_name} in {task_cfg.dir_path}, "
+        f"total {len(files_list)}, step {step}"
+    )
 
     # set multiprocess
     _manager = Manager()
@@ -286,19 +335,19 @@ def get_level2_daily_df_with_multiprocess(task_cfg: TaskConfig) -> pd.DataFrame:
     for i in range(0, len(files_list), step):
         pool.apply_async(
             update_res_list,
-            args=(files_list[i:i + step], task_cfg.func, res_list),
-            callback=lambda *args: pbar.update()
+            args=(files_list[i : i + step], task_cfg.func, res_list),
+            callback=lambda *args: pbar.update(),
         )
 
     pool.close()
     pool.join()
     pbar.close()
 
-    logger.info(f'Start concat dataframe ... ')
+    logger.info(f"Start concat dataframe ... ")
     start_time = time.perf_counter()
     # total_df = pl.concat(res_list)  # 57.6s
     total_df = pd.concat(res_list)  # with dropna col, time cost 57.3s -> 37.3s
-    logger.success(f'Concat df cost: {time.perf_counter() - start_time}s')
+    logger.success(f"Concat df cost: {time.perf_counter() - start_time}s")
     _manager.shutdown()
 
     gc.collect()
@@ -306,12 +355,12 @@ def get_level2_daily_df_with_multiprocess(task_cfg: TaskConfig) -> pd.DataFrame:
     return total_df
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import duckdb
 
     con = duckdb.connect()
 
-    dir_path = Path(rf'E:\DuckDB\stock\trades\origin\20230508')
+    dir_path = Path(rf"E:\DuckDB\stock\trades\origin\20230508")
     # dir_path = Path(rf'/home/fangyang/zhitai5000/DuckDB/stock/trades/origin/20230508/')
     # df = get_trade_df(dir_path / '000001.SZ' / '逐笔成交.csv')
 
@@ -323,7 +372,9 @@ if __name__ == '__main__':
     df22 = get_level2_daily_df_with_multiprocess(Task(dir_path).order)
     df23 = get_level2_daily_df_with_multiprocess(Task(dir_path).orderbook)
 
-    compress = 'ZSTD'
+    compress = "ZSTD"
     start_time = time.perf_counter()
-    con.sql('select * from df2').write_parquet(f'trade_{date_str}.parquet', compression=compress)
-    print(f'cost: {time.perf_counter() - start_time}s')
+    con.sql("select * from df2").write_parquet(
+        f"trade_{date_str}.parquet", compression=compress
+    )
+    print(f"cost: {time.perf_counter() - start_time}s")

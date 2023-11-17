@@ -71,5 +71,5 @@ def bond_zh_cov_value_analysis(symbol: str = "123138") -> pd.DataFrame:
     return temp_df
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass

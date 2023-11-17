@@ -1,8 +1,7 @@
-from typing import Tuple
-
-import numpy as np
 import pandas as pd
 import requests
+
+from typing import Tuple
 
 
 def bond_cb_redeem_jsl() -> pd.DataFrame:
@@ -43,24 +42,27 @@ def bond_cb_redeem_jsl() -> pd.DataFrame:
     r = requests.post(url, params=params, json=payload, headers=headers)
     data_json = r.json()
     temp_df = pd.DataFrame([item["cell"] for item in data_json["rows"]])
-    temp_df.rename(columns={
-        'bond_id': "代码",
-        "bond_nm": "名称",
-        'price': "现价",
-        'stock_id': "正股代码",
-        'stock_nm': "正股名称",
-        'orig_iss_amt': "规模",
-        'curr_iss_amt': "剩余规模",
-        'convert_dt': "转股起始日",
-        'convert_price': "转股价",
-        'redeem_price_ratio': "强赎触发比",
-        'real_force_redeem_price': "强赎价",
-        'redeem_tc': "强赎条款",
-        'sprice': "正股价",
-        'redeem_icon': "强赎状态",
-        'redeem_count': "强赎天计数",
-        'force_redeem_price': "强赎触发价",
-    }, inplace=True)
+    temp_df.rename(
+        columns={
+            "bond_id": "代码",
+            "bond_nm": "名称",
+            "price": "现价",
+            "stock_id": "正股代码",
+            "stock_nm": "正股名称",
+            "orig_iss_amt": "规模",
+            "curr_iss_amt": "剩余规模",
+            "convert_dt": "转股起始日",
+            "convert_price": "转股价",
+            "redeem_price_ratio": "强赎触发比",
+            "real_force_redeem_price": "强赎价",
+            "redeem_tc": "强赎条款",
+            "sprice": "正股价",
+            "redeem_icon": "强赎状态",
+            "redeem_count": "强赎天计数",
+            "force_redeem_price": "强赎触发价",
+        },
+        inplace=True,
+    )
 
     temp_df = temp_df[
         [
@@ -101,30 +103,24 @@ def bond_cb_redeem_jsl() -> pd.DataFrame:
 
 
 def get_bond_cb_redeem_jsl_df() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    bond_cb_redeem_jsl_df = bond_cb_redeem_jsl().drop(
-        labels=['正股价', '转股价'],
-        axis=1
+    bond_cb_redeem_jsl_df = bond_cb_redeem_jsl().drop(labels=["正股价", "转股价"], axis=1)
+    bond_cb_redeem_jsl_df["强赎天计数"] = bond_cb_redeem_jsl_df["强赎天计数"].replace(
+        to_replace=r"\<.*\>", value="", regex=True
     )
-    bond_cb_redeem_jsl_df['强赎天计数'] = bond_cb_redeem_jsl_df['强赎天计数'].replace(
-        to_replace=r'\<.*\>',
-        value="",
-        regex=True
-    )
-    bond_cb_redeem_jsl_df['不安全天数'] = (
-        bond_cb_redeem_jsl_df['强赎天计数']
-        .apply(lambda x: int(x.split('/')[0]) if '/' in x else 30)
+    bond_cb_redeem_jsl_df["不安全天数"] = bond_cb_redeem_jsl_df["强赎天计数"].apply(
+        lambda x: int(x.split("/")[0]) if "/" in x else 30
     )
 
-    bond_cb_redeem_jsl_df['强赎状态'] = bond_cb_redeem_jsl_df['强赎状态'].replace(
-        to_replace=r'^\s*$',
-        value="不强赎",
-        regex=True
+    bond_cb_redeem_jsl_df["强赎状态"] = bond_cb_redeem_jsl_df["强赎状态"].replace(
+        to_replace=r"^\s*$", value="不强赎", regex=True
     )
     bond_cb_redeem_jsl_df.rename(columns={"代码": "债券代码"}, inplace=True)
-    redeem_jsl_df = bond_cb_redeem_jsl_df[~bond_cb_redeem_jsl_df['强赎状态'].str.contains('不强赎')].copy()
+    redeem_jsl_df = bond_cb_redeem_jsl_df[
+        ~bond_cb_redeem_jsl_df["强赎状态"].str.contains("不强赎")
+    ].copy()
     return bond_cb_redeem_jsl_df, redeem_jsl_df
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     df, r_df = get_bond_cb_redeem_jsl_df()
     print(1)

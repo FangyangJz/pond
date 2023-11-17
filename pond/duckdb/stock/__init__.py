@@ -13,28 +13,38 @@ from tqdm import tqdm
 
 from pond.duckdb import DuckDB
 from pond.duckdb.stock.level2 import (
-    get_level2_daily_df_with_threading, get_trade_script, get_order_script, get_orderbook_script, Task, TaskConfig
+    get_level2_daily_df_with_threading,
+    get_trade_script,
+    get_order_script,
+    get_orderbook_script,
+    Task,
+    TaskConfig,
 )
 
 
 class StockDB(DuckDB):
-
     def __init__(self, db_path: Path):
-        self.path_stock = db_path / 'stock'
-        self.path_stock_info = self.path_stock / 'info'
-        self.path_stock_kline_1d = self.path_stock / 'kline_1d'
-        self.path_stock_kline_1d_nfq = self.path_stock_kline_1d / 'nfq'
-        self.path_stock_kline_1d_qfq = self.path_stock_kline_1d / 'qfq'
-        self.path_stock_level2 = self.path_stock / 'level2'
-        self.path_stock_level2_origin = self.path_stock_level2 / 'origin'
-        self.path_stock_level2_trade = self.path_stock_level2 / 'trade'
-        self.path_stock_level2_order = self.path_stock_level2 / 'order'
-        self.path_stock_level2_orderbook = self.path_stock_level2 / 'orderbook'
+        self.path_stock = db_path / "stock"
+        self.path_stock_info = self.path_stock / "info"
+        self.path_stock_kline_1d = self.path_stock / "kline_1d"
+        self.path_stock_kline_1d_nfq = self.path_stock_kline_1d / "nfq"
+        self.path_stock_kline_1d_qfq = self.path_stock_kline_1d / "qfq"
+        self.path_stock_level2 = self.path_stock / "level2"
+        self.path_stock_level2_origin = self.path_stock_level2 / "origin"
+        self.path_stock_level2_trade = self.path_stock_level2 / "trade"
+        self.path_stock_level2_order = self.path_stock_level2 / "order"
+        self.path_stock_level2_orderbook = self.path_stock_level2 / "orderbook"
         self.path_stock_list = [
-            self.path_stock, self.path_stock_info,
-            self.path_stock_kline_1d, self.path_stock_kline_1d_nfq, self.path_stock_kline_1d_qfq,
-            self.path_stock_level2, self.path_stock_level2_origin,
-            self.path_stock_level2_trade, self.path_stock_level2_order, self.path_stock_level2_orderbook
+            self.path_stock,
+            self.path_stock_info,
+            self.path_stock_kline_1d,
+            self.path_stock_kline_1d_nfq,
+            self.path_stock_kline_1d_qfq,
+            self.path_stock_level2,
+            self.path_stock_level2_origin,
+            self.path_stock_level2_trade,
+            self.path_stock_level2_order,
+            self.path_stock_level2_orderbook,
         ]
 
         super().__init__(db_path)
@@ -44,11 +54,15 @@ class StockDB(DuckDB):
 
     @property
     def stock_basic_df(self):
-        return self.con.sql(rf"SELECT * from read_parquet('{str(self.path_stock_info / 'basic.parquet')}')").df()
+        return self.con.sql(
+            rf"SELECT * from read_parquet('{str(self.path_stock_info / 'basic.parquet')}')"
+        ).df()
 
     @property
     def calender_df(self):
-        return self.con.sql(rf"SELECT * from read_parquet('{str(self.path_stock_info / 'calender.parquet')}')").df()
+        return self.con.sql(
+            rf"SELECT * from read_parquet('{str(self.path_stock_info / 'calender.parquet')}')"
+        ).df()
 
     def update_stock_info(self):
         from pond.akshare.stock import get_all_stocks_df
@@ -58,17 +72,28 @@ class StockDB(DuckDB):
 
         stock_basic_df = get_all_stocks_df()
 
-        calender_df = tool_trade_date_hist_sina().astype('str')
-        calender_df['trade_date'] = pd.to_datetime(calender_df['trade_date'])
+        calender_df = tool_trade_date_hist_sina().astype("str")
+        calender_df["trade_date"] = pd.to_datetime(calender_df["trade_date"])
         calender_df.reset_index(inplace=True)
 
-        (self.con.sql('select * from stock_basic_df')
-         .write_parquet(str(self.path_stock_info / f'basic.parquet'), compression=self.compress))
-        logger.success(f'Update basic.parquet cost: {time.perf_counter() - start_time}s')
+        (
+            self.con.sql("select * from stock_basic_df").write_parquet(
+                str(self.path_stock_info / f"basic.parquet"), compression=self.compress
+            )
+        )
+        logger.success(
+            f"Update basic.parquet cost: {time.perf_counter() - start_time}s"
+        )
 
-        (self.con.sql('select * from calender_df')
-         .write_parquet(str(self.path_stock_info / f'calender.parquet'), compression=self.compress))
-        logger.success(f'Update calender.parquet cost: {time.perf_counter() - start_time}s')
+        (
+            self.con.sql("select * from calender_df").write_parquet(
+                str(self.path_stock_info / f"calender.parquet"),
+                compression=self.compress,
+            )
+        )
+        logger.success(
+            f"Update calender.parquet cost: {time.perf_counter() - start_time}s"
+        )
 
     def update_level2_trade(self):
         """
@@ -76,21 +101,22 @@ class StockDB(DuckDB):
         Need to read by pandas and then map to duckdb.
         """
 
-        for dir_path in self.path_stock_level2_origin.glob('*'):
+        for dir_path in self.path_stock_level2_origin.glob("*"):
             if dir_path.is_dir():
                 date_str = dir_path.stem
                 df = get_level2_daily_df_with_threading(Task(dir_path).trade)
 
                 start_time = time.perf_counter()
                 (
-                    self.con.sql(get_trade_script())
-                    .write_parquet(
-                        str(self.path_stock_level2_trade / f'{date_str}.parquet'),
-                        compression=self.compress)
+                    self.con.sql(get_trade_script()).write_parquet(
+                        str(self.path_stock_level2_trade / f"{date_str}.parquet"),
+                        compression=self.compress,
+                    )
                 )
                 logger.success(
-                    f'Update level2 trade {date_str}.parquet, '
-                    f'time cost: {time.perf_counter() - start_time:.4f}s')
+                    f"Update level2 trade {date_str}.parquet, "
+                    f"time cost: {time.perf_counter() - start_time:.4f}s"
+                )
 
                 df = None
                 gc.collect()
@@ -101,21 +127,22 @@ class StockDB(DuckDB):
         Need to read by pandas and then map to duckdb.
         """
 
-        for dir_path in self.path_stock_level2_origin.glob('*'):
+        for dir_path in self.path_stock_level2_origin.glob("*"):
             if dir_path.is_dir():
                 date_str = dir_path.stem
                 df = get_level2_daily_df_with_threading(Task(dir_path).order)
 
                 start_time = time.perf_counter()
                 (
-                    self.con.sql(get_order_script())
-                    .write_parquet(
-                        str(self.path_stock_level2_order / f'{date_str}.parquet'),
-                        compression=self.compress)
+                    self.con.sql(get_order_script()).write_parquet(
+                        str(self.path_stock_level2_order / f"{date_str}.parquet"),
+                        compression=self.compress,
+                    )
                 )
                 logger.success(
-                    f'Update level2 order {date_str}.parquet, '
-                    f'time cost: {time.perf_counter() - start_time:.4f}s')
+                    f"Update level2 order {date_str}.parquet, "
+                    f"time cost: {time.perf_counter() - start_time:.4f}s"
+                )
 
                 df = None
                 gc.collect()
@@ -126,21 +153,22 @@ class StockDB(DuckDB):
         Need to read by pandas and then map to duckdb.
         """
 
-        for dir_path in self.path_stock_level2_origin.glob('*'):
+        for dir_path in self.path_stock_level2_origin.glob("*"):
             if dir_path.is_dir():
                 date_str = dir_path.stem
                 df = get_level2_daily_df_with_threading(Task(dir_path).orderbook)
 
                 start_time = time.perf_counter()
                 (
-                    self.con.sql(get_orderbook_script())
-                    .write_parquet(
-                        str(self.path_stock_level2_orderbook / f'{date_str}.parquet'),
-                        compression=self.compress)
+                    self.con.sql(get_orderbook_script()).write_parquet(
+                        str(self.path_stock_level2_orderbook / f"{date_str}.parquet"),
+                        compression=self.compress,
+                    )
                 )
                 logger.success(
-                    f'Update level2 orderbook {date_str}.parquet, '
-                    f'time cost: {time.perf_counter() - start_time:.4f}s')
+                    f"Update level2 orderbook {date_str}.parquet, "
+                    f"time cost: {time.perf_counter() - start_time:.4f}s"
+                )
 
                 df = None
                 gc.collect()
@@ -155,31 +183,34 @@ class StockDB(DuckDB):
 
         start_time = time.perf_counter()
 
-        logger.info('Start to read local tdx stock 1d data ...')
+        logger.info("Start to read local tdx stock 1d data ...")
         df = get_kline_1d_nfq_df(stock_basic_df=self.stock_basic_df, offset=offset)
 
         files = [f.stem for f in self.path_stock_kline_1d_nfq.iterdir()]
-        logger.info('Start to write parquet file by date ...')
-        for idx, group_df in (pbar2 := tqdm(df.groupby('trade_date'), position=0, leave=True)):
-            file_name = str(idx.date()).replace('-', '')
+        logger.info("Start to write parquet file by date ...")
+        for idx, group_df in (
+            pbar2 := tqdm(df.groupby("trade_date"), position=0, leave=True)
+        ):
+            file_name = str(idx.date()).replace("-", "")
             pbar2.set_postfix_str(file_name)
 
             if file_name not in files:
-                (self.con.sql('select * from group_df')
-                 .write_parquet(str(self.path_stock_kline_1d_nfq / f'{file_name}.parquet'), compression=self.compress))
+                (
+                    self.con.sql("select * from group_df").write_parquet(
+                        str(self.path_stock_kline_1d_nfq / f"{file_name}.parquet"),
+                        compression=self.compress,
+                    )
+                )
 
         pbar2.close()
-        logger.success(f'Update all parquet file cost: {time.perf_counter() - start_time:.2f}s')
+        logger.success(
+            f"Update all parquet file cost: {time.perf_counter() - start_time:.2f}s"
+        )
 
     def get_kline_1d_qfq_df(self):
-
-        return (
-            self.con
-            .sql(
-                rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_1d_qfq.iterdir()]})"
-            )
-            .df()
-        )
+        return self.con.sql(
+            rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_1d_qfq.iterdir()]})"
+        ).df()
 
     def update_kline_1d_qfq(self):
         """
@@ -189,27 +220,35 @@ class StockDB(DuckDB):
 
         start_time = time.perf_counter()
 
-        logger.info('Start to read local tdx stock 1d data ...')
+        logger.info("Start to read local tdx stock 1d data ...")
         qfq_df = get_kline_1d_qfq_df(stock_basic_df=self.stock_basic_df, offset=1)
         filename = f'{qfq_df["date"].min().strftime("%Y%m%d")}_{qfq_df["date"].max().strftime("%Y%m%d")}'
 
         for f in self.path_stock_kline_1d_qfq.iterdir():
             if f.stem == filename:
-                logger.info(f'{filename}.parquet has been created, not save memory df to disk.')
+                logger.info(
+                    f"{filename}.parquet has been created, not save memory df to disk."
+                )
                 return
             else:
                 # clear existing file
                 f.unlink()
 
-        logger.info('Start to write parquet file ...')
-        (self.con.sql('select * from qfq_df')
-         .write_parquet(str(self.path_stock_kline_1d_qfq / f'{filename}.parquet'), compression=self.compress))
+        logger.info("Start to write parquet file ...")
+        (
+            self.con.sql("select * from qfq_df").write_parquet(
+                str(self.path_stock_kline_1d_qfq / f"{filename}.parquet"),
+                compression=self.compress,
+            )
+        )
 
-        logger.success(f'Update all parquet file cost: {time.perf_counter() - start_time:.2f}s')
+        logger.success(
+            f"Update all parquet file cost: {time.perf_counter() - start_time:.2f}s"
+        )
 
 
-if __name__ == '__main__':
-    db = StockDB(Path(r'E:\DuckDB'))
+if __name__ == "__main__":
+    db = StockDB(Path(r"E:\DuckDB"))
     # db = StockDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
     # db.update_stock_orders()
 

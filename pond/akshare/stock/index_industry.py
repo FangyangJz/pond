@@ -6,7 +6,10 @@ import pandas as pd
 from tqdm import tqdm
 from datetime import date
 
-from gulf.akshare.const import AKSHARE_CRAWL_STOP_INTERVEL, AKSHARE_CRAWL_CONCURRENT_LIMIT
+from gulf.akshare.const import (
+    AKSHARE_CRAWL_STOP_INTERVEL,
+    AKSHARE_CRAWL_CONCURRENT_LIMIT,
+)
 from gulf.akshare.stock.index_decorator import trans_ch_col_name
 
 
@@ -18,26 +21,28 @@ def update_index_industry_em_df_thread(symbol, start_date, end_date, res_dict):
             start_date=start_date,
             end_date=date.today().strftime("%Y%m%d") if end_date is None else end_date,
             period="日k",
-            adjust="hfq"
+            adjust="hfq",
         )
     else:
         # 返回从开始到现在的全部数据, 未复权, 复权对于行业指数有用??
         df = ak.stock_board_industry_hist_min_em(symbol=symbol, period="101")
 
-    df['板块名称'] = symbol
+    df["板块名称"] = symbol
     res_dict[symbol] = df
 
 
 @trans_ch_col_name
-def get_stock_index_industry_em_daily_df(start_date=None, end_date=None) -> pd.DataFrame:
+def get_stock_index_industry_em_daily_df(
+    start_date=None, end_date=None
+) -> pd.DataFrame:
     ind_name = ak.stock_board_industry_name_em()
     t_list = []
     res_dict = dict()
-    for bk_name in tqdm(ind_name['板块名称'].values):
+    for bk_name in tqdm(ind_name["板块名称"].values):
         # update_index_industry_em_df_thread(bk_name, start_date, end_date, res_dict)
         t = threading.Thread(
             target=update_index_industry_em_df_thread,
-            args=(bk_name, start_date, end_date, res_dict)
+            args=(bk_name, start_date, end_date, res_dict),
         )
         t.start()
         t_list.append(t)
@@ -53,7 +58,7 @@ def get_stock_index_industry_em_daily_df(start_date=None, end_date=None) -> pd.D
     return pd.concat(list(res_dict.values()))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     file_name = "stock_index_industry_em_daily_df.pkl"
     # stock_index_industry_em_daily_df = get_stock_index_industry_em_daily_df(
     #     start_date="20230101"
