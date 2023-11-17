@@ -3,7 +3,7 @@
 # @Datetime : 2023/11/7 23:00
 # @Author   : Fangyang
 # @Software : PyCharm
-
+import gc
 import time
 from pathlib import Path
 
@@ -92,6 +92,9 @@ class StockDB(DuckDB):
                     f'Update level2 trade {date_str}.parquet, '
                     f'time cost: {time.perf_counter() - start_time:.4f}s')
 
+                df = None
+                gc.collect()
+
     def update_level2_order(self):
         """
         No use duckdb read csv file directly because duckdb doesn't support GBK encoding.
@@ -114,6 +117,9 @@ class StockDB(DuckDB):
                     f'Update level2 order {date_str}.parquet, '
                     f'time cost: {time.perf_counter() - start_time:.4f}s')
 
+                df = None
+                gc.collect()
+
     def update_level2_orderbook(self):
         """
         No use duckdb read csv file directly because duckdb doesn't support GBK encoding.
@@ -135,6 +141,9 @@ class StockDB(DuckDB):
                 logger.success(
                     f'Update level2 orderbook {date_str}.parquet, '
                     f'time cost: {time.perf_counter() - start_time:.4f}s')
+
+                df = None
+                gc.collect()
 
     def update_kline_1d_nfq(self, offset: int = 0):
         """

@@ -257,6 +257,8 @@ def get_level2_daily_df_with_threading(task_cfg: TaskConfig) -> pd.DataFrame:
     df = pd.concat(df_list)
     logger.success(f'Concat df cost: {time.perf_counter() - start_time}s')
 
+    df_list = None
+    t_list = None
     gc.collect()
 
     return df
