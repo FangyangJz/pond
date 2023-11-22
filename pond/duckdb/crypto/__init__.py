@@ -87,9 +87,18 @@ if __name__ == "__main__":
     db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
     # db.update_crypto_trades()
 
-    # for f in (pbar := tqdm(db.path_crypto_agg_trades_origin.glob('*.csv'))):
+    # for f in (pbar := tqdm(db.path_crypto_agg_trades_origin.glob("*.csv"))):
     #     r = db.con.read_csv(
     #         f,
-    #         names=['agg_trade_id', 'price', 'qty', 'first_trade_id', 'last_trade_id', 'transact_time', 'is_buyer_maker'])
+    #         names=[
+    #             "agg_trade_id",
+    #             "price",
+    #             "qty",
+    #             "first_trade_id",
+    #             "last_trade_id",
+    #             "transact_time",
+    #             "is_buyer_maker",
+    #         ],
+    #     )
     #     print(1)
     # db.update_crypto_agg_trades()

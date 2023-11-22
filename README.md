@@ -91,6 +91,10 @@ db.update_crypto_trades()
 db.update_crypto_agg_trades()
 ```
 
+## Ops Banchmark
+
+If you are still hesitant about which computing framework to choose. Please refer this link [Database-like ops benchmark](https://duckdblabs.github.io/db-benchmark/)
+
 ## About Install cuDF
 
 In my `python3.9` case, use Nvidia `rapids` products `[cuDF, cuML, cuxfilter]` in windows WSL2 or Linux.
