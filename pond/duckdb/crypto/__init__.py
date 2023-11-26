@@ -4,18 +4,14 @@
 # @Author   : Fangyang
 # @Software : PyCharm
 
-import time
 from pathlib import Path
-
-import pandas as pd
-from loguru import logger
 from tqdm import tqdm
 
-from pond.duckdb import DuckDB
+from pond.duckdb import DuckDB, DataFrameStrType, df_types
 
 
 class CryptoDB(DuckDB):
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, df_type: DataFrameStrType = df_types.polars):
         self.path_crypto = db_path / "crypto"
         self.path_crypto_info = self.path_crypto / "info"
         self.path_crypto_kline_1d = self.path_crypto / "kline_1d"
@@ -34,7 +30,7 @@ class CryptoDB(DuckDB):
             self.path_crypto_agg_trades_origin,
         ]
 
-        super().__init__(db_path)
+        super().__init__(db_path, df_type)
 
     def init_db_path(self):
         [f.mkdir() for f in self.path_crypto_list if not f.exists()]

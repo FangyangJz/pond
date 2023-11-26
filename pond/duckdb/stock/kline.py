@@ -13,12 +13,19 @@ import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
+from pond.duckdb.type import DataFrameType
 from pond.tdx.finance_cw import update_cw_data, get_cw_dict_acc
 from pond.tdx.fq import qfq_acc
 from pond.tdx.path import gbbq_path
 
 
-def get_kline_1d_qfq_df(stock_basic_df: pd.DataFrame, offset: int = 1) -> pd.DataFrame:
+def get_kline_1d_qfq_df(stock_basic_df: DataFrameType, offset: int = 1) -> pd.DataFrame:
+    stock_basic_df = (
+        stock_basic_df
+        if isinstance(stock_basic_df, pd.DataFrame)
+        else stock_basic_df.to_pandas()
+    )
+
     # 更新本地财务数据
     update_cw_data()
     # 读取财务数据, 获取流通股本数据
@@ -37,7 +44,13 @@ def get_kline_1d_qfq_df(stock_basic_df: pd.DataFrame, offset: int = 1) -> pd.Dat
     return df
 
 
-def get_kline_1d_nfq_df(stock_basic_df: pd.DataFrame, offset: int = 1) -> pd.DataFrame:
+def get_kline_1d_nfq_df(stock_basic_df: DataFrameType, offset: int = 1) -> pd.DataFrame:
+    stock_basic_df = (
+        stock_basic_df
+        if isinstance(stock_basic_df, pd.DataFrame)
+        else stock_basic_df.to_pandas()
+    )
+
     pool = Pool(os.cpu_count() - 1)
     step = int(len(stock_basic_df) / (4 * pool._processes))  # tune coe 4 get best speed
     _manager = Manager()
@@ -97,7 +110,7 @@ if __name__ == "__main__":
     from pond.duckdb.stock import StockDB
     from pathlib import Path
 
-    db = StockDB(Path(r"D:\DuckDB"))
+    db = StockDB(Path(r"E:\DuckDB"))
 
     qfq_df = get_kline_1d_qfq_df(db.stock_basic_df)
 

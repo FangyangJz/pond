@@ -1,7 +1,14 @@
 [[tool.poetry.source]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+priority = "default"
+
+
+[[tool.poetry.source]]
 name = "aliyun"
 url = "http://mirrors.aliyun.com/pypi/simple"
-default = true
+priority = "primary"
+
 
 [tool.poetry]
 name = "pond"
@@ -9,6 +16,7 @@ version = "0.1.0"
 description = ""
 authors = ["fangyang_gpu <fangyang.jing@hotmail.com>"]
 readme = "README.md"
+
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -18,6 +26,8 @@ requests = "^2.31.0"
 duckdb = "^0.9.1"
 loguru = "^0.7.2"
 black = "^23.11.0"
+polars = "^0.19.16"
+pyarrow = "^14.0.1"
 
 
 [build-system]

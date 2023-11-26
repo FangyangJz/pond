@@ -5,9 +5,9 @@
 # @Software : PyCharm
 import gc
 import time
-from pathlib import Path
-
 import pandas as pd
+
+from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
 
@@ -20,10 +20,11 @@ from pond.duckdb.stock.level2 import (
     Task,
     TaskConfig,
 )
+from pond.duckdb.type import DataFrameStrType, df_types, DataFrameType
 
 
 class StockDB(DuckDB):
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, df_type: DataFrameStrType = df_types.polars):
         self.path_stock = db_path / "stock"
         self.path_stock_info = self.path_stock / "info"
         self.path_stock_kline_1d = self.path_stock / "kline_1d"
@@ -47,22 +48,26 @@ class StockDB(DuckDB):
             self.path_stock_level2_orderbook,
         ]
 
-        super().__init__(db_path)
+        super().__init__(db_path, df_type)
 
     def init_db_path(self):
         [f.mkdir() for f in self.path_stock_list if not f.exists()]
 
     @property
-    def stock_basic_df(self):
-        return self.con.sql(
-            rf"SELECT * from read_parquet('{str(self.path_stock_info / 'basic.parquet')}')"
-        ).df()
+    def stock_basic_df(self) -> DataFrameType:
+        return self.transform_to_df(
+            self.con.sql(
+                rf"SELECT * from read_parquet('{str(self.path_stock_info / 'basic.parquet')}')"
+            )
+        )
 
     @property
-    def calender_df(self):
-        return self.con.sql(
-            rf"SELECT * from read_parquet('{str(self.path_stock_info / 'calender.parquet')}')"
-        ).df()
+    def calender_df(self) -> DataFrameType:
+        return self.transform_to_df(
+            self.con.sql(
+                rf"SELECT * from read_parquet('{str(self.path_stock_info / 'calender.parquet')}')"
+            )
+        )
 
     def update_stock_info(self):
         from pond.akshare.stock import get_all_stocks_df
@@ -207,10 +212,12 @@ class StockDB(DuckDB):
             f"Update all parquet file cost: {time.perf_counter() - start_time:.2f}s"
         )
 
-    def get_kline_1d_qfq_df(self):
-        return self.con.sql(
-            rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_1d_qfq.iterdir()]})"
-        ).df()
+    def get_kline_1d_qfq_df(self) -> DataFrameType:
+        return self.transform_to_df(
+            self.con.sql(
+                rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_1d_qfq.iterdir()]})"
+            )
+        )
 
     def update_kline_1d_qfq(self):
         """

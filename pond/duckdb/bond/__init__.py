@@ -10,11 +10,11 @@ from pathlib import Path
 import pandas as pd
 from loguru import logger
 
-from pond.duckdb import DuckDB
+from pond.duckdb import DuckDB, DataFrameStrType, df_types
 
 
 class BondDB(DuckDB):
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, df_type: DataFrameStrType = df_types.pandas):
         self.path_bond = db_path / "bond"
         self.path_bond_info = self.path_bond / "info"
         self.path_bond_kline_1d = self.path_bond / "kline_1d"
@@ -24,7 +24,7 @@ class BondDB(DuckDB):
             self.path_bond_kline_1d,
         ]
 
-        super().__init__(db_path)
+        super().__init__(db_path, df_type)
 
     def init_db_path(self):
         [f.mkdir() for f in self.path_bond_list if not f.exists()]
