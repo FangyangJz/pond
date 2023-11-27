@@ -11,6 +11,7 @@ from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
 
+from duckdb import DuckDBPyRelation
 from pond.duckdb import DuckDB
 from pond.duckdb.stock.level2 import (
     get_level2_daily_df_with_threading,
@@ -212,12 +213,19 @@ class StockDB(DuckDB):
             f"Update all parquet file cost: {time.perf_counter() - start_time:.2f}s"
         )
 
-    def get_kline_1d_qfq_df(self) -> DataFrameType:
-        return self.transform_to_df(
-            self.con.sql(
-                rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_1d_qfq.iterdir()]})"
-            )
+    def get_kline_1d_qfq_rel(
+        self, start_date: str = "2023-01-01", end_date: str = "2070-01-01"
+    ) -> DuckDBPyRelation:
+        return self.con.sql(
+            rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_1d_qfq.iterdir()]})"
+        ).filter(
+            f"(date >= TIMESTAMP '{start_date}') and (date < TIMESTAMP '{end_date}')"
         )
+
+    def get_kline_1d_qfq_df(
+        self, start_date: str = "2023-01-01", end_date: str = "2070-01-01"
+    ) -> DataFrameType:
+        return self.transform_to_df(self.get_kline_1d_qfq_rel(start_date, end_date))
 
     def update_kline_1d_qfq(self):
         """
@@ -259,7 +267,8 @@ if __name__ == "__main__":
     # db = StockDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
     # db.update_stock_orders()
 
-    # df = db.get_kline_1d_qfq_df()
+    rel = db.get_kline_1d_qfq_rel()
+    df = db.get_kline_1d_qfq_df().to_pandas()
 
     # db.update_stock_info()
     # db.update_kline_1d_nfq()
