@@ -19,7 +19,7 @@ def change_datetime_fields(db: StockDB):
         db.path_stock_level2_orderbook,
     ]:
         for file in (pbar := tqdm(dir_path.glob("*.parquet"))):
-            pbar.set_postfix_str(file)
+            pbar.set_postfix_str(str(file))
             rel = db.con.read_parquet(str(file))
             file = file.parent / ("_" + file.name)
             cols = ["自然日 as datetime" if "自然日" == c else c for c in rel.columns]
