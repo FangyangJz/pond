@@ -34,6 +34,7 @@ class StockDB(DuckDB):
         self.path_stock_level2 = self.path_stock / "level2"
         self.path_stock_level2_origin = self.path_stock_level2 / "origin"
         self.path_stock_level2_trade = self.path_stock_level2 / "trade"
+        self.path_stock_level2_trade_agg = self.path_stock_level2 / "trade_agg"
         self.path_stock_level2_order = self.path_stock_level2 / "order"
         self.path_stock_level2_orderbook = self.path_stock_level2 / "orderbook"
         self.path_stock_list = [
@@ -45,6 +46,7 @@ class StockDB(DuckDB):
             self.path_stock_level2,
             self.path_stock_level2_origin,
             self.path_stock_level2_trade,
+            self.path_stock_level2_trade_agg, 
             self.path_stock_level2_order,
             self.path_stock_level2_orderbook,
         ]
