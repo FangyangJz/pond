@@ -16,7 +16,7 @@ from tqdm import tqdm
 from pond.duckdb.type import DataFrameType
 from pond.tdx.finance_cw import update_cw_data, get_cw_dict_acc
 from pond.tdx.fq import qfq_acc
-from pond.tdx.path import gbbq_path
+from pond.tdx.path import gbbq_path, tdx_path
 
 
 def get_kline_1d_qfq_df(stock_basic_df: DataFrameType, offset: int = 1) -> pd.DataFrame:
@@ -86,7 +86,7 @@ def update_res_list(
 ):
     from mootdx.reader import Reader
 
-    reader = Reader.factory(market="std", tdxdir="C:/new_tdx")
+    reader = Reader.factory(market="std", tdxdir=tdx_path)
 
     # TODO multiprocess accelerate
     # for idx, row in (pbar := tqdm(stock_basic_slice_df.iterrows())):
