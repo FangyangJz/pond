@@ -112,12 +112,15 @@ class StockDB(DuckDB):
         for dir_path in self.path_stock_level2_origin.glob("*"):
             if dir_path.is_dir():
                 date_str = dir_path.stem
+                target_file = self.path_stock_level2_trade / f"{date_str}.parquet"
+                if target_file.exists():
+                    continue
                 df = get_level2_daily_df_with_threading(Task(dir_path).trade)
 
                 start_time = time.perf_counter()
                 (
                     self.con.sql(get_trade_script()).write_parquet(
-                        str(self.path_stock_level2_trade / f"{date_str}.parquet"),
+                        str(target_file),
                         compression=self.compress,
                     )
                 )
@@ -138,12 +141,16 @@ class StockDB(DuckDB):
         for dir_path in self.path_stock_level2_origin.glob("*"):
             if dir_path.is_dir():
                 date_str = dir_path.stem
+                target_file = self.path_stock_level2_order / f"{date_str}.parquet"
+                if target_file.exists():
+                    continue
+                
                 df = get_level2_daily_df_with_threading(Task(dir_path).order)
 
                 start_time = time.perf_counter()
                 (
                     self.con.sql(get_order_script()).write_parquet(
-                        str(self.path_stock_level2_order / f"{date_str}.parquet"),
+                        str(target_file),
                         compression=self.compress,
                     )
                 )
@@ -164,12 +171,16 @@ class StockDB(DuckDB):
         for dir_path in self.path_stock_level2_origin.glob("*"):
             if dir_path.is_dir():
                 date_str = dir_path.stem
+                target_file = self.path_stock_level2_orderbook / f"{date_str}.parquet"
+                if target_file.exists():
+                    continue
+
                 df = get_level2_daily_df_with_threading(Task(dir_path).orderbook)
 
                 start_time = time.perf_counter()
                 (
                     self.con.sql(get_orderbook_script()).write_parquet(
-                        str(self.path_stock_level2_orderbook / f"{date_str}.parquet"),
+                        str(target_file),
                         compression=self.compress,
                     )
                 )
@@ -269,11 +280,11 @@ if __name__ == "__main__":
     # db = StockDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
     # db.update_stock_orders()
 
-    rel = db.get_kline_1d_qfq_rel()
-    df = db.get_kline_1d_qfq_df().to_pandas()
+    #rel = db.get_kline_1d_qfq_rel()
+    #df = db.get_kline_1d_qfq_df().to_pandas()
 
-    # db.update_stock_info()
-    # db.update_kline_1d_nfq()
+    db.update_stock_info()
+    db.update_kline_1d_nfq()
     # db.update_kline_1d_qfq()
 
     db.update_level2_trade()
