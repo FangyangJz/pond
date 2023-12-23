@@ -14,7 +14,7 @@ class CryptoDB(DuckDB):
     def __init__(self, db_path: Path, df_type: DataFrameStrType = df_types.polars):
         self.path_crypto = db_path / "crypto"
         self.path_crypto_info = self.path_crypto / "info"
-        self.path_crypto_kline_1d = self.path_crypto / "kline_1d"
+        self.path_crypto_kline = self.path_crypto / "kline"
         self.path_crypto_trades = self.path_crypto / "trades"
         self.path_crypto_trades_origin = self.path_crypto_trades / "origin"
         self.path_crypto_agg_trades = self.path_crypto / "agg_trades"
@@ -23,7 +23,7 @@ class CryptoDB(DuckDB):
         self.path_crypto_list = [
             self.path_crypto,
             self.path_crypto_info,
-            self.path_crypto_kline_1d,
+            self.path_crypto_kline,
             self.path_crypto_trades,
             self.path_crypto_trades_origin,
             self.path_crypto_agg_trades,
@@ -79,8 +79,8 @@ class CryptoDB(DuckDB):
 
 
 if __name__ == "__main__":
-    # db = CryptoDB(Path(r'D:\DuckDB'))
-    db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
+    db = CryptoDB(Path(r'E:\DuckDB'))
+    # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
     # db.update_crypto_trades()
 
     # for f in (pbar := tqdm(db.path_crypto_agg_trades_origin.glob("*.csv"))):
