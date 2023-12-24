@@ -6,7 +6,7 @@
 
 from pathlib import Path
 
-CACHE_DIR = Path(r'E:\DuckDB\crypto\kline')
+CACHE_DIR = Path(r'E:\DuckDB\crypto')
 
 if __name__ == "__main__":
     pass

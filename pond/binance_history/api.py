@@ -10,7 +10,7 @@ import pandas as pd
 import pendulum
 from pandas import DataFrame
 
-from utils import gen_dates, get_data, unify_datetime
+from pond.binance_history.utils import gen_dates, get_data, unify_datetime
 from typing import Optional, Union
 
 
@@ -122,10 +122,11 @@ if __name__ == "__main__":
     # symbol = "BTCUSDT"
     # asset_type = "spot"
 
-    start = "2023-1-1 5:29"
-    end = "2023-11-3 11:31"
+    start = "2023-1-1"
+    end = "2023-11-1"
     tz = "Asia/Shanghai"
 
+    from pond.duckdb.crypto.future import get_cm_future_symbol_list
     klines = fetch_klines(
         symbol=symbol, start=start, end=end, tz=tz, asset_type=asset_type
     )

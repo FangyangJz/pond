@@ -18,8 +18,8 @@ import pandas as pd
 import pendulum
 from pandas import Timestamp, DataFrame
 
-import config
-from exceptions import NetworkError, DataNotFound
+from pond.binance_history import config
+from pond.binance_history.exceptions import NetworkError, DataNotFound
 
 
 def gen_data_url(
