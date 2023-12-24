@@ -69,6 +69,7 @@ class CryptoDB(DuckDB):
                 tz=tz,
                 asset_type=asset_type,
             )
+            klines['jj_code'] = symbol
             pbar.set_postfix_str(f"{symbol}, df shape: {klines.shape}")
             kline_df_list.append(klines)
 
@@ -126,7 +127,7 @@ if __name__ == "__main__":
 
     db = CryptoDB(Path(r"E:\DuckDB"))
 
-    # db.update_kline_cm_future()
+    db.update_kline_cm_future()
     df = pl.read_parquet(db.path_crypto_kline/'futures_cm_1m.parquet').to_pandas()
     print(1)
 
