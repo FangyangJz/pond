@@ -56,9 +56,9 @@ def gen_data_url(
     return url
 
 
-def unify_datetime(input: Union[str, datetime.datetime]) -> datetime.datetime:
+def unify_datetime(input: Union[str, datetime.datetime]) -> pendulum.datetime.DateTime:
     if isinstance(input, str):
-        return pendulum.parse(input, strict=False).replace(tzinfo=None)
+        return pendulum.parser.parse(input, strict=False).replace(tzinfo=None) # type: ignore
     elif isinstance(input, datetime.datetime):
         return input.replace(tzinfo=None)
     else:
@@ -138,7 +138,7 @@ def get_data(
     data_tz: str,
     timeframe: Optional[str] = None,
     local_path:Union[Path, None]=None,
-) -> DataFrame:
+) -> Union[DataFrame, None]:
     if data_type == "klines":
         assert timeframe is not None
 
@@ -147,11 +147,12 @@ def get_data(
     df = load_data_from_disk(url, local_path)
     if df is None:
         df = download_data(data_type, asset_type, data_tz, url)
-        save_data_to_disk(url, df, local_path)
+        if df is not None:
+            save_data_to_disk(url, df, local_path)
     return df
 
 
-def download_data(data_type: str, asset_type:str, data_tz: str, url: str) -> DataFrame:
+def download_data(data_type: str, asset_type:str, data_tz: str, url: str) -> Union[DataFrame, None]:
     assert data_type in ["klines", "aggTrades"]
 
     try:
@@ -176,9 +177,8 @@ def load_klines(asset_type:str, data_tz: str, content: bytes) -> DataFrame:
     with zipfile.ZipFile(io.BytesIO(content)) as zipf:
         csv_name = zipf.namelist()[0]
         with zipf.open(csv_name, "r") as csvfile:
-            if asset_type == 'spot':
-                skiprows = None
-            elif asset_type == 'futures/cm':
+            skiprows = 0 # asset_type == 'spot'
+            if asset_type == 'futures/cm':
                 skiprows = 1
 
             df = pd.read_csv(

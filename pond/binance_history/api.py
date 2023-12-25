@@ -63,8 +63,8 @@ def fetch_data(
     symbol: str,
     asset_type: str,
     data_type: str,
-    start: datetime,
-    end: datetime,
+    start:  Union[str, datetime],
+    end:  Union[str, datetime],
     tz: Optional[str] = None,
     timeframe: Optional[str] = None,
     local_path:Union[Path, None]=None,
@@ -114,7 +114,7 @@ def fetch_data(
         get_data(data_type, asset_type, "daily", symbol, dt, tz, timeframe, local_path)
         for dt in days
     ]
-    df = pd.concat(monthly_dfs + daily_dfs)
+    df = pd.concat(monthly_dfs + daily_dfs) # type: ignore
     return df.loc[start:end]
 
 
