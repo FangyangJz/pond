@@ -5,6 +5,7 @@
 # @Software : PyCharm
 
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import pendulum
@@ -21,6 +22,7 @@ def fetch_klines(
     timeframe: str = "1m",
     asset_type: str = "spot",
     tz: Optional[str] = None,
+    local_path:Union[Path, None]=None,
 ) -> DataFrame:
     """convinience function by calling ``fetch_data``"""
 
@@ -32,6 +34,7 @@ def fetch_klines(
         end=end,
         timeframe=timeframe,
         tz=tz,
+        local_path=local_path
     )
 
 
@@ -41,6 +44,7 @@ def fetch_agg_trades(
     end: Union[str, datetime],
     asset_type: str = "spot",
     tz: Optional[str] = None,
+    local_path:Union[Path, None]=None,
 ) -> DataFrame:
     """convinience function by calling ``fetch_data``"""
 
@@ -51,6 +55,7 @@ def fetch_agg_trades(
         start=start,
         end=end,
         tz=tz,
+        local_path=local_path
     )
 
 
@@ -62,6 +67,7 @@ def fetch_data(
     end: datetime,
     tz: Optional[str] = None,
     timeframe: Optional[str] = None,
+    local_path:Union[Path, None]=None,
 ) -> DataFrame:
     """
     :param symbol: The binance market pair name. e.g. ``'BTCUSDT'``.
@@ -101,11 +107,11 @@ def fetch_data(
         timeframe=timeframe,
     )
     monthly_dfs = [
-        get_data(data_type, asset_type, "monthly", symbol, dt, tz, timeframe)
+        get_data(data_type, asset_type, "monthly", symbol, dt, tz, timeframe, local_path)
         for dt in months
     ]
     daily_dfs = [
-        get_data(data_type, asset_type, "daily", symbol, dt, tz, timeframe)
+        get_data(data_type, asset_type, "daily", symbol, dt, tz, timeframe, local_path)
         for dt in days
     ]
     df = pd.concat(monthly_dfs + daily_dfs)

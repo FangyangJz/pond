@@ -18,7 +18,6 @@ import pandas as pd
 import pendulum
 from pandas import Timestamp, DataFrame
 
-from pond.binance_history import config
 from pond.binance_history.exceptions import NetworkError, DataNotFound
 
 
@@ -138,16 +137,17 @@ def get_data(
     dt: Timestamp,
     data_tz: str,
     timeframe: Optional[str] = None,
+    local_path:Union[Path, None]=None,
 ) -> DataFrame:
     if data_type == "klines":
         assert timeframe is not None
 
     url = gen_data_url(data_type, asset_type, freq, symbol, dt, timeframe)
 
-    df = load_data_from_disk(url)
+    df = load_data_from_disk(url, local_path)
     if df is None:
         df = download_data(data_type, asset_type, data_tz, url)
-        save_data_to_disk(url, df)
+        save_data_to_disk(url, df, local_path)
     return df
 
 
@@ -228,19 +228,24 @@ def load_agg_trades(data_tz: str, content: bytes) -> DataFrame:
     return df
 
 
-def get_local_data_path(url: str) -> Path:
+def get_local_data_path(url: str, local_path:Union[Path, None]=None) -> Path:
     path = urlparse(url).path
-    return config.CACHE_DIR / path[1:]
+    
+    if local_path:
+        return local_path / path[1:]
+    else:
+        from pond.binance_history import config
+        return config.CACHE_DIR / path[1:]
 
 
-def save_data_to_disk(url: str, df: DataFrame) -> None:
-    path = get_local_data_path(url)
+def save_data_to_disk(url: str, df: DataFrame, local_path:Union[Path, None]=None) -> None:
+    path = get_local_data_path(url, local_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_pickle(path)
 
 
-def load_data_from_disk(url: str) -> Union[DataFrame, None]:
-    path = get_local_data_path(url)
+def load_data_from_disk(url: str, local_path:Union[Path, None]=None) -> Union[DataFrame, None]:
+    path = get_local_data_path(url, local_path)
     if os.path.exists(path):
         return pd.read_pickle(path)
     else:

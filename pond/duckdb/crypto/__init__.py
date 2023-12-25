@@ -68,6 +68,7 @@ class CryptoDB(DuckDB):
                 timeframe=timeframe,
                 tz=tz,
                 asset_type=asset_type,
+                local_path=self.path_crypto
             )
             klines['jj_code'] = symbol
             pbar.set_postfix_str(f"{symbol}, df shape: {klines.shape}")
