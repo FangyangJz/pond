@@ -56,7 +56,7 @@ def gen_data_url(
     return url
 
 
-def unify_datetime(input: Union[str, datetime.datetime]) -> pendulum.datetime.DateTime:
+def unify_datetime(input: Union[str, datetime.datetime]) -> pendulum.DateTime:
     if isinstance(input, str):
         return pendulum.parser.parse(input, strict=False).replace(tzinfo=None) # type: ignore
     elif isinstance(input, datetime.datetime):
