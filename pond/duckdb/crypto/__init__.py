@@ -23,6 +23,7 @@ class CryptoDB(DuckDB):
         self.path_crypto_trades_origin = self.path_crypto_trades / "origin"
         self.path_crypto_agg_trades = self.path_crypto / "agg_trades"
         self.path_crypto_agg_trades_origin = self.path_crypto_agg_trades / "origin"
+        self.path_crypto_orderbook = self.path_crypto / "orderbook"
         # self.proxies = {
         #     "https": "127.0.0.1:7890",
         # }
@@ -39,6 +40,7 @@ class CryptoDB(DuckDB):
             self.path_crypto_trades_origin,
             self.path_crypto_agg_trades,
             self.path_crypto_agg_trades_origin,
+            self.path_crypto_orderbook,
         ]
 
         super().__init__(db_path, df_type)
