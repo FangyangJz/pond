@@ -37,6 +37,7 @@ class StockDB(DuckDB):
         self.path_stock_level2_trade_agg = self.path_stock_level2 / "trade_agg"
         self.path_stock_level2_order = self.path_stock_level2 / "order"
         self.path_stock_level2_orderbook = self.path_stock_level2 / "orderbook"
+        self.path_stock_level2_orderbook_rebuild = self.path_stock_level2 / "orderbook_rebuild"
         self.path_stock_list = [
             self.path_stock,
             self.path_stock_info,
@@ -49,6 +50,7 @@ class StockDB(DuckDB):
             self.path_stock_level2_trade_agg, 
             self.path_stock_level2_order,
             self.path_stock_level2_orderbook,
+            self.path_stock_level2_orderbook_rebuild,
         ]
 
         super().__init__(db_path, df_type)
@@ -283,8 +285,8 @@ if __name__ == "__main__":
     #rel = db.get_kline_1d_qfq_rel()
     #df = db.get_kline_1d_qfq_df().to_pandas()
 
-    db.update_stock_info()
-    db.update_kline_1d_nfq()
+    # db.update_stock_info()
+    # db.update_kline_1d_nfq()
     # db.update_kline_1d_qfq()
 
     db.update_level2_trade()
