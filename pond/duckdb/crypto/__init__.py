@@ -9,7 +9,6 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
-from binance.cm_futures import CMFutures
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
 
 
@@ -24,12 +23,6 @@ class CryptoDB(DuckDB):
         self.path_crypto_agg_trades = self.path_crypto / "agg_trades"
         self.path_crypto_agg_trades_origin = self.path_crypto_agg_trades / "origin"
         self.path_crypto_orderbook = self.path_crypto / "orderbook"
-        # self.proxies = {
-        #     "https": "127.0.0.1:7890",
-        # }
-        self.client_cm_future = CMFutures(
-            # proxies=self.proxies
-        )
 
         self.path_crypto_list = [
             self.path_crypto,
@@ -56,10 +49,18 @@ class CryptoDB(DuckDB):
         timeframe: str = "1m",
         tz="Asia/Shanghai",
     ):
+        from binance.cm_futures import CMFutures
         from pond.binance_history.api import fetch_klines
         from pond.duckdb.crypto.future import get_cm_future_symbol_list
 
-        cm_symbol_list = get_cm_future_symbol_list(self.client_cm_future)
+        # proxies = {
+        #     "https": "127.0.0.1:7890",
+        # }
+        client_cm_future = CMFutures(
+            # proxies=proxies
+        )
+
+        cm_symbol_list = get_cm_future_symbol_list(client_cm_future)
 
         kline_df_list = []
         for symbol in (pbar := tqdm(cm_symbol_list)):
@@ -70,9 +71,9 @@ class CryptoDB(DuckDB):
                 timeframe=timeframe,
                 tz=tz,
                 asset_type=asset_type,
-                local_path=self.path_crypto
+                local_path=self.path_crypto,
             )
-            klines['jj_code'] = symbol
+            klines["jj_code"] = symbol
             pbar.set_postfix_str(f"{symbol}, df shape: {klines.shape}")
             kline_df_list.append(klines)
 
@@ -131,7 +132,7 @@ if __name__ == "__main__":
     db = CryptoDB(Path(r"E:\DuckDB"))
 
     db.update_kline_cm_future()
-    df = pl.read_parquet(db.path_crypto_kline/'futures_cm_1m.parquet').to_pandas()
+    df = pl.read_parquet(db.path_crypto_kline / "futures_cm_1m.parquet").to_pandas()
     print(1)
 
     # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
