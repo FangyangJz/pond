@@ -8,8 +8,10 @@ from pathlib import Path
 
 import pandas as pd
 from tqdm import tqdm
+from loguru import logger
 
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
+from pond.duckdb.crypto.custom_types import TIMEFRAMES
 
 
 class CryptoDB(DuckDB):
@@ -29,6 +31,7 @@ class CryptoDB(DuckDB):
             self.path_crypto_data,
             self.path_crypto_info,
             self.path_crypto_kline,
+            *self.get_common_interval_path_list(self.path_crypto_kline),
             self.path_crypto_trades,
             self.path_crypto_trades_origin,
             self.path_crypto_agg_trades,
@@ -38,6 +41,10 @@ class CryptoDB(DuckDB):
 
         super().__init__(db_path, df_type)
 
+    @staticmethod
+    def get_common_interval_path_list(base_path: Path):
+        return [base_path / freq for freq in ["1m", "1d"]]
+
     def init_db_path(self):
         [f.mkdir() for f in self.path_crypto_list if not f.exists()]
 
@@ -46,24 +53,34 @@ class CryptoDB(DuckDB):
         start: str = "2023-1-1",
         end: str = "2023-11-1",
         asset_type: str = "futures/cm",
-        timeframe: str = "1m",
-        tz="Asia/Shanghai",
+        timeframe: TIMEFRAMES = "1m",
+        tz: str = "Asia/Shanghai",
     ):
         from binance.cm_futures import CMFutures
         from pond.binance_history.api import fetch_klines
         from pond.duckdb.crypto.future import get_cm_future_symbol_list
 
-        # proxies = {
-        #     "https": "127.0.0.1:7890",
-        # }
-        client_cm_future = CMFutures(
-            # proxies=proxies
-        )
+        proxies = {
+            "https": "127.0.0.1:7890",
+        }
+        client_cm_future = CMFutures(proxies=proxies)
 
         cm_symbol_list = get_cm_future_symbol_list(client_cm_future)
 
-        kline_df_list = []
-        for symbol in (pbar := tqdm(cm_symbol_list)):
+        exist_files = [
+            f.stem for f in (self.path_crypto_kline / timeframe).glob("*.parquet")
+        ]
+
+        for symbol in (
+            pbar := tqdm(
+                cm_symbol_list,
+                desc=f"Download {timeframe} {asset_type} data from {start} -> {end}",
+            )
+        ):
+            if symbol in exist_files:
+                logger.warning(f"{symbol} is existed, skip download.")
+                continue
+
             klines = fetch_klines(
                 symbol=symbol,
                 start=start,
@@ -75,13 +92,10 @@ class CryptoDB(DuckDB):
             )
             klines["jj_code"] = symbol
             pbar.set_postfix_str(f"{symbol}, df shape: {klines.shape}")
-            kline_df_list.append(klines)
 
-        kline_df = pd.concat(kline_df_list)
-        kline_df.to_parquet(
-            self.path_crypto_kline
-            / f'{asset_type.replace("/", "_") if "/" in asset_type else asset_type}_{timeframe}.parquet'
-        )
+            klines.to_parquet(
+                self.path_crypto_kline / timeframe / f"{symbol}.parquet"
+            )
 
     def update_crypto_trades(self):
         trades_list = [f.stem for f in self.path_crypto_trades.iterdir()]
@@ -129,13 +143,13 @@ class CryptoDB(DuckDB):
 if __name__ == "__main__":
     import polars as pl
 
-    db = CryptoDB(Path(r"E:\DuckDB"))
+    # db = CryptoDB(Path(r"E:\DuckDB"))
+    db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
 
     db.update_kline_cm_future()
     df = pl.read_parquet(db.path_crypto_kline / "futures_cm_1m.parquet").to_pandas()
     print(1)
 
-    # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
     # db.update_crypto_trades()
 
     # for f in (pbar := tqdm(db.path_crypto_agg_trades_origin.glob("*.csv"))):

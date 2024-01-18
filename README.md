@@ -74,6 +74,13 @@ df3 = db.get_kline_1d_qfq_df()
 ```
 
 ### 3. CryptoDB
+
+Dependency install:
+```commandline
+pip install binance-futures-connector
+```
+
+Usage examples:
 ```python
 from pathlib import Path
 from pond.duckdb.crypto import CryptoDB
