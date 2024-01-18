@@ -11,7 +11,7 @@ from tqdm import tqdm
 from loguru import logger
 
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
-from pond.duckdb.crypto.custom_types import TIMEFRAMES
+from pond.duckdb.crypto.custom_types import TIMEFRAMES, TIMEZONE
 
 
 class CryptoDB(DuckDB):
@@ -54,7 +54,7 @@ class CryptoDB(DuckDB):
         end: str = "2023-11-1",
         asset_type: str = "futures/cm",
         timeframe: TIMEFRAMES = "1m",
-        tz: str = "Asia/Shanghai",
+        tz: TIMEZONE = "UTC",
     ):
         from binance.cm_futures import CMFutures
         from pond.binance_history.api import fetch_klines
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     # db = CryptoDB(Path(r"E:\DuckDB"))
     db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
 
-    # db.update_kline_cm_future()
+    db.update_kline_cm_future()
     df = pl.read_parquet(
         db.path_crypto_kline / "1m" / "BTCUSD_PERP.parquet"
     ).to_pandas()

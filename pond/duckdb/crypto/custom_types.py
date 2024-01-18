@@ -19,3 +19,5 @@ TIMEFRAMES = Literal[
     "1w",
     "1M",
 ]
+
+TIMEZONE = Literal['UTC', 'Asia/Shanghai']

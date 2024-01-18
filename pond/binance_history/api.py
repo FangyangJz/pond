@@ -22,7 +22,7 @@ def fetch_klines(
     timeframe: str = "1m",
     asset_type: str = "spot",
     tz: Optional[str] = None,
-    local_path:Union[Path, None]=None,
+    local_path: Union[Path, None] = None,
 ) -> DataFrame:
     """convinience function by calling ``fetch_data``"""
 
@@ -34,7 +34,7 @@ def fetch_klines(
         end=end,
         timeframe=timeframe,
         tz=tz,
-        local_path=local_path
+        local_path=local_path,
     )
 
 
@@ -44,7 +44,7 @@ def fetch_agg_trades(
     end: Union[str, datetime],
     asset_type: str = "spot",
     tz: Optional[str] = None,
-    local_path:Union[Path, None]=None,
+    local_path: Union[Path, None] = None,
 ) -> DataFrame:
     """convinience function by calling ``fetch_data``"""
 
@@ -55,7 +55,7 @@ def fetch_agg_trades(
         start=start,
         end=end,
         tz=tz,
-        local_path=local_path
+        local_path=local_path,
     )
 
 
@@ -63,11 +63,11 @@ def fetch_data(
     symbol: str,
     asset_type: str,
     data_type: str,
-    start:  Union[str, datetime],
-    end:  Union[str, datetime],
+    start: Union[str, datetime],
+    end: Union[str, datetime],
     tz: Optional[str] = None,
     timeframe: Optional[str] = None,
-    local_path:Union[Path, None]=None,
+    local_path: Union[Path, None] = None,
 ) -> DataFrame:
     """
     :param symbol: The binance market pair name. e.g. ``'BTCUSDT'``.
@@ -107,14 +107,16 @@ def fetch_data(
         timeframe=timeframe,
     )
     monthly_dfs = [
-        get_data(data_type, asset_type, "monthly", symbol, dt, tz, timeframe, local_path)
+        get_data(
+            data_type, asset_type, "monthly", symbol, dt, tz, timeframe, local_path
+        )
         for dt in months
     ]
     daily_dfs = [
         get_data(data_type, asset_type, "daily", symbol, dt, tz, timeframe, local_path)
         for dt in days
     ]
-    df = pd.concat(monthly_dfs + daily_dfs) # type: ignore
+    df = pd.concat(monthly_dfs + daily_dfs)  # type: ignore
     return df.loc[start:end]
 
 
@@ -125,15 +127,22 @@ if __name__ == "__main__":
     symbol = "BTCUSD_PERP"
     asset_type = "futures/cm"
 
-    # symbol = "BTCUSDT"
-    # asset_type = "spot"
+    symbol = "BTCUSDT"
+    asset_type = "spot"
 
-    start = "2023-1-1"
+    start = "2020-9-1"
     end = "2023-11-1"
-    tz = "Asia/Shanghai"
+    # tz = "Asia/Shanghai"
+    tz = "UTC"
 
     from pond.duckdb.crypto.future import get_cm_future_symbol_list
+
     klines = fetch_klines(
-        symbol=symbol, start=start, end=end, tz=tz, asset_type=asset_type
+        symbol=symbol,
+        start=start,
+        end=end,
+        tz=tz,
+        asset_type=asset_type,
+        local_path=Path("/home/fangyang/zhitai5000/DuckDB/crypto/"),
     )
     print(1)

@@ -58,7 +58,7 @@ def gen_data_url(
 
 def unify_datetime(input: Union[str, datetime.datetime]) -> pendulum.DateTime:
     if isinstance(input, str):
-        return pendulum.parser.parse(input, strict=False).replace(tzinfo=None) # type: ignore
+        return pendulum.parser.parse(input, strict=False).replace(tzinfo=None)  # type: ignore
     elif isinstance(input, datetime.datetime):
         return input.replace(tzinfo=None)
     else:
@@ -137,7 +137,7 @@ def get_data(
     dt: Timestamp,
     data_tz: str,
     timeframe: Optional[str] = None,
-    local_path:Union[Path, None]=None,
+    local_path: Union[Path, None] = None,
 ) -> Union[DataFrame, None]:
     if data_type == "klines":
         assert timeframe is not None
@@ -152,7 +152,9 @@ def get_data(
     return df
 
 
-def download_data(data_type: str, asset_type:str, data_tz: str, url: str) -> Union[DataFrame, None]:
+def download_data(
+    data_type: str, asset_type: str, data_tz: str, url: str
+) -> Union[DataFrame, None]:
     assert data_type in ["klines", "aggTrades"]
 
     try:
@@ -173,12 +175,12 @@ def download_data(data_type: str, asset_type:str, data_tz: str, url: str) -> Uni
         return load_agg_trades(data_tz, resp.content)
 
 
-def load_klines(asset_type:str, data_tz: str, content: bytes) -> DataFrame:
+def load_klines(asset_type: str, data_tz: str, content: bytes) -> DataFrame:
     with zipfile.ZipFile(io.BytesIO(content)) as zipf:
         csv_name = zipf.namelist()[0]
         with zipf.open(csv_name, "r") as csvfile:
-            skiprows = 0 # asset_type == 'spot'
-            if asset_type == 'futures/cm':
+            skiprows = 0  # asset_type == 'spot'
+            if asset_type == "futures/cm":
                 skiprows = 1
 
             df = pd.read_csv(
@@ -228,23 +230,28 @@ def load_agg_trades(data_tz: str, content: bytes) -> DataFrame:
     return df
 
 
-def get_local_data_path(url: str, local_path:Union[Path, None]=None) -> Path:
+def get_local_data_path(url: str, local_path: Union[Path, None] = None) -> Path:
     path = urlparse(url).path
-    
+
     if local_path:
         return local_path / path[1:]
     else:
         from pond.binance_history import config
+
         return config.CACHE_DIR / path[1:]
 
 
-def save_data_to_disk(url: str, df: DataFrame, local_path:Union[Path, None]=None) -> None:
+def save_data_to_disk(
+    url: str, df: DataFrame, local_path: Union[Path, None] = None
+) -> None:
     path = get_local_data_path(url, local_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_pickle(path)
 
 
-def load_data_from_disk(url: str, local_path:Union[Path, None]=None) -> Union[DataFrame, None]:
+def load_data_from_disk(
+    url: str, local_path: Union[Path, None] = None
+) -> Union[DataFrame, None]:
     path = get_local_data_path(url, local_path)
     if os.path.exists(path):
         return pd.read_pickle(path)
