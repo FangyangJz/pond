@@ -93,9 +93,7 @@ class CryptoDB(DuckDB):
             klines["jj_code"] = symbol
             pbar.set_postfix_str(f"{symbol}, df shape: {klines.shape}")
 
-            klines.to_parquet(
-                self.path_crypto_kline / timeframe / f"{symbol}.parquet"
-            )
+            klines.to_parquet(self.path_crypto_kline / timeframe / f"{symbol}.parquet")
 
     def update_crypto_trades(self):
         trades_list = [f.stem for f in self.path_crypto_trades.iterdir()]
@@ -146,8 +144,10 @@ if __name__ == "__main__":
     # db = CryptoDB(Path(r"E:\DuckDB"))
     db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
 
-    db.update_kline_cm_future()
-    df = pl.read_parquet(db.path_crypto_kline / "futures_cm_1m.parquet").to_pandas()
+    # db.update_kline_cm_future()
+    df = pl.read_parquet(
+        db.path_crypto_kline / "1m" / "BTCUSD_PERP.parquet"
+    ).to_pandas()
     print(1)
 
     # db.update_crypto_trades()
