@@ -14,4 +14,7 @@ class Downloader:
     def download(self, func, **kwargs):
         if func is None:
             return
-        self.df = func(**kwargs)
+        try:
+            self.df = func(**kwargs)
+        except Exception as e:
+            print(e)
