@@ -57,7 +57,7 @@ class ClickHouseManager:
             df = df[df["datetime"] > record.datetime]
         df.drop_duplicates(inplace=True)
         rows = df.to_sql(table.__tablename__, self.engine, index=False, if_exists='append')
-        print(f"saved {rows} into table {table.__tablename__}")
+        print(f"saved {len(df)} into table {table.__tablename__}")
 
 
     def get_syncing_tasks(self, date) -> List[Task]:
@@ -92,4 +92,4 @@ if __name__ == "__main__":
     password = os.environ.get("CLICKHOUSE_PWD")
     conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
     manager = ClickHouseManager(conn_str)
-    manager.sync(date=(datetime(2022, 9, 30)))
+    manager.sync(date=(datetime(2024, 1, 21)))
