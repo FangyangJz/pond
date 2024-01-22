@@ -21,3 +21,4 @@ TIMEFRAMES = Literal[
 ]
 
 TIMEZONE = Literal['UTC', 'Asia/Shanghai']
+ASSET_TYPE = Literal["futures/cm", 'spot']

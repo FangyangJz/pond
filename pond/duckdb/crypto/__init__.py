@@ -11,7 +11,7 @@ from tqdm import tqdm
 from loguru import logger
 
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
-from pond.duckdb.crypto.custom_types import TIMEFRAMES, TIMEZONE
+from pond.duckdb.crypto.custom_types import TIMEFRAMES, TIMEZONE, ASSET_TYPE
 
 
 class CryptoDB(DuckDB):
@@ -52,7 +52,7 @@ class CryptoDB(DuckDB):
         self,
         start: str = "2023-1-1",
         end: str = "2023-11-1",
-        asset_type: str = "futures/cm",
+        asset_type: ASSET_TYPE = "futures/cm",
         timeframe: TIMEFRAMES = "1m",
         tz: TIMEZONE = "UTC",
     ):
@@ -64,6 +64,7 @@ class CryptoDB(DuckDB):
             "https": "127.0.0.1:7890",
         }
         client_cm_future = CMFutures(proxies=proxies)
+        # client_cm_future = CMFutures()
 
         cm_symbol_list = get_cm_future_symbol_list(client_cm_future)
 
@@ -141,8 +142,8 @@ class CryptoDB(DuckDB):
 if __name__ == "__main__":
     import polars as pl
 
-    # db = CryptoDB(Path(r"E:\DuckDB"))
-    db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
+    db = CryptoDB(Path(r"E:\DuckDB"))
+    # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
 
     db.update_kline_cm_future()
     df = pl.read_parquet(
