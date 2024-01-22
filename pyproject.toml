@@ -28,6 +28,10 @@ loguru = "^0.7.2"
 black = "^23.11.0"
 polars = "^0.20.4"
 pyarrow = "^14.0.2"
+polars = "^0.19.16"
+pyarrow = "^14.0.1"
+sqlalchemy = "^2.0.25"
+clickhouse-sqlalchemy = "^0.3.0"
 
 
 [build-system]
