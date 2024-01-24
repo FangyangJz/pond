@@ -22,13 +22,8 @@ class TsTable(Base):
         for column in self.__dict__['_sa_instance_state'].class_.__table__.columns._all_columns:
             col:Column = column
             if col.comment in df.columns:
-                #duplicate the column if required 
-                if col.comment in columns.keys():
-                    df[col.name] = df[col.comment]
-                    df[col.name] = self.format_col(col, df[col.name])
-                else:
-                    columns[col.comment] = col.name
-                    df[col.comment] = self.format_col(col, df[col.comment])
+                columns[col.comment] = col.name
+                df[col.comment] = self.format_col(col, df[col.comment])
 
         df = df.rename(columns=columns)
         return df[columns.values()]

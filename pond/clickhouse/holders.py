@@ -11,7 +11,7 @@ class FreeHoldingDetail(TsTable):
 
     __tablename__ = "FreeHoldingDetail"
 
-    datetime = Column(types.DateTime64, comment="公告日", primary_key=True)
+    datetime = Column(types.DateTime64, comment="时间", primary_key=True)
     code = Column(types.String, comment="股票代码")
     name = Column(types.String, comment="股东名称")
     nature = Column(types.String, comment="股东类型")
@@ -37,7 +37,7 @@ class HoldingDetail(TsTable):
     """
     持股明细-十大股东
     """
-    datetime = Column(types.DateTime64, comment="公告日", primary_key=True)
+    datetime = Column(types.DateTime64, comment="时间", primary_key=True)
     code = Column(types.String, comment="股票代码")
     name = Column(types.String, comment="股东名称")
     nature = Column(types.String, comment="股东类型")
@@ -125,7 +125,7 @@ class HolderCounts(TsTable):
     """
     __tablename__ = "HolderCounts"
 
-    datetime = Column(types.DateTime64, comment="公告日期", primary_key=True)
+    datetime = Column(types.DateTime64, comment="时间", primary_key=True)
     code = Column(types.String, comment="代码")
     report_date = Column(types.DateTime64, comment="股东户数统计截止日-本次")
     last_report_date = Column(types.DateTime64, comment="股东户数统计截止日-上次")
