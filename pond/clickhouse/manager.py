@@ -31,8 +31,12 @@ class ClickHouseManager:
         self.session = make_session(self.engine)
 
     def sync(self, date=datetime.now()):
+        print(f"click house manager syncing at {date.isoformat()}")
         tasks = self.get_syncing_tasks(date)
         for task in tasks:
+            record = self.session.query(task.table).order_by(desc(task.table.datetime)).limit(1).one_or_none()
+            if record is not None and record.datetime >= date:
+                continue
             for kwargs in task.arg_groups:
                 downloader = Downloader.remote()
                 downloader.download.remote(task.func, **kwargs)
@@ -72,14 +76,22 @@ class ClickHouseManager:
             for changement in changements:
                 holding_detail_arg_groups.append({"date":datestr(date), "indicator":holder_type, "symbol":changement})
         tasks.append(Task(HoldingDetail, ak.stock_gdfx_holding_detail_em, holding_detail_arg_groups))
+        
         #free holding statistic
         tasks.append(Task(FreeHoldingStatistic, ak.stock_gdfx_free_holding_statistics_em, [args]))
+
         #holding statistic
         tasks.append(Task(HoldingStatistic, ak.stock_gdfx_holding_statistics_em, [args]))
+
         #holder counts
         tasks.append(Task(HolderCounts, ak.stock_zh_a_gdhs, [{"symbol":datestr(date)}]))
+
         #restricted release detail
-        begin = date - timedelta(days=365 * 2)
+        record = self.session.query(StockRestrictedReleaseDetail).order_by(desc(StockRestrictedReleaseDetail.datetime)).limit(1).one_or_none()
+        if record is not None:
+            begin = record.datetime
+        else:
+            begin = date - timedelta(days=365 * 2)
         restricted_release_detail_args = {"start_date":datestr(begin), "end_date":datestr(date)}
         tasks.append(Task(StockRestrictedReleaseDetail, ak.stock_restricted_release_detail_em, [restricted_release_detail_args]))
         return tasks
@@ -92,4 +104,8 @@ if __name__ == "__main__":
     password = os.environ.get("CLICKHOUSE_PWD")
     conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
     manager = ClickHouseManager(conn_str)
-    manager.sync(date=(datetime(2024, 1, 21)))
+    begin = datetime(2018, 1, 1)
+    end = datetime.now()
+    while begin < end:
+        begin += timedelta(days=1)
+        manager.sync(date=begin)
