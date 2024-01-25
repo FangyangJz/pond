@@ -101,11 +101,14 @@ class ClickHouseManager:
 
 if __name__ == "__main__":
     import os
+    import time
     password = os.environ.get("CLICKHOUSE_PWD")
     conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
     manager = ClickHouseManager(conn_str)
-    begin = datetime(2018, 1, 1)
+    begin = datetime(2019, 2, 2)
     end = datetime.now()
     while begin < end:
         begin += timedelta(days=1)
         manager.sync(date=begin)
+        time.sleep(2)
+    
