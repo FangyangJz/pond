@@ -48,6 +48,40 @@ class CryptoDB(DuckDB):
     def init_db_path(self):
         [f.mkdir() for f in self.path_crypto_list if not f.exists()]
 
+    def get_local_cm_future_perpetual_symbol_list(self):
+        df = self.get_future_info()
+        df = df[df['contractType'] == "PERPETUAL"]
+        return df.symbol.to_list()
+
+    def get_future_info(self, from_local=True):
+        if from_local:
+            file = self.path_crypto_info/'info.csv'
+            if file.exists():
+                info_df = pd.read_csv(file)
+            else:
+                logger.warning(f'{file} is not exist on local, start to read from network.')
+                info_df = self.update_future_info()
+        else:
+            info_df = self.update_future_info()
+
+        return info_df
+
+    def update_future_info(self):
+        file  = self.path_crypto_info/'info.csv'
+        logger.info(f'Update {file} from network...')
+
+        from binance.cm_futures import CMFutures
+        from pond.duckdb.crypto.future import get_cm_future_info_df
+
+        proxies = {
+            "https": "127.0.0.1:7890",
+        }
+        client_cm_future = CMFutures(proxies=proxies)
+        info_df = get_cm_future_info_df(client_cm_future)
+        info_df.to_csv(self.path_crypto_info/'info.csv', index_label=False)
+        
+        return info_df
+
     def update_kline_cm_future(
         self,
         start: str = "2023-1-1",
@@ -144,6 +178,8 @@ if __name__ == "__main__":
 
     db = CryptoDB(Path(r"E:\DuckDB"))
     # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
+    df = db.get_future_info()
+    ll = db.get_local_cm_future_perpetual_symbol_list()
 
     db.update_kline_cm_future()
     df = pl.read_parquet(
