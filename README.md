@@ -89,11 +89,15 @@ from pond.duckdb.crypto import CryptoDB
 # db = CryptoDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
 db = CryptoDB(Path(r'D:\DuckDB'))
 
-# download CM future data to D:\DuckDB\crypto\data
-# aggregate data and save parquet file in E:\DuckDB\crypto\kline
-db.update_kline_cm_future(*params)
+# update CM and UM future info in E:\DuckDB\crypto\info
+db.update_future_info()
+
+# download history future data to D:\DuckDB\crypto\data
+# save parquet file in E:\DuckDB\crypto\kline
+db.update_history_data(*params)
+
 # read parquet file in E:\DuckDB\crypto\kline directory
-df = pl.read_parquet(db.path_crypto_kline/'futures_cm_1m.parquet')
+df = pl.read_parquet(db.path_crypto_kline_um/ '1m' /'BTCUSDT.parquet')
 
 # extract csv file in D:\DuckDB\crypto\trades\origin
 # update crypto trade data from csv file to parquet
