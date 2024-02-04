@@ -6,7 +6,8 @@
 import time
 
 from binance.cm_futures import CMFutures
-from typing import List
+from binance.um_futures import UMFutures
+from typing import List, Union
 
 from tqdm import tqdm
 import pandas as pd
@@ -15,29 +16,41 @@ import datetime as dt
 # https://github.com/binance/binance-futures-connector-python
 
 
-def get_cm_future_info_df(client: CMFutures)->pd.DataFrame:
+def get_future_info_df(client: Union[CMFutures, UMFutures]) -> pd.DataFrame:
     info = client.exchange_info()
-    df = pd.DataFrame.from_records(info['symbols'])
-    df['update_datetime'] = dt.datetime.utcfromtimestamp(info['serverTime']/1000).replace(tzinfo=dt.timezone.utc)
-    df['deliveryDate'] = df['deliveryDate'].apply(lambda x : dt.datetime.utcfromtimestamp(x/1000).replace(tzinfo=dt.timezone.utc))
-    df['onboardDate'] = df['onboardDate'].apply(lambda x : dt.datetime.utcfromtimestamp(x/1000).replace(tzinfo=dt.timezone.utc))
+    df = pd.DataFrame.from_records(info["symbols"])
+    df["update_datetime"] = dt.datetime.utcfromtimestamp(
+        info["serverTime"] / 1000
+    ).replace(tzinfo=dt.timezone.utc)
+    df["deliveryDate"] = df["deliveryDate"].apply(
+        lambda x: dt.datetime.utcfromtimestamp(x / 1000).replace(tzinfo=dt.timezone.utc)
+    )
+    df["onboardDate"] = df["onboardDate"].apply(
+        lambda x: dt.datetime.utcfromtimestamp(x / 1000).replace(tzinfo=dt.timezone.utc)
+    )
     return df
 
-def get_cm_future_symbol_list(client: CMFutures) -> List[str]:
-    df = get_cm_future_info_df(client)
-    return [i["symbol"] for i in df["symbols"].values if i["contractType"] == "PERPETUAL"]
+
+def get_future_symbol_list(client: Union[CMFutures, UMFutures]) -> List[str]:
+    df = get_future_info_df(client)
+    return [
+        ss["symbol"] for _, ss in df.iterrows() if ss["contractType"] == "PERPETUAL"
+    ]
 
 
 if __name__ == "__main__":
-    from pond.binance_history.api import fetch_klines
+    from pond.binance_history.api import fetch_data
+    from pond.binance_history.type import AssetType, DataType
 
     proxies = {"https": "127.0.0.1:7890"}
 
-    client = CMFutures(
-        proxies=proxies
-    )
-    cm_symbol_list = get_cm_future_symbol_list(client)
-    asset_type = "futures/cm"
+    um_client = UMFutures(proxies=proxies)
+    cm_client = CMFutures(proxies=proxies)
+
+    # r = get_future_info_df(um_client)
+
+    cm_symbol_list = get_future_symbol_list(cm_client)
+    um_symbol_list = get_future_symbol_list(um_client)
 
     start = "2023-1-1"
     end = "2023-11-1"
@@ -45,10 +58,16 @@ if __name__ == "__main__":
 
     for symbol in tqdm(cm_symbol_list):
         start_time = time.perf_counter()
-        klines = fetch_klines(
-            symbol=symbol, start=start, end=end, tz=tz, asset_type=asset_type
+        klines = fetch_data(
+            symbol=symbol,
+            asset_type=AssetType.future_cm,
+            data_type=DataType.klines,
+            start=start,
+            end=end,
+            tz=tz,
+            timeframe='1m'
         )
-        print(symbol, klines.shape, time.perf_counter()-start_time)
+        print(symbol, klines.shape, time.perf_counter() - start_time)
         print(1)
     # r = client.klines("BTCUSD_PERP", "1d")
     # info = client.exchange_info()

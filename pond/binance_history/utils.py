@@ -19,19 +19,17 @@ import pendulum
 from pandas import Timestamp, DataFrame
 
 from pond.binance_history.exceptions import NetworkError, DataNotFound
+from pond.binance_history.type import TIMEFRAMES, AssetType, DataType, TIMEZONE
 
 
 def gen_data_url(
-    data_type: str,
-    asset_type: str,
+    data_type: DataType,
+    asset_type: AssetType,
     freq: str,
     symbol: str,
     dt: Timestamp,
-    timeframe: Optional[str] = None,
+    timeframe: TIMEFRAMES,
 ):
-    url: str
-    date_str: str
-
     if freq == "monthly":
         date_str = dt.strftime("%Y-%m")
     elif freq == "daily":
@@ -39,16 +37,14 @@ def gen_data_url(
     else:
         raise ValueError(f"freq must be 'monthly' or 'daily', but got '{freq}'")
 
-    if data_type == "klines":
-        if timeframe is None:
-            raise ValueError("'timeframe' must not be None when data_type is 'klines'")
+    if data_type == DataType.klines:
         url = (
-            f"https://data.binance.vision/data/{asset_type}/{freq}/{data_type}/{symbol}/{timeframe}"
+            f"https://data.binance.vision/data/{asset_type.value}/{freq}/{data_type.value}/{symbol}/{timeframe}"
             f"/{symbol}-{timeframe}-{date_str}.zip"
         )
-    elif data_type == "aggTrades":
+    elif data_type == DataType.aggTrades:
         url = (
-            f"https://data.binance.vision/data/{asset_type}/{freq}/{data_type}/{symbol}"
+            f"https://data.binance.vision/data/{asset_type.value}/{freq}/{data_type.value}/{symbol}"
             f"/{symbol}-{data_type}-{date_str}.zip"
         )
     else:
@@ -80,12 +76,12 @@ def exists_month(month_url):
 
 
 def gen_dates(
-    data_type: str,
-    asset_type: str,
+    data_type: DataType,
+    asset_type: AssetType,
     symbol: str,
     start: Timestamp,
     end: Timestamp,
-    timeframe: Optional[str] = None,
+    timeframe: TIMEFRAMES,
 ):
     assert start.tz is None and end.tz is None
 
@@ -130,13 +126,13 @@ def gen_dates(
 
 
 def get_data(
-    data_type: str,
-    asset_type: str,
+    data_type: DataType,
+    asset_type: AssetType,
     freq: str,
     symbol: str,
     dt: Timestamp,
-    data_tz: str,
-    timeframe: Optional[str] = None,
+    data_tz: TIMEZONE,
+    timeframe: TIMEFRAMES,
     local_path: Union[Path, None] = None,
 ) -> Union[DataFrame, None]:
     if data_type == "klines":
@@ -153,9 +149,9 @@ def get_data(
 
 
 def download_data(
-    data_type: str, asset_type: str, data_tz: str, url: str
+    data_type: DataType, asset_type: AssetType, data_tz: TIMEZONE, url: str
 ) -> Union[DataFrame, None]:
-    assert data_type in ["klines", "aggTrades"]
+    assert isinstance(data_type, DataType)
 
     try:
         resp = httpx.get(url)
@@ -169,18 +165,18 @@ def download_data(
     else:
         raise NetworkError(url)
 
-    if data_type == "klines":
+    if data_type == DataType.klines:
         return load_klines(asset_type, data_tz, resp.content)
-    elif data_type == "aggTrades":
+    elif data_type == DataType.aggTrades:
         return load_agg_trades(data_tz, resp.content)
 
 
-def load_klines(asset_type: str, data_tz: str, content: bytes) -> DataFrame:
+def load_klines(asset_type: AssetType, data_tz: TIMEZONE, content: bytes) -> DataFrame:
     with zipfile.ZipFile(io.BytesIO(content)) as zipf:
         csv_name = zipf.namelist()[0]
         with zipf.open(csv_name, "r") as csvfile:
             skiprows = 0  # asset_type == 'spot'
-            if asset_type == "futures/cm":
+            if asset_type in [AssetType.future_cm, AssetType.future_um]:
                 skiprows = 1
 
             df = pd.read_csv(
@@ -212,7 +208,7 @@ def load_klines(asset_type: str, data_tz: str, content: bytes) -> DataFrame:
     return df
 
 
-def load_agg_trades(data_tz: str, content: bytes) -> DataFrame:
+def load_agg_trades(data_tz: TIMEZONE, content: bytes) -> DataFrame:
     with zipfile.ZipFile(io.BytesIO(content)) as zipf:
         csv_name = zipf.namelist()[0]
         with zipf.open(csv_name, "r") as csvfile:

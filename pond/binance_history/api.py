@@ -8,65 +8,21 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-import pendulum
 from pandas import DataFrame
 
+from pond.binance_history.type import TIMEFRAMES, AssetType, TIMEZONE, DataType
 from pond.binance_history.utils import gen_dates, get_data, unify_datetime
-from typing import Optional, Union
-
-
-def fetch_klines(
-    symbol: str,
-    start: Union[str, datetime],
-    end: Union[str, datetime],
-    timeframe: str = "1m",
-    asset_type: str = "spot",
-    tz: Optional[str] = None,
-    local_path: Union[Path, None] = None,
-) -> DataFrame:
-    """convinience function by calling ``fetch_data``"""
-
-    return fetch_data(
-        data_type="klines",
-        asset_type=asset_type,
-        symbol=symbol,
-        start=start,
-        end=end,
-        timeframe=timeframe,
-        tz=tz,
-        local_path=local_path,
-    )
-
-
-def fetch_agg_trades(
-    symbol: str,
-    start: Union[str, datetime],
-    end: Union[str, datetime],
-    asset_type: str = "spot",
-    tz: Optional[str] = None,
-    local_path: Union[Path, None] = None,
-) -> DataFrame:
-    """convinience function by calling ``fetch_data``"""
-
-    return fetch_data(
-        data_type="aggTrades",
-        asset_type=asset_type,
-        symbol=symbol,
-        start=start,
-        end=end,
-        tz=tz,
-        local_path=local_path,
-    )
+from typing import Union
 
 
 def fetch_data(
     symbol: str,
-    asset_type: str,
-    data_type: str,
+    asset_type: AssetType,
+    data_type: DataType,
     start: Union[str, datetime],
     end: Union[str, datetime],
-    tz: Optional[str] = None,
-    timeframe: Optional[str] = None,
+    tz: TIMEZONE = "UTC",
+    timeframe: TIMEFRAMES = '1m',
     local_path: Union[Path, None] = None,
 ) -> DataFrame:
     """
@@ -89,13 +45,9 @@ def fetch_data(
         the dataframe's index is the open datetime of klines, the timezone of the datetime is set by ``tz``,
         if it is None, your local timezone will be used.
     """
-    if tz is None:
-        tz = pendulum.local_timezone().name
 
     start, end = unify_datetime(start), unify_datetime(end)
-
     start, end = pd.Timestamp(start, tz=tz), pd.Timestamp(end, tz=tz)
-
     symbol = symbol.upper().replace("/", "")
 
     months, days = gen_dates(
@@ -125,10 +77,10 @@ if __name__ == "__main__":
     # https://data.binance.vision/?prefix=data/futures/cm/monthly/klines/
 
     symbol = "BTCUSD_PERP"
-    asset_type = "futures/cm"
+    asset_type = AssetType.future_cm
 
     symbol = "BTCUSDT"
-    asset_type = "spot"
+    asset_type = AssetType.spot
 
     start = "2020-9-1"
     end = "2023-11-1"
