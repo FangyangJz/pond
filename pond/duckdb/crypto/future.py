@@ -69,6 +69,7 @@ if __name__ == "__main__":
         )
         print(symbol, klines.shape, time.perf_counter() - start_time)
         print(1)
+
     # r = client.klines("BTCUSD_PERP", "1d")
     # info = client.exchange_info()
     # cm_list = []

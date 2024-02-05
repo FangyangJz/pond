@@ -5,11 +5,11 @@
 # @Software : PyCharm
 
 from pathlib import Path
+from typing import Dict, List
 
 import pandas as pd
 from tqdm import tqdm
 from loguru import logger
-
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
 from pond.binance_history.type import TIMEFRAMES, TIMEZONE, AssetType, DataType
 
@@ -56,12 +56,14 @@ class CryptoDB(DuckDB):
     def init_db_path(self):
         [f.mkdir() for f in self.path_crypto_list if not f.exists()]
 
-    def get_local_cm_future_perpetual_symbol_list(self):
-        df = self.get_future_info()
+    def get_local_future_perpetual_symbol_list(
+        self, asset_type: AssetType
+    ) -> List[str]:
+        df = self.get_future_info(asset_type)
         df = df[df["contractType"] == "PERPETUAL"]
         return df.symbol.to_list()
 
-    def get_future_info(self, asset_type: AssetType, from_local=True):
+    def get_future_info(self, asset_type: AssetType, from_local=True) -> pd.DataFrame:
         a1, a2 = asset_type.value.split("/")
         file = self.path_crypto_info / f"{a2.upper()}{a1.capitalize()}.csv"
 
@@ -73,7 +75,10 @@ class CryptoDB(DuckDB):
 
         return pd.read_csv(file)
 
-    def update_future_info(self):
+    def update_future_info(self, proxies: Dict[str, str] = {"https": "127.0.0.1:7890"}):
+        """
+        params: proxies={"https": "127.0.0.1:7890"}
+        """
         file = self.path_crypto_info / "info.csv"
         logger.info(f"Update {file} from network...")
 
@@ -81,9 +86,6 @@ class CryptoDB(DuckDB):
         from binance.um_futures import UMFutures
         from pond.duckdb.crypto.future import get_future_info_df
 
-        proxies = {
-            "https": "127.0.0.1:7890",
-        }
         clients = [CMFutures(proxies=proxies), UMFutures(proxies=proxies)]
 
         for c in clients:
@@ -100,18 +102,15 @@ class CryptoDB(DuckDB):
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
         tz: TIMEZONE = "UTC",
+        proxies: Dict[str, str] = {},
     ):
         from binance.cm_futures import CMFutures
         from binance.um_futures import UMFutures
         from pond.binance_history.api import fetch_data
-        from pond.duckdb.crypto.future import get_future_symbol_list
 
         assert isinstance(asset_type, AssetType)
         assert isinstance(data_type, DataType)
 
-        proxies = {
-            "https": "127.0.0.1:7890",
-        }
         client = None
 
         if asset_type == AssetType.future_cm:
@@ -129,14 +128,12 @@ class CryptoDB(DuckDB):
                 base_path = self.path_crypto_agg_trades
 
         elif asset_type == AssetType.spot:
-            raise NotImplemented('spot client has not been added')
+            raise NotImplemented("spot client has not been added")
             base_path = self.path_crypto_kline_spot
 
-        symbol_list = get_future_symbol_list(client)
+        symbol_list = self.get_local_future_perpetual_symbol_list(asset_type=asset_type)
 
-        exist_files = [
-            f.stem for f in (base_path / timeframe).glob("*.parquet")
-        ]
+        exist_files = [f.stem for f in (base_path / timeframe).glob("*.parquet")]
 
         for symbol in (
             pbar := tqdm(
@@ -148,6 +145,7 @@ class CryptoDB(DuckDB):
                 logger.warning(f"{symbol} is existed, skip download.")
                 continue
 
+            pbar.set_postfix_str(f"{symbol}, download ...")
             data = fetch_data(
                 symbol=symbol,
                 asset_type=asset_type,
@@ -159,7 +157,9 @@ class CryptoDB(DuckDB):
                 local_path=self.path_crypto,
             )
             data["jj_code"] = symbol
-            pbar.set_postfix_str(f"{symbol}, df shape: {data.shape}")
+            pbar.set_postfix_str(
+                f"{symbol} download successfully, df shape: {data.shape}"
+            )
 
             data.to_parquet(base_path / timeframe / f"{symbol}.parquet")
 
@@ -211,19 +211,19 @@ if __name__ == "__main__":
 
     db = CryptoDB(Path(r"E:\DuckDB"))
     # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
-    # db.update_future_info()
+
+    db.update_future_info()
+
     # df = db.get_future_info(asset_type=AssetType.future_um)
-    # ll = db.get_local_cm_future_perpetual_symbol_list()
+    # ll = db.get_local_future_perpetual_symbol_list(asset_type=AssetType.future_um)
 
     db.update_history_data(
-        start='2024-1-1',
+        start="2023-1-1",
         end="2024-2-1",
         asset_type=AssetType.future_um,
-        data_type=DataType.klines
+        data_type=DataType.klines,
     )
-    df = pl.read_parquet(
-        db.path_crypto_kline_um / "1m" / "BTCUSDT.parquet"
-    ).to_pandas()
+    df = pl.read_parquet(db.path_crypto_kline_um / "1m" / "BTCUSDT.parquet").to_pandas()
     print(1)
 
     # db.update_crypto_trades()
