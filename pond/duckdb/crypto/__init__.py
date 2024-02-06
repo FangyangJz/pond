@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
+import datetime as dt
+from dateutil import parser, tz
 from tqdm import tqdm
 from loguru import logger
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
@@ -19,14 +21,20 @@ class CryptoDB(DuckDB):
         self.path_crypto = db_path / "crypto"
         self.path_crypto_data = self.path_crypto / "data"
         self.path_crypto_info = self.path_crypto / "info"
+
         self.path_crypto_kline = self.path_crypto / "kline"
         self.path_crypto_kline_spot = self.path_crypto_kline / "spot"
         self.path_crypto_kline_um = self.path_crypto_kline / "um"
         self.path_crypto_kline_cm = self.path_crypto_kline / "cm"
         self.path_crypto_trades = self.path_crypto / "trades"
         self.path_crypto_trades_origin = self.path_crypto_trades / "origin"
+
         self.path_crypto_agg_trades = self.path_crypto / "agg_trades"
         self.path_crypto_agg_trades_origin = self.path_crypto_agg_trades / "origin"
+        self.path_crypto_agg_trades_spot = self.path_crypto_agg_trades / "spot"
+        self.path_crypto_agg_trades_um = self.path_crypto_agg_trades / "um"
+        self.path_crypto_agg_trades_cm = self.path_crypto_agg_trades / "cm"
+
         self.path_crypto_orderbook = self.path_crypto / "orderbook"
 
         self.path_crypto_list = [
@@ -44,6 +52,9 @@ class CryptoDB(DuckDB):
             self.path_crypto_trades_origin,
             self.path_crypto_agg_trades,
             self.path_crypto_agg_trades_origin,
+            self.path_crypto_agg_trades_spot,
+            self.path_crypto_agg_trades_um,
+            self.path_crypto_agg_trades_cm,
             self.path_crypto_orderbook,
         ]
 
@@ -77,6 +88,8 @@ class CryptoDB(DuckDB):
 
     def update_future_info(self, proxies: Dict[str, str] = {"https": "127.0.0.1:7890"}):
         """
+        字段说明: https://binance-docs.github.io/apidocs/futures/cn/#0f3f2d5ee7
+
         params: proxies={"https": "127.0.0.1:7890"}
         """
         file = self.path_crypto_info / "info.csv"
@@ -94,6 +107,32 @@ class CryptoDB(DuckDB):
                 self.path_crypto_info / f"{c.__class__.__name__}.csv", index_label=False
             )
 
+    def get_client(self, asset_type: AssetType, proxies: Dict[str, str] = {}):
+        if asset_type == AssetType.future_cm:
+            from binance.cm_futures import CMFutures
+
+            return CMFutures(proxies=proxies)
+
+        elif asset_type == AssetType.future_um:
+            from binance.um_futures import UMFutures
+
+            return UMFutures(proxies=proxies)
+
+        elif asset_type == AssetType.spot:
+            raise NotImplemented("spot client has not been added")
+
+    def get_base_path(self, asset_type: AssetType, data_type: DataType) -> Path:
+        path_map = {
+            (AssetType.spot, DataType.klines): self.path_crypto_kline_spot,
+            (AssetType.spot, DataType.aggTrades): self.path_crypto_agg_trades_spot,
+            (AssetType.future_cm, DataType.klines): self.path_crypto_kline_cm,
+            (AssetType.future_cm, DataType.aggTrades): self.path_crypto_agg_trades_cm,
+            (AssetType.future_um, DataType.klines): self.path_crypto_kline_um,
+            (AssetType.future_um, DataType.aggTrades): self.path_crypto_agg_trades_um,
+        }
+
+        return path_map[(asset_type, data_type)]
+
     def update_history_data(
         self,
         start: str = "2023-1-1",
@@ -101,65 +140,63 @@ class CryptoDB(DuckDB):
         asset_type: AssetType = AssetType.future_um,
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
-        tz: TIMEZONE = "UTC",
+        timezone: TIMEZONE = "UTC",
         proxies: Dict[str, str] = {},
+        skip_symbols: List[str] = [],
     ):
-        from binance.cm_futures import CMFutures
-        from binance.um_futures import UMFutures
         from pond.binance_history.api import fetch_data
 
         assert isinstance(asset_type, AssetType)
         assert isinstance(data_type, DataType)
 
-        client = None
+        base_path = self.get_base_path(asset_type, data_type)
 
-        if asset_type == AssetType.future_cm:
-            client = CMFutures(proxies=proxies)
-            if data_type == DataType.klines:
-                base_path = self.path_crypto_kline_cm
-            elif data_type == DataType.aggTrades:
-                base_path = self.path_crypto_agg_trades
+        df = self.get_future_info(asset_type)
+        df = df[df["contractType"] == "PERPETUAL"][
+            ["symbol", "contractType", "deliveryDate", "onboardDate", "update_datetime"]
+        ]
 
-        elif asset_type == AssetType.future_um:
-            client = UMFutures(proxies=proxies)
-            if data_type == DataType.klines:
-                base_path = self.path_crypto_kline_um
-            elif data_type == DataType.aggTrades:
-                base_path = self.path_crypto_agg_trades
-
-        elif asset_type == AssetType.spot:
-            raise NotImplemented("spot client has not been added")
-            base_path = self.path_crypto_kline_spot
-
-        symbol_list = self.get_local_future_perpetual_symbol_list(asset_type=asset_type)
-
+        # symbol_list = self.get_local_future_perpetual_symbol_list(asset_type=asset_type)
         exist_files = [f.stem for f in (base_path / timeframe).glob("*.parquet")]
 
-        for symbol in (
-            pbar := tqdm(
-                symbol_list,
-                desc=f"Download {timeframe} {asset_type} data from {start} -> {end}",
-            )
-        ):
+        start = parser.parse(start).replace(tzinfo=tz.tzutc())
+        end = parser.parse(end).replace(tzinfo=tz.tzutc())
+
+        for idx, row in (pbar := tqdm(df.iterrows())):
+            symbol = row["symbol"]
+            delivery_date = parser.parse(row["deliveryDate"])
+            # TUSDT onboardDate 2023-01-31, but real history data is 2023-02-01
+            onboard_date = parser.parse(row["onboardDate"]) + dt.timedelta(days=1)
+            _start = max(onboard_date, start)
+            _end = min(delivery_date, end)
+
+            if _start > _end:
+                logger.warning(f"{symbol} start:{_start} exceed end:{_end}, skip download.")
+                continue
+
             if symbol in exist_files:
                 logger.warning(f"{symbol} is existed, skip download.")
                 continue
 
-            pbar.set_postfix_str(f"{symbol}, download ...")
+            if symbol in skip_symbols:
+                continue
+
+            pbar.set_postfix_str(
+                f"{symbol}, download {timeframe} {asset_type.value} data from {_start} -> {_end} ..."
+            )
             data = fetch_data(
                 symbol=symbol,
                 asset_type=asset_type,
                 data_type=data_type,
-                start=start,
-                end=end,
+                start=_start,
+                end=_end,
                 timeframe=timeframe,
-                tz=tz,
+                tz=timezone,
                 local_path=self.path_crypto,
+                proxies=proxies,
             )
             data["jj_code"] = symbol
-            pbar.set_postfix_str(
-                f"{symbol} download successfully, df shape: {data.shape}"
-            )
+            logger.success(f"{symbol} download df shape: {data.shape}")
 
             data.to_parquet(base_path / timeframe / f"{symbol}.parquet")
 
@@ -208,11 +245,12 @@ class CryptoDB(DuckDB):
 
 if __name__ == "__main__":
     import polars as pl
+    from pond.binance_history.exceptions import DataNotFound
 
     db = CryptoDB(Path(r"E:\DuckDB"))
     # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
 
-    db.update_future_info()
+    # db.update_future_info()
 
     # df = db.get_future_info(asset_type=AssetType.future_um)
     # ll = db.get_local_future_perpetual_symbol_list(asset_type=AssetType.future_um)
@@ -222,7 +260,9 @@ if __name__ == "__main__":
         end="2024-2-1",
         asset_type=AssetType.future_um,
         data_type=DataType.klines,
+        # proxies={"https://": "https://127.0.0.1:7890"},
     )
+
     df = pl.read_parquet(db.path_crypto_kline_um / "1m" / "BTCUSDT.parquet").to_pandas()
     print(1)
 

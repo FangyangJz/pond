@@ -10,7 +10,7 @@ import os
 import os.path
 import zipfile
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, Dict
 from urllib.parse import urlparse
 
 import httpx
@@ -61,9 +61,9 @@ def unify_datetime(input: Union[str, datetime.datetime]) -> pendulum.DateTime:
         raise TypeError(input)
 
 
-def exists_month(month_url):
+def exists_month(month_url, proxies):
     try:
-        resp = httpx.head(month_url)
+        resp = httpx.head(month_url, proxies=proxies)
     except (httpx.TimeoutException, httpx.NetworkError) as e:
         raise NetworkError(e)
 
@@ -82,6 +82,7 @@ def gen_dates(
     start: Timestamp,
     end: Timestamp,
     timeframe: TIMEFRAMES,
+    proxies: Dict[str, str] = {},
 ):
     assert start.tz is None and end.tz is None
 
@@ -99,8 +100,7 @@ def gen_dates(
     last_month_url = gen_data_url(
         data_type, asset_type, "monthly", symbol, months[-1], timeframe=timeframe
     )
-
-    if not exists_month(last_month_url):
+    if not exists_month(last_month_url, proxies):
         daily_month = months.pop()
         if len(months) > 1:
             second_last_month_url = gen_data_url(
@@ -111,7 +111,7 @@ def gen_dates(
                 months[-1],
                 timeframe=timeframe,
             )
-            if not exists_month(second_last_month_url):
+            if not exists_month(second_last_month_url, proxies):
                 daily_month = months.pop()
 
         days = pd.date_range(

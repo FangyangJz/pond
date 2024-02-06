@@ -12,7 +12,7 @@ from pandas import DataFrame
 
 from pond.binance_history.type import TIMEFRAMES, AssetType, TIMEZONE, DataType
 from pond.binance_history.utils import gen_dates, get_data, unify_datetime
-from typing import Union
+from typing import Union, Dict
 
 
 def fetch_data(
@@ -22,8 +22,9 @@ def fetch_data(
     start: Union[str, datetime],
     end: Union[str, datetime],
     tz: TIMEZONE = "UTC",
-    timeframe: TIMEFRAMES = '1m',
+    timeframe: TIMEFRAMES = "1m",
     local_path: Union[Path, None] = None,
+    proxies: Dict[str, str] = {},
 ) -> DataFrame:
     """
     :param symbol: The binance market pair name. e.g. ``'BTCUSDT'``.
@@ -57,6 +58,7 @@ def fetch_data(
         start.tz_convert(None),
         end.tz_convert(None),
         timeframe=timeframe,
+        proxies=proxies
     )
     monthly_dfs = [
         get_data(
@@ -75,26 +77,22 @@ def fetch_data(
 if __name__ == "__main__":
     # check file link
     # https://data.binance.vision/?prefix=data/futures/cm/monthly/klines/
+    from pathlib import Path
 
-    symbol = "BTCUSD_PERP"
-    asset_type = AssetType.future_cm
-
-    symbol = "BTCUSDT"
-    asset_type = AssetType.spot
-
-    start = "2020-9-1"
+    symbol = "CVCUSDT"
+    start = "2023-1-1"
     end = "2023-11-1"
     # tz = "Asia/Shanghai"
     tz = "UTC"
 
-    from pond.duckdb.crypto.future import get_cm_future_symbol_list
-
-    klines = fetch_klines(
+    klines = fetch_data(
         symbol=symbol,
         start=start,
         end=end,
         tz=tz,
-        asset_type=asset_type,
-        local_path=Path("/home/fangyang/zhitai5000/DuckDB/crypto/"),
+        asset_type=AssetType.future_um,
+        data_type=DataType.klines,
+        # local_path=Path("/home/fangyang/zhitai5000/DuckDB/crypto/"),
+        local_path=Path(r"E:/DuckDB/crypto/"),
     )
     print(1)
