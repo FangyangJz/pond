@@ -94,6 +94,7 @@ db.update_future_info()
 
 # download history future data to D:\DuckDB\crypto\data
 # save parquet file in E:\DuckDB\crypto\kline
+# In my case, close proxy software (clash) to avoid TLS handshake error.
 db.update_history_data(*params)
 
 # read parquet file in E:\DuckDB\crypto\kline directory
