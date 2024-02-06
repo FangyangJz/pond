@@ -154,6 +154,7 @@ def download_data(
     assert isinstance(data_type, DataType)
 
     try:
+        print(url)
         resp = httpx.get(url)
     except (httpx.TimeoutException, httpx.NetworkError) as e:
         raise NetworkError(e)
