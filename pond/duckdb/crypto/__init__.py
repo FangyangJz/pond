@@ -198,6 +198,7 @@ class CryptoDB(DuckDB):
                 proxies=proxies,
             )
             data["jj_code"] = symbol
+            data = data.astype({'volume': 'float64'})
             logger.success(f"{symbol} download df shape: {data.shape}")
 
             data.to_parquet(base_path / timeframe / f"{symbol}.parquet")
