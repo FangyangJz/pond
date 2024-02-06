@@ -161,6 +161,7 @@ class CryptoDB(DuckDB):
 
         start = parser.parse(start).replace(tzinfo=tz.tzutc())
         end = parser.parse(end).replace(tzinfo=tz.tzutc())
+        total_len = len(df)
 
         for idx, row in (pbar := tqdm(df.iterrows())):
             symbol = row["symbol"]
@@ -181,6 +182,7 @@ class CryptoDB(DuckDB):
             if symbol in skip_symbols:
                 continue
 
+            pbar.set_description_str(f'Total {total_len}', refresh=False)
             pbar.set_postfix_str(
                 f"{symbol}, download {timeframe} {asset_type.value} data from {_start} -> {_end} ..."
             )
