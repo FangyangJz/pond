@@ -63,8 +63,9 @@ def unify_datetime(input: Union[str, datetime.datetime]) -> pendulum.DateTime:
 
 def exists_month(month_url, proxies):
     try:
-        resp = httpx.head(month_url, proxies=proxies)
+        resp = httpx.head(month_url, proxies=proxies, timeout=None)
     except (httpx.TimeoutException, httpx.NetworkError) as e:
+        print(month_url)
         raise NetworkError(e)
 
     if resp.status_code == 200:
@@ -155,7 +156,7 @@ def download_data(
 
     try:
         print(url)
-        resp = httpx.get(url)
+        resp = httpx.get(url,  timeout=None)
     except (httpx.TimeoutException, httpx.NetworkError) as e:
         raise NetworkError(e)
 
