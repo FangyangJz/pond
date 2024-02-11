@@ -198,8 +198,8 @@ class CryptoDB(DuckDB):
                 data_type=data_type,
                 asset_type=asset_type,
                 symbol=symbol,
-                start=start,
-                end=end,
+                start=_start,
+                end=_end,
                 timeframe=timeframe,
             )
 
@@ -230,7 +230,10 @@ class CryptoDB(DuckDB):
                         "low": pl.Float64,
                         "close": pl.Float64,
                         "volume": pl.Float64,
-                        'count':pl.Int64
+                        'quote_volume':pl.Float64,
+                        'count':pl.Int64,
+                        'taker_buy_volume':pl.Float64,
+                        'taker_buy_quote_volume':pl.Float64,
                     },
                 )
                 df_list.append(df)
