@@ -1,11 +1,9 @@
 from random import choice
-
+from typing import Dict
 import requests
 
 
-def request_session():
-    ###########################
-    # fangyang add in case ban req
+def get_mock_headers() -> Dict[str, str]:
     user_agent_list = [
         "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36",
         "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36",
@@ -17,12 +15,17 @@ def request_session():
         "Mozilla/5.0 (Macintosh; U; PPC Mac OS X 10.5; en-US; rv:1.9.2.15) Gecko/20110303 Firefox/3.6.15",
     ]
 
+    return {"User-Agent": choice(user_agent_list)}
+
+
+def request_session():
     # 频繁请求某个网址偶尔会报错请求超时，可采用下面方式降低失败率，设置重试次数为5，会话设置为不维持连接.
     requests.adapters.DEFAULT_RETRIES = 5
     ses = requests.session()
     ses.keep_alive = False
 
-    headers = {"User-Agent": choice(user_agent_list), "Connection": "close"}
+    headers = get_mock_headers()
+    headers["Connection"] = "close"
 
     # proxies = {
     #     "http": "http://127.0.0.1:1080",
