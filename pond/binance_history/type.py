@@ -27,19 +27,24 @@ TIMEFRAMES = Literal[
     "1M",
 ]
 
-TIMEZONE = Literal['UTC', 'Asia/Shanghai']
+TIMEZONE = Literal["UTC", "Asia/Shanghai"]
+
+
+class Freq(Enum):
+    monthly = "monthly"
+    daily = "daily"
 
 
 class DataType(Enum):
-    klines='klines'
-    aggTrades='aggTrades'
+    klines = "klines"
+    aggTrades = "aggTrades"
 
 
 class AssetType(Enum):
-    spot='spot'
-    future_um='futures/um'
-    future_cm='futures/cm'
+    spot = "spot"
+    future_um = "futures/um"
+    future_cm = "futures/cm"
 
 
 if __name__ == "__main__":
-    assert AssetType.future_cm.value == 'futures/cm'
+    assert AssetType.future_cm.value == "futures/cm"

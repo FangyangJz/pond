@@ -11,7 +11,7 @@ import pandas as pd
 from pandas import DataFrame
 
 from pond.binance_history.type import TIMEFRAMES, AssetType, TIMEZONE, DataType
-from pond.binance_history.utils import gen_dates, get_data, unify_datetime
+from pond.binance_history.utils import gen_download_urls, get_data, unify_datetime
 from typing import Union, Dict
 
 
@@ -51,7 +51,7 @@ def fetch_data(
     start, end = pd.Timestamp(start, tz=tz), pd.Timestamp(end, tz=tz)
     symbol = symbol.upper().replace("/", "")
 
-    months, days = gen_dates(
+    months, days = gen_download_urls(
         data_type,
         asset_type,
         symbol,

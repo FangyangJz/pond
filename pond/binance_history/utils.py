@@ -12,39 +12,41 @@ import zipfile
 from pathlib import Path
 from typing import Optional, Union, Dict
 from urllib.parse import urlparse
+from zipfile import ZipFile
 
 import httpx
+import polars as pl
 import pandas as pd
 import pendulum
 from pandas import Timestamp, DataFrame
 
 from pond.binance_history.exceptions import NetworkError, DataNotFound
-from pond.binance_history.type import TIMEFRAMES, AssetType, DataType, TIMEZONE
+from pond.binance_history.type import TIMEFRAMES, AssetType, DataType, TIMEZONE, Freq
 
 
 def gen_data_url(
     data_type: DataType,
     asset_type: AssetType,
-    freq: str,
+    freq: Freq,
     symbol: str,
     dt: Timestamp,
     timeframe: TIMEFRAMES,
 ):
-    if freq == "monthly":
+    if freq == Freq.monthly:
         date_str = dt.strftime("%Y-%m")
-    elif freq == "daily":
+    elif freq == Freq.daily:
         date_str = dt.strftime("%Y-%m-%d")
     else:
         raise ValueError(f"freq must be 'monthly' or 'daily', but got '{freq}'")
 
     if data_type == DataType.klines:
         url = (
-            f"https://data.binance.vision/data/{asset_type.value}/{freq}/{data_type.value}/{symbol}/{timeframe}"
+            f"https://data.binance.vision/data/{asset_type.value}/{freq.value}/{data_type.value}/{symbol}/{timeframe}"
             f"/{symbol}-{timeframe}-{date_str}.zip"
         )
     elif data_type == DataType.aggTrades:
         url = (
-            f"https://data.binance.vision/data/{asset_type.value}/{freq}/{data_type.value}/{symbol}"
+            f"https://data.binance.vision/data/{asset_type.value}/{freq.value}/{data_type.value}/{symbol}"
             f"/{symbol}-{data_type}-{date_str}.zip"
         )
     else:
@@ -76,7 +78,7 @@ def exists_month(month_url, proxies):
         raise NetworkError(resp.status_code)
 
 
-def gen_dates(
+def gen_download_urls(
     data_type: DataType,
     asset_type: AssetType,
     symbol: str,
@@ -85,45 +87,67 @@ def gen_dates(
     timeframe: TIMEFRAMES,
     proxies: Dict[str, str] = {},
 ):
-    assert start.tz is None and end.tz is None
-
-    if start > end:
-        raise ValueError("start cannot be greater than end")
+    # assert start.tz is None and end.tz is None
+    assert start <= end, "start cannot be greater than end"
 
     months = pd.date_range(
-        Timestamp(start.year, start.month, 1),
+        start.replace(day=1),
         end,
         freq="MS",
     ).to_list()
 
     assert len(months) > 0
 
+    daily_month = None
     last_month_url = gen_data_url(
-        data_type, asset_type, "monthly", symbol, months[-1], timeframe=timeframe
+        data_type, asset_type, Freq.monthly, symbol, months[-1], timeframe=timeframe
     )
-    if not exists_month(last_month_url, proxies):
+    while not exists_month(last_month_url, proxies):
         daily_month = months.pop()
         if len(months) > 1:
-            second_last_month_url = gen_data_url(
+            last_month_url = gen_data_url(
                 data_type,
                 asset_type,
-                "monthly",
+                Freq.monthly,
                 symbol,
                 months[-1],
                 timeframe=timeframe,
             )
-            if not exists_month(second_last_month_url, proxies):
-                daily_month = months.pop()
 
-        days = pd.date_range(
-            Timestamp(daily_month.year, daily_month.month, 1),
+    days = (
+        pd.date_range(
+            daily_month.replace(day=1),
             end,
             freq="D",
         ).to_list()
-    else:
-        days = []
+        if daily_month is not None
+        else []
+    )
 
-    return months, days
+    months_urls = [
+        gen_data_url(
+            data_type=data_type,
+            asset_type=asset_type,
+            freq=Freq.monthly,
+            symbol=symbol,
+            dt=m,
+            timeframe=timeframe,
+        )
+        for m in months
+    ]
+
+    days_urls = [
+        gen_data_url(
+            data_type=data_type,
+            asset_type=asset_type,
+            freq=Freq.daily,
+            symbol=symbol,
+            dt=m,
+            timeframe=timeframe,
+        )
+        for m in days
+    ]
+    return months_urls, days_urls
 
 
 def get_data(
@@ -156,7 +180,7 @@ def download_data(
 
     try:
         print(url)
-        resp = httpx.get(url,  timeout=None)
+        resp = httpx.get(url, timeout=None)
     except (httpx.TimeoutException, httpx.NetworkError) as e:
         raise NetworkError(e)
 
@@ -251,11 +275,45 @@ def load_data_from_disk(
     url: str, local_path: Union[Path, None] = None
 ) -> Union[DataFrame, None]:
     path = get_local_data_path(url, local_path)
-    if os.path.exists(path):
-        return pd.read_pickle(path)
+    if path.exists():
+        return pl.read_csv(ZipFile(path).read(f"{path.stem}.csv"))
+
     else:
         return None
 
 
 if __name__ == "__main__":
-    pass
+    import pandas as pd
+    from dateutil import parser, tz
+
+    months = pd.date_range(
+        Timestamp(2023, 5, 1),
+        "2023-10-1",
+        freq="MS",
+    ).to_list()
+
+    url_list = [
+        gen_data_url(
+            data_type=DataType.klines,
+            asset_type=AssetType.future_um,
+            freq=Freq.monthly,
+            symbol="BTCUSDT",
+            dt=m,
+            timeframe="1m",
+        )
+        for m in months
+    ]
+
+    start = "2023-1-15"
+    end = "2023-5-15"
+    start = parser.parse(start).replace(tzinfo=tz.tzutc())
+    end = parser.parse(end).replace(tzinfo=tz.tzutc())
+    month_urls, day_urls = gen_download_urls(
+        data_type=DataType.klines,
+        asset_type=AssetType.future_um,
+        symbol="BTCUSDT",
+        start=start,
+        end=end,
+        timeframe="1m",
+    )
+    print(1)

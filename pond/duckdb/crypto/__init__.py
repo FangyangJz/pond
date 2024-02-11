@@ -144,7 +144,12 @@ class CryptoDB(DuckDB):
         proxies: Dict[str, str] = {},
         skip_symbols: List[str] = [],
     ):
-        from pond.binance_history.api import fetch_data
+        from pond.binance_history.utils import (
+            gen_download_urls,
+            load_data_from_disk,
+            get_local_data_path,
+        )
+        from pond.binance_history.async_api import start_async_download_files
 
         assert isinstance(asset_type, AssetType)
         assert isinstance(data_type, DataType)
@@ -172,7 +177,9 @@ class CryptoDB(DuckDB):
             _end = min(delivery_date, end)
 
             if _start > _end:
-                logger.warning(f"{symbol} start:{_start} exceed end:{_end}, skip download.")
+                logger.warning(
+                    f"{symbol} start:{_start} exceed end:{_end}, skip download."
+                )
                 continue
 
             if symbol in exist_files:
@@ -182,26 +189,54 @@ class CryptoDB(DuckDB):
             if symbol in skip_symbols:
                 continue
 
-            pbar.set_description_str(f'Total {total_len}', refresh=False)
+            pbar.set_description_str(f"Total {total_len}", refresh=False)
             pbar.set_postfix_str(
                 f"{symbol}, download {timeframe} {asset_type.value} data from {_start} -> {_end} ..."
             )
-            data = fetch_data(
-                symbol=symbol,
-                asset_type=asset_type,
-                data_type=data_type,
-                start=_start,
-                end=_end,
-                timeframe=timeframe,
-                tz=timezone,
-                local_path=self.path_crypto,
-                proxies=proxies,
-            )
-            data["jj_code"] = symbol
-            data = data.astype({'volume': 'float64'})
-            logger.success(f"{symbol} download df shape: {data.shape}")
 
-            data.to_parquet(base_path / timeframe / f"{symbol}.parquet")
+            month_urls, day_urls = gen_download_urls(
+                data_type=data_type,
+                asset_type=asset_type,
+                symbol=symbol,
+                start=start,
+                end=end,
+                timeframe=timeframe,
+            )
+
+            download_month_urls = [
+                u
+                for u in month_urls
+                if not get_local_data_path(u, self.path_crypto).exists()
+            ]
+            download_day_urls = [
+                u
+                for u in day_urls
+                if not get_local_data_path(u, self.path_crypto).exists()
+            ]
+
+            if download_month_urls:
+                start_async_download_files(month_urls, self.path_crypto)
+            if download_day_urls:
+                start_async_download_files(day_urls, self.path_crypto)
+
+            df_list = []
+            for url in month_urls + day_urls:
+                df = load_data_from_disk(url, self.path_crypto)
+                df_list.append(df)
+
+            df = (
+                pl.concat(df_list)
+                .with_columns(
+                    (pl.col("open_time") * 1e3).cast(pl.Datetime),
+                    (pl.col("close_time") * 1e3).cast(pl.Datetime),
+                    jj_code=pl.lit(symbol),
+                )
+                .select(pl.exclude("ignore"))
+            )
+            # data = data.astype({"volume": "float64"})
+
+            logger.success(f"{symbol} load df shape: {df.shape}")
+            df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
 
     def update_crypto_trades(self):
         trades_list = [f.stem for f in self.path_crypto_trades.iterdir()]
@@ -260,7 +295,7 @@ if __name__ == "__main__":
 
     db.update_history_data(
         start="2023-1-1",
-        end="2024-2-1",
+        end="2024-2-10",
         asset_type=AssetType.future_um,
         data_type=DataType.klines,
         # proxies={"https://": "https://127.0.0.1:7890"},
