@@ -221,7 +221,18 @@ class CryptoDB(DuckDB):
 
             df_list = []
             for url in month_urls + day_urls:
-                df = load_data_from_disk(url, self.path_crypto)
+                df = load_data_from_disk(
+                    url,
+                    self.path_crypto,
+                    dtypes={
+                        "open": pl.Float64,
+                        "high": pl.Float64,
+                        "low": pl.Float64,
+                        "close": pl.Float64,
+                        "volume": pl.Float64,
+                        'count':pl.Int64
+                    },
+                )
                 df_list.append(df)
 
             df = (

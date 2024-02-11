@@ -10,7 +10,7 @@ import os
 import os.path
 import zipfile
 from pathlib import Path
-from typing import Optional, Union, Dict
+from typing import Optional, Union, Dict, Any
 from urllib.parse import urlparse
 from zipfile import ZipFile
 
@@ -272,11 +272,11 @@ def save_data_to_disk(
 
 
 def load_data_from_disk(
-    url: str, local_path: Union[Path, None] = None
-) -> Union[DataFrame, None]:
+    url: str, local_path: Union[Path, None] = None, dtypes:Union[Dict[str, Any], None]=None
+) -> Union[pl.DataFrame, None]:
     path = get_local_data_path(url, local_path)
     if path.exists():
-        return pl.read_csv(ZipFile(path).read(f"{path.stem}.csv"))
+        return pl.read_csv(ZipFile(path).read(f"{path.stem}.csv"), dtypes=dtypes)
 
     else:
         return None
