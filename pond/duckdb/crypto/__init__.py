@@ -164,8 +164,8 @@ class CryptoDB(DuckDB):
         # symbol_list = self.get_local_future_perpetual_symbol_list(asset_type=asset_type)
         exist_files = [f.stem for f in (base_path / timeframe).glob("*.parquet")]
 
-        _start = parser.parse(start).replace(tzinfo=tz.tzutc())
-        _end = parser.parse(end).replace(tzinfo=tz.tzutc())
+        input_start = parser.parse(start).replace(tzinfo=tz.tzutc())
+        input_end = parser.parse(end).replace(tzinfo=tz.tzutc())
         total_len = len(df)
 
         for idx, row in (pbar := tqdm(df.iterrows())):
@@ -173,8 +173,8 @@ class CryptoDB(DuckDB):
             delivery_date = parser.parse(row["deliveryDate"])
             # TUSDT onboardDate 2023-01-31, but real history data is 2023-02-01
             onboard_date = parser.parse(row["onboardDate"]) + dt.timedelta(days=1)
-            _start = max(onboard_date, _start)
-            _end = min(delivery_date, _end)
+            _start = max(onboard_date, input_start)
+            _end = min(delivery_date, input_end)
 
             if _start > _end:
                 logger.warning(
