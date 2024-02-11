@@ -236,21 +236,26 @@ class CryptoDB(DuckDB):
                         'taker_buy_quote_volume':pl.Float64,
                     },
                 )
-                df_list.append(df)
 
-            df = (
-                pl.concat(df_list)
-                .with_columns(
-                    (pl.col("open_time") * 1e3).cast(pl.Datetime),
-                    (pl.col("close_time") * 1e3).cast(pl.Datetime),
-                    jj_code=pl.lit(symbol),
+                if df is not None:
+                    df_list.append(df)
+
+            if df_list:
+                df = (
+                    pl.concat(df_list)
+                    .with_columns(
+                        (pl.col("open_time") * 1e3).cast(pl.Datetime),
+                        (pl.col("close_time") * 1e3).cast(pl.Datetime),
+                        jj_code=pl.lit(symbol),
+                    )
+                    .select(pl.exclude("ignore"))
                 )
-                .select(pl.exclude("ignore"))
-            )
-            # data = data.astype({"volume": "float64"})
+                # data = data.astype({"volume": "float64"})
 
-            logger.success(f"{symbol} load df shape: {df.shape}")
-            df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
+                logger.success(f"{symbol} load df shape: {df.shape}")
+                df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
+            else:
+                logger.warning(f"{symbol} load df is None")
 
     def update_crypto_trades(self):
         trades_list = [f.stem for f in self.path_crypto_trades.iterdir()]

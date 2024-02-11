@@ -90,39 +90,35 @@ def gen_download_urls(
     # assert start.tz is None and end.tz is None
     assert start <= end, "start cannot be greater than end"
 
+    days = []
     months = pd.date_range(
         start.replace(day=1),
         end,
         freq="MS",
     ).to_list()
+    if months:
+        last_month_url = gen_data_url(
+            data_type, asset_type, Freq.monthly, symbol, months[-1], timeframe=timeframe
+        )
+        while not exists_month(last_month_url, proxies):
+            daily_month = months.pop()
+            days = pd.date_range(
+                daily_month,
+                end,
+                freq="D",
+            ).to_list()
 
-    assert len(months) > 0
-
-    daily_month = None
-    last_month_url = gen_data_url(
-        data_type, asset_type, Freq.monthly, symbol, months[-1], timeframe=timeframe
-    )
-    while not exists_month(last_month_url, proxies):
-        daily_month = months.pop()
-        if len(months) > 1:
-            last_month_url = gen_data_url(
-                data_type,
-                asset_type,
-                Freq.monthly,
-                symbol,
-                months[-1],
-                timeframe=timeframe,
-            )
-
-    days = (
-        pd.date_range(
-            daily_month.replace(day=1),
-            end,
-            freq="D",
-        ).to_list()
-        if daily_month is not None
-        else []
-    )
+            if months:
+                last_month_url = gen_data_url(
+                    data_type,
+                    asset_type,
+                    Freq.monthly,
+                    symbol,
+                    months[-1],
+                    timeframe=timeframe,
+                )
+            else:
+                break
 
     months_urls = [
         gen_data_url(
@@ -272,7 +268,9 @@ def save_data_to_disk(
 
 
 def load_data_from_disk(
-    url: str, local_path: Union[Path, None] = None, dtypes:Union[Dict[str, Any], None]=None
+    url: str,
+    local_path: Union[Path, None] = None,
+    dtypes: Union[Dict[str, Any], None] = None,
 ) -> Union[pl.DataFrame, None]:
     path = get_local_data_path(url, local_path)
     if path.exists():
