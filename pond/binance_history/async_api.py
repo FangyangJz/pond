@@ -25,14 +25,16 @@ async def download_file(url: str, path: Path):
         response = await client.get(url, timeout=None, headers=headers)
         # 检查状态码是否为 200
         if response.status_code == 200:
+            # 打印成功的信息
+            logger.success(f"[{response.status_code}] {url}")
+
             file_path = path / urlparse(url).path[1:]
             file_path.parent.mkdir(parents=True, exist_ok=True)
             # 以二进制模式打开文件
             with open(file_path, "wb") as f:
                 # 写入响应的内容
                 f.write(response.content)
-            # 打印成功的信息
-            logger.success(f"[{response.status_code}] {url} to {file_path}")
+                logger.success(f"Save to {file_path}")
         else:
             # 打印失败的信息
             logger.error(f"[{response.status_code}] {url}")
@@ -50,7 +52,6 @@ async def download_files(url_list: List[str], path: Path):
 
 # 定义一个主函数，用于调用下载函数
 async def download_zip_files(url_list: List[str], path: Path):
-    
     await download_files(url_list, path)
 
 
@@ -70,5 +71,5 @@ if __name__ == "__main__":
         "https://data.binance.vision/data/futures/um/monthly/klines/DEFIUSDT/1m/DEFIUSDT-1m-1998-07.zip",
         "https://data.binance.vision/data/futures/um/monthly/klines/DEFIUSDT/1m/DEFIUSDT-1m-2023-08.zip",
     ]
-    
-    start_async_download_files(url_list, Path('./temp'))
+
+    start_async_download_files(url_list, Path("./temp"))

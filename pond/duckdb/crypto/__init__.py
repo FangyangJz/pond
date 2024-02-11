@@ -145,7 +145,7 @@ class CryptoDB(DuckDB):
         skip_symbols: List[str] = [],
     ):
         from pond.binance_history.utils import (
-            gen_download_urls,
+            get_urls,
             load_data_from_disk,
             get_local_data_path,
         )
@@ -164,8 +164,8 @@ class CryptoDB(DuckDB):
         # symbol_list = self.get_local_future_perpetual_symbol_list(asset_type=asset_type)
         exist_files = [f.stem for f in (base_path / timeframe).glob("*.parquet")]
 
-        start = parser.parse(start).replace(tzinfo=tz.tzutc())
-        end = parser.parse(end).replace(tzinfo=tz.tzutc())
+        _start = parser.parse(start).replace(tzinfo=tz.tzutc())
+        _end = parser.parse(end).replace(tzinfo=tz.tzutc())
         total_len = len(df)
 
         for idx, row in (pbar := tqdm(df.iterrows())):
@@ -173,8 +173,8 @@ class CryptoDB(DuckDB):
             delivery_date = parser.parse(row["deliveryDate"])
             # TUSDT onboardDate 2023-01-31, but real history data is 2023-02-01
             onboard_date = parser.parse(row["onboardDate"]) + dt.timedelta(days=1)
-            _start = max(onboard_date, start)
-            _end = min(delivery_date, end)
+            _start = max(onboard_date, _start)
+            _end = min(delivery_date, _end)
 
             if _start > _end:
                 logger.warning(
@@ -194,46 +194,36 @@ class CryptoDB(DuckDB):
                 f"{symbol}, download {timeframe} {asset_type.value} data from {_start} -> {_end} ..."
             )
 
-            month_urls, day_urls = gen_download_urls(
+            load_urls, download_urls = get_urls(
                 data_type=data_type,
                 asset_type=asset_type,
                 symbol=symbol,
                 start=_start,
                 end=_end,
                 timeframe=timeframe,
+                file_path=self.path_crypto,
             )
 
-            download_month_urls = [
-                u
-                for u in month_urls
-                if not get_local_data_path(u, self.path_crypto).exists()
-            ]
-            download_day_urls = [
-                u
-                for u in day_urls
-                if not get_local_data_path(u, self.path_crypto).exists()
-            ]
-
-            if download_month_urls:
-                start_async_download_files(month_urls, self.path_crypto)
-            if download_day_urls:
-                start_async_download_files(day_urls, self.path_crypto)
+            start_async_download_files(download_urls, self.path_crypto)
 
             df_list = []
-            for url in month_urls + day_urls:
+            for url in load_urls:
                 df = load_data_from_disk(
                     url,
                     self.path_crypto,
                     dtypes={
+                        "open_time": pl.Int64,
                         "open": pl.Float64,
                         "high": pl.Float64,
                         "low": pl.Float64,
                         "close": pl.Float64,
                         "volume": pl.Float64,
-                        'quote_volume':pl.Float64,
-                        'count':pl.Int64,
-                        'taker_buy_volume':pl.Float64,
-                        'taker_buy_quote_volume':pl.Float64,
+                        "close_time": pl.Int64,
+                        "quote_volume": pl.Float64,
+                        "count": pl.Int64,
+                        "taker_buy_volume": pl.Float64,
+                        "taker_buy_quote_volume": pl.Float64,
+                        "ignore": pl.Int8,
                     },
                 )
 
@@ -250,8 +240,6 @@ class CryptoDB(DuckDB):
                     )
                     .select(pl.exclude("ignore"))
                 )
-                # data = data.astype({"volume": "float64"})
-
                 logger.success(f"{symbol} load df shape: {df.shape}")
                 df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
             else:
@@ -313,7 +301,7 @@ if __name__ == "__main__":
     # ll = db.get_local_future_perpetual_symbol_list(asset_type=AssetType.future_um)
 
     db.update_history_data(
-        start="2023-1-1",
+        start="2022-1-1",
         end="2024-2-10",
         asset_type=AssetType.future_um,
         data_type=DataType.klines,

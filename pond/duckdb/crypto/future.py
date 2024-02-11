@@ -3,13 +3,11 @@
 # @Datetime : 2023/12/23 下午 09:18
 # @Author   : Fangyang
 # @Software : PyCharm
-import time
 
 from binance.cm_futures import CMFutures
 from binance.um_futures import UMFutures
 from typing import List, Union
 
-from tqdm import tqdm
 import pandas as pd
 import datetime as dt
 
@@ -39,7 +37,6 @@ def get_future_symbol_list(client: Union[CMFutures, UMFutures]) -> List[str]:
 
 
 if __name__ == "__main__":
-    from pond.binance_history.api import fetch_data
     from pond.binance_history.type import AssetType, DataType
 
     proxies = {"https": "127.0.0.1:7890"}
@@ -55,27 +52,5 @@ if __name__ == "__main__":
     start = "2023-1-1"
     end = "2023-11-1"
     tz = "Asia/Shanghai"
-
-    for symbol in tqdm(cm_symbol_list):
-        start_time = time.perf_counter()
-        klines = fetch_data(
-            symbol=symbol,
-            asset_type=AssetType.future_cm,
-            data_type=DataType.klines,
-            start=start,
-            end=end,
-            tz=tz,
-            timeframe='1m'
-        )
-        print(symbol, klines.shape, time.perf_counter() - start_time)
-        print(1)
-
-    # r = client.klines("BTCUSD_PERP", "1d")
-    # info = client.exchange_info()
-    # cm_list = []
-    # for i in info["symbols"]:
-    #     if i["contractType"] == "PERPETUAL":
-    #         cm_list.append(i)
-    #
     # r = client.continuous_klines("BTCUSD", "PERPETUAL", "1m")
     print(1)

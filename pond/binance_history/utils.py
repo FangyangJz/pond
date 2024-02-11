@@ -4,23 +4,17 @@
 # @Author   : Fangyang
 # @Software : PyCharm
 
-import datetime
-import io
-import os
-import os.path
-import zipfile
 from pathlib import Path
-from typing import Optional, Union, Dict, Any
+from typing import Union, Dict, Any, List, Tuple
 from urllib.parse import urlparse
 from zipfile import ZipFile
 
 import httpx
 import polars as pl
 import pandas as pd
-import pendulum
-from pandas import Timestamp, DataFrame
+from datetime import datetime
 
-from pond.binance_history.exceptions import NetworkError, DataNotFound
+from pond.binance_history.exceptions import NetworkError
 from pond.binance_history.type import TIMEFRAMES, AssetType, DataType, TIMEZONE, Freq
 
 
@@ -29,7 +23,7 @@ def gen_data_url(
     asset_type: AssetType,
     freq: Freq,
     symbol: str,
-    dt: Timestamp,
+    dt: datetime,
     timeframe: TIMEFRAMES,
 ):
     if freq == Freq.monthly:
@@ -54,15 +48,6 @@ def gen_data_url(
     return url
 
 
-def unify_datetime(input: Union[str, datetime.datetime]) -> pendulum.DateTime:
-    if isinstance(input, str):
-        return pendulum.parser.parse(input, strict=False).replace(tzinfo=None)  # type: ignore
-    elif isinstance(input, datetime.datetime):
-        return input.replace(tzinfo=None)
-    else:
-        raise TypeError(input)
-
-
 def exists_month(month_url, proxies):
     try:
         resp = httpx.head(month_url, proxies=proxies, timeout=None)
@@ -78,15 +63,16 @@ def exists_month(month_url, proxies):
         raise NetworkError(resp.status_code)
 
 
-def gen_download_urls(
+def get_urls(
     data_type: DataType,
     asset_type: AssetType,
     symbol: str,
-    start: Timestamp,
-    end: Timestamp,
+    start: datetime,
+    end: datetime,
     timeframe: TIMEFRAMES,
+    file_path: Path,
     proxies: Dict[str, str] = {},
-):
+) -> Tuple[List[str], List[str]]:
     # assert start.tz is None and end.tz is None
     assert start <= end, "start cannot be greater than end"
 
@@ -100,7 +86,10 @@ def gen_download_urls(
         last_month_url = gen_data_url(
             data_type, asset_type, Freq.monthly, symbol, months[-1], timeframe=timeframe
         )
-        while not exists_month(last_month_url, proxies):
+
+        while (not get_local_data_path(last_month_url, file_path).exists()) and (
+            not exists_month(last_month_url, proxies)
+        ):
             daily_month = months.pop()
             days = pd.date_range(
                 daily_month,
@@ -119,8 +108,7 @@ def gen_download_urls(
                 )
             else:
                 break
-
-    months_urls = [
+    load_months_urls = [
         gen_data_url(
             data_type=data_type,
             asset_type=asset_type,
@@ -131,8 +119,13 @@ def gen_download_urls(
         )
         for m in months
     ]
+    download_months_urls = [
+        url
+        for url in load_months_urls
+        if not get_local_data_path(url, file_path).exists()
+    ]
 
-    days_urls = [
+    load_days_urls = [
         gen_data_url(
             data_type=data_type,
             asset_type=asset_type,
@@ -143,110 +136,13 @@ def gen_download_urls(
         )
         for m in days
     ]
-    return months_urls, days_urls
+    download_days_urls = [
+        url for url in load_days_urls if not get_local_data_path(url, file_path).exists()
+    ]
 
-
-def get_data(
-    data_type: DataType,
-    asset_type: AssetType,
-    freq: str,
-    symbol: str,
-    dt: Timestamp,
-    data_tz: TIMEZONE,
-    timeframe: TIMEFRAMES,
-    local_path: Union[Path, None] = None,
-) -> Union[DataFrame, None]:
-    if data_type == "klines":
-        assert timeframe is not None
-
-    url = gen_data_url(data_type, asset_type, freq, symbol, dt, timeframe)
-
-    df = load_data_from_disk(url, local_path)
-    if df is None:
-        df = download_data(data_type, asset_type, data_tz, url)
-        if df is not None:
-            save_data_to_disk(url, df, local_path)
-    return df
-
-
-def download_data(
-    data_type: DataType, asset_type: AssetType, data_tz: TIMEZONE, url: str
-) -> Union[DataFrame, None]:
-    assert isinstance(data_type, DataType)
-
-    try:
-        print(url)
-        resp = httpx.get(url, timeout=None)
-    except (httpx.TimeoutException, httpx.NetworkError) as e:
-        raise NetworkError(e)
-
-    if resp.status_code == 200:
-        pass
-    elif resp.status_code == 404:
-        raise DataNotFound(url)
-    else:
-        raise NetworkError(url)
-
-    if data_type == DataType.klines:
-        return load_klines(asset_type, data_tz, resp.content)
-    elif data_type == DataType.aggTrades:
-        return load_agg_trades(data_tz, resp.content)
-
-
-def load_klines(asset_type: AssetType, data_tz: TIMEZONE, content: bytes) -> DataFrame:
-    with zipfile.ZipFile(io.BytesIO(content)) as zipf:
-        csv_name = zipf.namelist()[0]
-        with zipf.open(csv_name, "r") as csvfile:
-            skiprows = 0  # asset_type == 'spot'
-            if asset_type in [AssetType.future_cm, AssetType.future_um]:
-                skiprows = 1
-
-            df = pd.read_csv(
-                csvfile,
-                usecols=range(9),
-                header=None,
-                skiprows=skiprows,
-                names=[
-                    "open_ms",
-                    "open",
-                    "high",
-                    "low",
-                    "close",
-                    "volume",
-                    "close_ms",
-                    "quote_volume",
-                    "trades",
-                ],
-            )
-            df["open_datetime"] = pd.to_datetime(
-                df.open_ms, unit="ms", utc=True
-            ).dt.tz_convert(data_tz)
-            df["close_datetime"] = pd.to_datetime(
-                df.close_ms, unit="ms", utc=True
-            ).dt.tz_convert(data_tz)
-            del df["open_ms"]
-            del df["close_ms"]
-            df.set_index("open_datetime", inplace=True)
-    return df
-
-
-def load_agg_trades(data_tz: TIMEZONE, content: bytes) -> DataFrame:
-    with zipfile.ZipFile(io.BytesIO(content)) as zipf:
-        csv_name = zipf.namelist()[0]
-        with zipf.open(csv_name, "r") as csvfile:
-            df = pd.read_csv(
-                csvfile,
-                header=0,
-                usecols=[1, 2, 5, 6],
-                names=["price", "quantity", "timestamp", "is_buyer_maker"],
-            )
-            df["datetime"] = pd.to_datetime(
-                df.timestamp, unit="ms", utc=True
-            ).dt.tz_convert(data_tz)
-            del df["timestamp"]
-            df.set_index("datetime", inplace=True)
-    return df
-
+    load_urls = load_months_urls + load_days_urls
+    download_urls = download_months_urls + download_days_urls
+    return load_urls, download_urls
 
 def get_local_data_path(url: str, local_path: Union[Path, None] = None) -> Path:
     path = urlparse(url).path
@@ -259,14 +155,6 @@ def get_local_data_path(url: str, local_path: Union[Path, None] = None) -> Path:
         return config.CACHE_DIR / path[1:]
 
 
-def save_data_to_disk(
-    url: str, df: DataFrame, local_path: Union[Path, None] = None
-) -> None:
-    path = get_local_data_path(url, local_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_pickle(path)
-
-
 def load_data_from_disk(
     url: str,
     local_path: Union[Path, None] = None,
@@ -274,7 +162,7 @@ def load_data_from_disk(
 ) -> Union[pl.DataFrame, None]:
     path = get_local_data_path(url, local_path)
     if path.exists():
-        return pl.read_csv(ZipFile(path).read(f"{path.stem}.csv"), dtypes=dtypes)
+        return pl.read_csv(ZipFile(path).read(f"{path.stem}.csv"), dtypes=dtypes, columns=list(dtypes.keys()) if dtypes else None)
 
     else:
         return None
@@ -285,7 +173,7 @@ if __name__ == "__main__":
     from dateutil import parser, tz
 
     months = pd.date_range(
-        Timestamp(2023, 5, 1),
+        datetime(2023, 5, 1),
         "2023-10-1",
         freq="MS",
     ).to_list()
@@ -306,12 +194,13 @@ if __name__ == "__main__":
     end = "2023-5-15"
     start = parser.parse(start).replace(tzinfo=tz.tzutc())
     end = parser.parse(end).replace(tzinfo=tz.tzutc())
-    month_urls, day_urls = gen_download_urls(
+    month_urls, day_urls = get_urls(
         data_type=DataType.klines,
         asset_type=AssetType.future_um,
         symbol="BTCUSDT",
         start=start,
         end=end,
         timeframe="1m",
+        file_path=Path('.')
     )
     print(1)
