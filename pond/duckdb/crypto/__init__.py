@@ -9,9 +9,11 @@ from typing import Dict, List
 
 import pandas as pd
 import datetime as dt
-from dateutil import parser, tz
 from tqdm import tqdm
 from loguru import logger
+from dateutil import parser, tz
+from httpx._types import ProxiesTypes
+
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
 from pond.binance_history.type import TIMEFRAMES, TIMEZONE, AssetType, DataType
 
@@ -140,14 +142,12 @@ class CryptoDB(DuckDB):
         asset_type: AssetType = AssetType.future_um,
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
-        timezone: TIMEZONE = "UTC",
-        proxies: Dict[str, str] = {},
+        proxies: ProxiesTypes = {},
         skip_symbols: List[str] = [],
     ):
         from pond.binance_history.utils import (
             get_urls,
             load_data_from_disk,
-            get_local_data_path,
         )
         from pond.binance_history.async_api import start_async_download_files
 
@@ -204,7 +204,7 @@ class CryptoDB(DuckDB):
                 file_path=self.path_crypto,
             )
 
-            start_async_download_files(download_urls, self.path_crypto)
+            start_async_download_files(download_urls, self.path_crypto, proxies=proxies)
 
             df_list = []
             for url in load_urls:
