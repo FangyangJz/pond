@@ -170,7 +170,7 @@ def load_data_from_disk(
     path = get_local_data_path(url, local_path)
 
     if path.exists():
-        if int(path.stem.split("-")[-2]) < 2022:
+        if int(path.stem.split("-")[2]) < 2022:
             df = (
                 pl.read_csv(
                     ZipFile(path).read(f"{path.stem}.csv"),
@@ -203,7 +203,6 @@ def load_data_from_disk(
 
     else:
         return None
-
 
 if __name__ == "__main__":
     import pandas as pd
