@@ -137,12 +137,15 @@ def get_urls(
         for m in days
     ]
     download_days_urls = [
-        url for url in load_days_urls if not get_local_data_path(url, file_path).exists()
+        url
+        for url in load_days_urls
+        if not get_local_data_path(url, file_path).exists()
     ]
 
     load_urls = load_months_urls + load_days_urls
     download_urls = download_months_urls + download_days_urls
     return load_urls, download_urls
+
 
 def get_local_data_path(url: str, local_path: Union[Path, None] = None) -> Path:
     path = urlparse(url).path
@@ -160,9 +163,43 @@ def load_data_from_disk(
     local_path: Union[Path, None] = None,
     dtypes: Union[Dict[str, Any], None] = None,
 ) -> Union[pl.DataFrame, None]:
+    """
+    binance data start 2022-01.zip has csv header, need adjust to this in case of lack of data
+    for example lack of 2022-01-01 daily bar
+    """
     path = get_local_data_path(url, local_path)
+
     if path.exists():
-        return pl.read_csv(ZipFile(path).read(f"{path.stem}.csv"), dtypes=dtypes, columns=list(dtypes.keys()) if dtypes else None)
+        if int(path.stem.split("-")[-2]) < 2022:
+            df = (
+                pl.read_csv(
+                    ZipFile(path).read(f"{path.stem}.csv"),
+                    dtypes=dtypes,
+                    # columns=list(dtypes.keys()) if dtypes else None,
+                    has_header=False,
+                )
+                # .with_columns(
+                #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
+                #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
+                # )
+                # .to_pandas()
+            )
+        else:
+            df = (
+                pl.read_csv(
+                    ZipFile(path).read(f"{path.stem}.csv"),
+                    dtypes=dtypes,
+                    columns=list(dtypes.keys()) if dtypes else None,
+                    has_header=True,
+                )
+                # .with_columns(
+                #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
+                #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
+                # )
+                # .to_pandas()
+            )
+
+        return df
 
     else:
         return None
@@ -201,6 +238,6 @@ if __name__ == "__main__":
         start=start,
         end=end,
         timeframe="1m",
-        file_path=Path('.')
+        file_path=Path("."),
     )
     print(1)
