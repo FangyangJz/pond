@@ -124,16 +124,15 @@ class CryptoDB(DuckDB):
             raise NotImplemented("spot client has not been added")
 
     def get_base_path(self, asset_type: AssetType, data_type: DataType) -> Path:
-        path_map = {
+        return {
             (AssetType.spot, DataType.klines): self.path_crypto_kline_spot,
             (AssetType.spot, DataType.aggTrades): self.path_crypto_agg_trades_spot,
             (AssetType.future_cm, DataType.klines): self.path_crypto_kline_cm,
             (AssetType.future_cm, DataType.aggTrades): self.path_crypto_agg_trades_cm,
             (AssetType.future_um, DataType.klines): self.path_crypto_kline_um,
             (AssetType.future_um, DataType.aggTrades): self.path_crypto_agg_trades_um,
-        }
+        }[(asset_type, data_type)] # type: ignore
 
-        return path_map[(asset_type, data_type)]
 
     def update_history_data(
         self,
