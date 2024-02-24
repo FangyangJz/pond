@@ -15,7 +15,7 @@ from dateutil import parser, tz
 from httpx._types import ProxiesTypes
 
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
-from pond.binance_history.type import TIMEFRAMES, TIMEZONE, AssetType, DataType
+from pond.binance_history.type import TIMEFRAMES, AssetType, DataType
 
 
 class CryptoDB(DuckDB):

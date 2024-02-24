@@ -37,8 +37,6 @@ def get_future_symbol_list(client: Union[CMFutures, UMFutures]) -> List[str]:
 
 
 if __name__ == "__main__":
-    from pond.binance_history.type import AssetType, DataType
-
     proxies = {"https": "127.0.0.1:7890"}
 
     um_client = UMFutures(proxies=proxies)

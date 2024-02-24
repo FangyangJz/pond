@@ -15,7 +15,7 @@ import pandas as pd
 from datetime import datetime
 
 from pond.binance_history.exceptions import NetworkError
-from pond.binance_history.type import TIMEFRAMES, AssetType, DataType, TIMEZONE, Freq
+from pond.binance_history.type import TIMEFRAMES, AssetType, DataType, Freq
 
 
 def gen_data_url(
