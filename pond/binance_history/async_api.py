@@ -31,18 +31,14 @@ async def download_file(url: str, path: Path, proxies: ProxiesTypes = {}):
             logger.error(f"[{response.status_code}] {url}")
 
 
-async def download_files(url_list: List[str], path: Path, proxies: ProxiesTypes = {}):
+async def download_zip_files(
+    url_list: List[str], path: Path, proxies: ProxiesTypes = {}
+):
     tasks = []
     for url in url_list:
         task = asyncio.create_task(download_file(url, path, proxies))
         tasks.append(task)
     await asyncio.gather(*tasks)
-
-
-async def download_zip_files(
-    url_list: List[str], path: Path, proxies: ProxiesTypes = {}
-):
-    await download_files(url_list, path, proxies)
 
 
 def start_async_download_files(
