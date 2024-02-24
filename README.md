@@ -82,6 +82,7 @@ pip install binance-futures-connector
 
 Usage examples:
 ```python
+import polars as pl
 from pathlib import Path
 from pond.duckdb.crypto import CryptoDB
 
