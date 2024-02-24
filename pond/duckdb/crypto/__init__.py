@@ -6,7 +6,7 @@
 
 from pathlib import Path
 from typing import Dict, List
-
+import polars as pl
 import pandas as pd
 import datetime as dt
 from tqdm import tqdm
@@ -289,7 +289,6 @@ class CryptoDB(DuckDB):
 
 
 if __name__ == "__main__":
-    import polars as pl
     from pond.binance_history.exceptions import DataNotFound
 
     db = CryptoDB(Path(r"E:\DuckDB"))
@@ -301,11 +300,11 @@ if __name__ == "__main__":
     # ll = db.get_local_future_perpetual_symbol_list(asset_type=AssetType.future_um)
 
     db.update_history_data(
-        start="2020-1-1",
+        start="2022-1-1",
         end="2024-2-10",
         asset_type=AssetType.future_um,
         data_type=DataType.klines,
-        timeframe='1d',
+        timeframe='1m',
         # proxies={"https://": "https://127.0.0.1:7890"},
     )
 
