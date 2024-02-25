@@ -64,7 +64,7 @@ class CryptoDB(DuckDB):
 
     @staticmethod
     def get_common_interval_path_list(base_path: Path):
-        return [base_path / freq for freq in ["1m", "1d"]]
+        return [base_path / freq for freq in ["1m", "1h", "1d"]]
 
     def init_db_path(self):
         [f.mkdir() for f in self.path_crypto_list if not f.exists()]
