@@ -5,7 +5,6 @@
 # @Software : PyCharm
 
 from pathlib import Path
-from typing import Dict, List
 import polars as pl
 import pandas as pd
 import datetime as dt
@@ -71,7 +70,7 @@ class CryptoDB(DuckDB):
 
     def get_local_future_perpetual_symbol_list(
         self, asset_type: AssetType
-    ) -> List[str]:
+    ) -> list[str]:
         df = self.get_future_info(asset_type)
         df = df[df["contractType"] == "PERPETUAL"]
         return df.symbol.to_list()
@@ -88,7 +87,7 @@ class CryptoDB(DuckDB):
 
         return pd.read_csv(file)
 
-    def update_future_info(self, proxies: Dict[str, str] = {"https": "127.0.0.1:7890"}):
+    def update_future_info(self, proxies: dict[str, str] = {"https": "127.0.0.1:7890"}):
         """
         字段说明: https://binance-docs.github.io/apidocs/futures/cn/#0f3f2d5ee7
 
@@ -109,7 +108,7 @@ class CryptoDB(DuckDB):
                 self.path_crypto_info / f"{c.__class__.__name__}.csv", index_label=False
             )
 
-    def get_client(self, asset_type: AssetType, proxies: Dict[str, str] = {}):
+    def get_client(self, asset_type: AssetType, proxies: dict[str, str] = {}):
         if asset_type == AssetType.future_cm:
             from binance.cm_futures import CMFutures
 
@@ -142,7 +141,7 @@ class CryptoDB(DuckDB):
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
         proxies: ProxiesTypes = {},
-        skip_symbols: List[str] = [],
+        skip_symbols: list[str] = [],
     ):
         from pond.binance_history.utils import (
             get_urls,
@@ -303,7 +302,7 @@ if __name__ == "__main__":
         end="2024-2-10",
         asset_type=AssetType.future_um,
         data_type=DataType.klines,
-        timeframe='1m',
+        timeframe='1h',
         # proxies={"https://": "https://127.0.0.1:7890"},
     )
 

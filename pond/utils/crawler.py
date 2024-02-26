@@ -1,9 +1,8 @@
 from random import choice
-from typing import Dict
 import requests
 
 
-def get_mock_headers() -> Dict[str, str]:
+def get_mock_headers() -> dict[str, str]:
     user_agent_list = [
         "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36",
         "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36",

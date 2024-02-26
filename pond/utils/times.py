@@ -9,8 +9,10 @@ from loguru import logger
 from functools import wraps
 from datetime import datetime
 
-def datestr(date:datetime, spliter=''):
+
+def datestr(date: datetime, spliter=""):
     return date.date().isoformat().replace("-", spliter)
+
 
 def timeit_function_wrapper(func):
     @wraps(func)  # --> 4

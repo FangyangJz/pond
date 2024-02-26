@@ -6,7 +6,6 @@
 
 from binance.cm_futures import CMFutures
 from binance.um_futures import UMFutures
-from typing import List, Union
 
 import pandas as pd
 import datetime as dt
@@ -14,7 +13,7 @@ import datetime as dt
 # https://github.com/binance/binance-futures-connector-python
 
 
-def get_future_info_df(client: Union[CMFutures, UMFutures]) -> pd.DataFrame:
+def get_future_info_df(client: CMFutures | UMFutures) -> pd.DataFrame:
     info = client.exchange_info()
     df = pd.DataFrame.from_records(info["symbols"])
     df["update_datetime"] = dt.datetime.utcfromtimestamp(
@@ -29,7 +28,7 @@ def get_future_info_df(client: Union[CMFutures, UMFutures]) -> pd.DataFrame:
     return df
 
 
-def get_future_symbol_list(client: Union[CMFutures, UMFutures]) -> List[str]:
+def get_future_symbol_list(client: CMFutures | UMFutures) -> list[str]:
     df = get_future_info_df(client)
     return [
         ss["symbol"] for _, ss in df.iterrows() if ss["contractType"] == "PERPETUAL"

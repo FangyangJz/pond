@@ -7,11 +7,12 @@
 import pandas as pd
 import polars as pl
 import pyarrow as pa
-from typing import Literal, Union
+from typing import Literal
 from dataclasses import dataclass
 
-DataFrameStrType = Literal["pandas", "polars", 'arrow']
-DataFrameType = Union[pd.DataFrame, pl.DataFrame, pa.lib.Table]
+DataFrameStrType = Literal["pandas", "polars", "arrow"]
+DataFrameType = pd.DataFrame | pl.DataFrame | pa.lib.Table
+
 
 @dataclass
 class DFType:

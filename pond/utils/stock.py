@@ -5,7 +5,7 @@
 # @Software : PyCharm
 
 
-from typing import Union, List, Any
+from typing import Union, Any
 
 # 市场
 MARKET_SZ = 0  # 深市
@@ -13,7 +13,7 @@ MARKET_SH = 1  # 沪市
 MARKET_BJ = 2  # 北交
 
 
-def get_stock_markets(symbols=None) -> List[List[Union[Union[int, str], Any]]]:
+def get_stock_markets(symbols=None) -> list[list[Union[Union[int, str], Any]]]:
     results = []
 
     assert isinstance(symbols, list), "stock code need list type"
@@ -27,7 +27,7 @@ def get_stock_markets(symbols=None) -> List[List[Union[Union[int, str], Any]]]:
     return results
 
 
-def get_stock_market(symbol: str = "", string: bool = False) -> Union[int, str]:
+def get_stock_market(symbol: str = "", string: bool = False) -> int | str:
     """判断股票ID对应的证券市场匹配规则
 
     ['50', '51', '60', '90', '110'] 为 sh
