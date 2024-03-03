@@ -13,12 +13,12 @@ def read_tdx_minute_kline_distrubuted(**kwargs):
     reader = Reader.factory(market=market, tdxdir=tdx_dir)
     df = reader.minute(symbol=symbol, suffix=period)
     if df is not None:
-        if "start_date" in kwargs.keys():
-            df = df[df["date"] >= kwargs["start_date"]]
-        if "end_date" in kwargs.keys():
-            df = df[df["date"] <= kwargs["end_date"]]
-    return df
-
+        df = df.reset_index(drop=False)
+        if 'start_date' in kwargs.keys():
+            df = df[df["date"] >= kwargs['start_date']]
+        if 'end_date' in kwargs.keys():
+            df = df[df["date"] <= kwargs['end_date']]
+    return  df
 
 def read_tdx_minute_kline(
     tdx_dir=tdx_path,
@@ -49,7 +49,11 @@ if __name__ == "__main__":
     from pond.akshare.stock.all_basic import get_all_stocks_df
 
     df_stocks = get_all_stocks_df()
-    df = read_tdx_minute_kline(
-        tdx_dir=r"D:\windows\programs\TongDaXin", symbols=df_stocks["代码"][:50]
-    )
+    import time
+    from datetime import datetime
+
+    # # 这里测试确实cache生效了
+    start_time = time.perf_counter()
+    df = read_tdx_minute_kline(tdx_dir=r"D:\windows\programs\TongDaXin", symbols=df_stocks['代码'][:500], start_date=datetime(2023,12,1), end_date=datetime(2024,1,26))
+    print(f"Time cost:{time.perf_counter()-start_time:.2f}s")
     print(len(df))
