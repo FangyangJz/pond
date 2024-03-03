@@ -4,8 +4,6 @@
 # @Author   : Fangyang
 # @Software : PyCharm
 from functools import cache
-from typing import Tuple
-
 import akshare as ak
 import pandas as pd
 
@@ -21,7 +19,7 @@ from pond.utils.code2code import (
 @cache
 def get_bond_basic_df(
     data_delist_status: str = "include",
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     返回 (bond_zh_cov_df, redeem_df）
 

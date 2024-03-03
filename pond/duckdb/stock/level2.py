@@ -7,7 +7,7 @@ import gc
 import os
 import threading
 import time
-from typing import List, Callable
+from typing import Callable
 
 from tqdm import tqdm
 from pathlib import Path
@@ -20,7 +20,7 @@ from loguru import logger
 csv_engine: CSVEngine = "c"
 
 
-def get_trade_df(csv_file: Path, df_list: List[pd.DataFrame] = None) -> pd.DataFrame:
+def get_trade_df(csv_file: Path, df_list: list[pd.DataFrame] | None = None) -> pd.DataFrame:
     """
     From 海通证券 选股因子系列研究75 限价订单簿LOB的还原与应用
 
@@ -97,7 +97,7 @@ def get_trade_script() -> str:
 #     return df[keep_cols]
 
 
-def get_order_df(csv_file: Path, df_list: List[pd.DataFrame] = None) -> pd.DataFrame:
+def get_order_df(csv_file: Path, df_list: list[pd.DataFrame] | None = None) -> pd.DataFrame:
     dtype_dict = {
         "万得代码": str,  # keep convert to jj_code
         # '交易所代码': int,
@@ -185,7 +185,7 @@ ask_bid_dtype_dict = {
 
 
 def get_orderbook_df(
-    csv_file: Path, df_list: List[pd.DataFrame] = None
+    csv_file: Path, df_list: list[pd.DataFrame] | None = None
 ) -> pd.DataFrame:
     dtype_dict = {
         "万得代码": str,  # keep convert to jj_code
@@ -309,7 +309,7 @@ def get_level2_daily_df_with_threading(task_cfg: TaskConfig) -> pd.DataFrame:
 
 
 def update_res_list(
-    file_path_list: List[Path],
+    file_path_list: list[Path],
     func: Callable[[Path], pd.DataFrame],
     res_list: ListProxy,
 ):

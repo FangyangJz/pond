@@ -4,11 +4,9 @@
 # @Author   : Fangyang
 # @Software : PyCharm
 
-
 import time
 from ctypes import c_uint32
 from pathlib import Path
-from typing import Union
 
 import pandas as pd
 from loguru import logger
@@ -22,7 +20,7 @@ from pond.tdx.path import gbbq_path
 # and this http://blog.sina.com.cn/s/blog_6b2f87db0102uxo3.html
 class GbbqReader:
     @staticmethod
-    def get_df(filename: Union[Path, str]) -> pd.DataFrame:
+    def get_df(filename: Path | str) -> pd.DataFrame:
         import struct
         import pandas as pd
         import sys

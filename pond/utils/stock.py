@@ -5,7 +5,7 @@
 # @Software : PyCharm
 
 
-from typing import Union, Any
+from typing import Any
 
 # 市场
 MARKET_SZ = 0  # 深市
@@ -13,7 +13,7 @@ MARKET_SH = 1  # 沪市
 MARKET_BJ = 2  # 北交
 
 
-def get_stock_markets(symbols=None) -> list[list[Union[Union[int, str], Any]]]:
+def get_stock_markets(symbols=None) -> list[list[Any]]:
     results = []
 
     assert isinstance(symbols, list), "stock code need list type"

@@ -6,11 +6,11 @@ import akshare as ak
 import pandas as pd
 from tqdm import tqdm
 
-from gulf.akshare.const import (
+from pond.akshare.const import (
     AKSHARE_CRAWL_CONCURRENT_LIMIT,
     AKSHARE_CRAWL_STOP_INTERVEL,
 )
-from gulf.akshare.stock.index_decorator import trans_ch_col_name
+from pond.akshare.stock.index_decorator import trans_ch_col_name
 
 
 def update_index_concept_em_df_thread(symbol, start_date, end_date, res_dict):

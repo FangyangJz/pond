@@ -5,7 +5,7 @@
 # @Software : PyCharm
 
 from pathlib import Path
-from typing import Union, Dict, Any, List, Tuple
+from typing import Any
 from urllib.parse import urlparse
 from zipfile import ZipFile
 
@@ -72,7 +72,7 @@ def get_urls(
     timeframe: TIMEFRAMES,
     file_path: Path,
     proxies: Dict[str, str] = {},
-) -> Tuple[List[str], List[str]]:
+) -> tuple[list[str], list[str]]:
     # assert start.tz is None and end.tz is None
     assert start <= end, "start cannot be greater than end"
 
@@ -147,7 +147,7 @@ def get_urls(
     return load_urls, download_urls
 
 
-def get_local_data_path(url: str, local_path: Union[Path, None] = None) -> Path:
+def get_local_data_path(url: str, local_path: Path | None = None) -> Path:
     path = urlparse(url).path
 
     if local_path:
@@ -160,9 +160,9 @@ def get_local_data_path(url: str, local_path: Union[Path, None] = None) -> Path:
 
 def load_data_from_disk(
     url: str,
-    local_path: Union[Path, None] = None,
-    dtypes: Union[Dict[str, Any], None] = None,
-) -> Union[pl.DataFrame, None]:
+    local_path: Path | None = None,
+    dtypes: dict[str, Any] | None = None,
+) -> pl.DataFrame | None:
     """
     binance data start 2022-01.zip has csv header, need adjust to this in case of lack of data
     for example lack of 2022-01-01 daily bar

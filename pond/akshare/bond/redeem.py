@@ -97,13 +97,21 @@ def bond_cb_redeem_jsl() -> pd.DataFrame:
         r"^.*?(\d{1,2}\/\d{1,2} \| \d{1,2}).*?$", r"\1", regex=True
     )
     temp_df["强赎状态"] = temp_df["强赎状态"].map(
-        {"R": "已公告强赎", "O": "公告要强赎", "G": "公告不强赎", "B": "已满足强赎条件", "": ""}
+        {
+            "R": "已公告强赎",
+            "O": "公告要强赎",
+            "G": "公告不强赎",
+            "B": "已满足强赎条件",
+            "": "",
+        }
     )
     return temp_df
 
 
 def get_bond_cb_redeem_jsl_df() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    bond_cb_redeem_jsl_df = bond_cb_redeem_jsl().drop(labels=["正股价", "转股价"], axis=1)
+    bond_cb_redeem_jsl_df = bond_cb_redeem_jsl().drop(
+        labels=["正股价", "转股价"], axis=1
+    )
     bond_cb_redeem_jsl_df["强赎天计数"] = bond_cb_redeem_jsl_df["强赎天计数"].replace(
         to_replace=r"\<.*\>", value="", regex=True
     )

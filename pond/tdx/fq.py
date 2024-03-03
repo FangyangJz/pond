@@ -10,12 +10,10 @@ import time
 from multiprocessing import Pool, Manager
 from multiprocessing.managers import DictProxy
 from multiprocessing.pool import Pool as PoolType
-from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
 from loguru import logger
-
 from tqdm import tqdm
 
 from mootdx.reader import Reader
@@ -26,7 +24,7 @@ from pond.tdx.path import gbbq_path, tdx_path
 def update_res_dict(
     stock_df: pd.DataFrame,
     gbbq_df: pd.DataFrame,
-    cw_dict: Dict[str, pd.DataFrame],
+    cw_dict: dict[str, pd.DataFrame],
     res_dict: DictProxy,
     offset: int,
 ):
@@ -57,10 +55,10 @@ def update_res_dict(
 def qfq_acc(
     stock_basic_df: pd.DataFrame,
     gbbq_df: pd.DataFrame,
-    cw_dict: Dict[str, pd.DataFrame],
+    cw_dict: dict[str, pd.DataFrame],
     offset: int = 1,
     pool: PoolType = None,
-) -> Dict[str, pd.DataFrame]:
+) -> dict[str, pd.DataFrame]:
     build_in_pool = False
     if not isinstance(pool, PoolType):
         logger.info(f"Not pass multiprocess pool in parameter, build in function.")
@@ -109,9 +107,9 @@ def qfq_acc(
 def qfq(
     stock_basic_df: pd.DataFrame,
     gbbq_df: pd.DataFrame,
-    cw_dict: Dict[str, pd.DataFrame],
+    cw_dict: dict[str, pd.DataFrame],
     offset: int = 1,
-) -> Dict[str, pd.DataFrame]:
+) -> dict[str, pd.DataFrame]:
     logger.info("Function qfq with 1 process...")
     res_dict = dict()
     update_res_dict(stock_basic_df, gbbq_df, cw_dict, res_dict, offset)
@@ -123,11 +121,11 @@ def make_fq(
     code: str,
     code_df: pd.DataFrame,
     gbbq_df: pd.DataFrame,
-    cw_dict: Union[Dict[str, pd.DataFrame], None] = None,
+    cw_dict: dict[str, pd.DataFrame] | None = None,
     start_date="",
     end_date="",
     fqtype: str = "qfq",
-) -> pd.DataFrame:
+) -> pd.DataFrame | str:
     """
     股票周期数据复权处理函数
     :param code:str格式，具体股票代码
@@ -469,9 +467,9 @@ if __name__ == "__main__":
     res_dict2 = qfq(db.stock_basic_df, df_gbbq, cw_dict)
     qfq_cost_time = time.perf_counter() - qfq_start_time
 
-    logger.success(f"qfq_acc_cost_time:{qfq_acc_cost_time:.4f}s")
+    # logger.success(f"qfq_acc_cost_time:{qfq_acc_cost_time:.4f}s")
     logger.success(f"qfq_cost_time:{qfq_cost_time:.4f}s")
-    logger.success(f"build_in_pool_cost_time:{build_in_pool_cost_time:.4f}s")
+    # logger.success(f"build_in_pool_cost_time:{build_in_pool_cost_time:.4f}s")
 
     print(1)
 

@@ -8,7 +8,6 @@ import threading
 import time
 import pandas as pd
 
-from typing import Dict
 from tqdm import tqdm
 from loguru import logger
 
@@ -21,7 +20,7 @@ from pond.utils.stock import get_stock_ch_market
 
 
 def get_stock_hist_df(
-    res_dict: Dict[str, pd.DataFrame],
+    res_dict: dict[str, pd.DataFrame],
     code: str = "000001",
     name: str = "平安银行",
     start_date: str = "19700101",
@@ -130,7 +129,7 @@ def update_res_dict_thread(
 
 
 if __name__ == "__main__":
-    from gulf.akshare.stock.all_basic import get_all_stocks_df
+    from pond.akshare.stock.all_basic import get_all_stocks_df
 
     stock_zh_a_spot_em_df = get_all_stocks_df()
     res_dict = dict()

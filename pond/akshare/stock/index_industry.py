@@ -6,11 +6,11 @@ import pandas as pd
 from tqdm import tqdm
 from datetime import date
 
-from gulf.akshare.const import (
+from pond.akshare.const import (
     AKSHARE_CRAWL_STOP_INTERVEL,
     AKSHARE_CRAWL_CONCURRENT_LIMIT,
 )
-from gulf.akshare.stock.index_decorator import trans_ch_col_name
+from pond.akshare.stock.index_decorator import trans_ch_col_name
 
 
 def update_index_industry_em_df_thread(symbol, start_date, end_date, res_dict):

@@ -10,7 +10,6 @@ import zipfile
 from multiprocessing import Pool, Manager
 from multiprocessing.pool import Pool as PoolType
 from pathlib import Path
-from typing import List, Union, Dict
 
 import pandas as pd
 from mootdx.affair import Affair
@@ -19,7 +18,7 @@ from loguru import logger
 import struct
 
 
-def get_local_cw_file_list(ext_name=".dat") -> List[Path]:
+def get_local_cw_file_list(ext_name=".dat") -> list[Path]:
     """
     列出本地已有的专业财务文件。返回文件列表
     :param ext_name: str类型。文件扩展名。返回指定扩展名的文件列表
@@ -52,7 +51,7 @@ def update_cw_data():
                 zipobj.extractall(cw_path)
 
 
-def get_history_financial_df(filepath: Union[Path, str]) -> pd.DataFrame:
+def get_history_financial_df(filepath: Path | str) -> pd.DataFrame:
     """
     读取解析通达信目录的历史财务数据
     :param filepath: 字符串类型。传入文件路径
@@ -61,11 +60,11 @@ def get_history_financial_df(filepath: Union[Path, str]) -> pd.DataFrame:
     with open(filepath, "rb") as cw_file:
         header_pack_format = "<1hI1H3L"
         header_size = struct.calcsize(header_pack_format)
-        stock_item_size = struct.calcsize("<6s1c1L")
+        # stock_item_size = struct.calcsize("<6s1c1L")
         data_header = cw_file.read(header_size)
         stock_header = struct.unpack(header_pack_format, data_header)
         max_count = stock_header[2]
-        report_date = stock_header[1]
+        # report_date = stock_header[1]
         report_size = stock_header[4]
         report_fields_count = int(report_size / 4)
         report_pack_format = f"<{report_fields_count}f"
@@ -78,7 +77,7 @@ def get_history_financial_df(filepath: Union[Path, str]) -> pd.DataFrame:
             foa = stock_item[2]
             cw_file.seek(foa)
             info_data = cw_file.read(struct.calcsize(report_pack_format))
-            data_size = len(info_data)
+            # data_size = len(info_data)
             cw_info = list(struct.unpack(report_pack_format, info_data))
             cw_info.insert(0, code)
             cw_info.insert(1, filepath.stem[4:])
@@ -88,7 +87,7 @@ def get_history_financial_df(filepath: Union[Path, str]) -> pd.DataFrame:
 
 
 def update_cw_dict(
-    part_local_cw_file_list: List[Path], cw_dict: Dict[str, pd.DataFrame]
+    part_local_cw_file_list: list[Path], cw_dict: dict[str, pd.DataFrame]
 ):
     for i in part_local_cw_file_list:
         cw_df = get_history_financial_df(i)
@@ -97,14 +96,14 @@ def update_cw_dict(
         cw_dict[i.stem[4:]] = cw_df
 
 
-def get_cw_dict() -> Dict[str, pd.DataFrame]:
+def get_cw_dict() -> dict[str, pd.DataFrame]:
     logger.info("Loading local financial data with 1 process...")
     cw_dict = {}
     update_cw_dict(get_local_cw_file_list(), cw_dict)
     return cw_dict
 
 
-def get_cw_dict_acc(pool: PoolType = None) -> Dict[str, pd.DataFrame]:
+def get_cw_dict_acc(pool: PoolType = None) -> dict[str, pd.DataFrame]:
     from tqdm import tqdm
 
     build_in_pool = False

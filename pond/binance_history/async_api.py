@@ -7,7 +7,6 @@
 import httpx
 import asyncio
 
-from typing import List
 from pathlib import Path
 from loguru import logger
 from urllib.parse import urlparse
@@ -32,7 +31,7 @@ async def download_file(url: str, path: Path, proxies: ProxiesTypes = {}):
 
 
 async def download_zip_files(
-    url_list: List[str], path: Path, proxies: ProxiesTypes = {}
+    url_list: list[str], path: Path, proxies: ProxiesTypes = {}
 ):
     tasks = []
     for url in url_list:
@@ -42,7 +41,7 @@ async def download_zip_files(
 
 
 def start_async_download_files(
-    url_list: List[str], path: Path, proxies: ProxiesTypes = {}
+    url_list: list[str], path: Path, proxies: ProxiesTypes = {}
 ):
     asyncio.run(download_zip_files(url_list, path, proxies))
 

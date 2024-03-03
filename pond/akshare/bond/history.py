@@ -9,19 +9,16 @@ import time
 import numpy as np
 import pandas as pd
 
-from typing import Dict
 from datetime import datetime
 from tqdm import tqdm
 from loguru import logger
+import akshare as ak
 
 from pond.akshare.const import (
     AKSHARE_CRAWL_CONCURRENT_LIMIT,
     AKSHARE_CRAWL_STOP_INTERVEL,
 )
 from pond.akshare.bond.cov_value_analysis import bond_zh_cov_value_analysis
-
-import akshare as ak
-
 from pond.akshare.stock.migrate_func import stock_zh_a_hist
 
 
@@ -33,7 +30,7 @@ def get_bond_daily_df(
     stock_code: str,
     stock_name: str,
     market: str,
-    res_dict: Dict[str, pd.DataFrame],
+    res_dict: dict[str, pd.DataFrame],
 ):
     """
     scale = row['发行规模'] if np.isnan(row['剩余规模']) else row['剩余规模']
@@ -157,7 +154,7 @@ def get_bond_daily_df(
 
 
 def update_bond_daily_res_dict_thread(
-    bond_basic_df: pd.DataFrame, res_dict: Dict[str, pd.DataFrame]
+    bond_basic_df: pd.DataFrame, res_dict: dict[str, pd.DataFrame]
 ):
     start_time = time.perf_counter()
     t_list = []
@@ -246,7 +243,7 @@ def get_bond_index_daily():
 
 
 if __name__ == "__main__":
-    from gulf.akshare.bond import get_bond_basic_df
+    from pond.akshare.bond import get_bond_basic_df
 
     df1, df2 = get_bond_basic_df(data_delist_status="exclude")
     res_dict = dict()

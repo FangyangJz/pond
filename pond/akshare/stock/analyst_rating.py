@@ -1,7 +1,7 @@
 import json
 import threading
 
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
 from datetime import datetime
@@ -13,10 +13,10 @@ from pond.utils.crawler import request_session
 def request_data(
     url: str,
     num: int,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     # headers: Dict[str, str],
-    columns: List[str],
-    res_dict: Dict[str, pd.DataFrame],
+    columns: list[str],
+    res_dict: dict[str, pd.DataFrame],
 ) -> dict[str, pd.DataFrame]:
     ses = request_session()
     r = ses.get(url=url, params=params)
