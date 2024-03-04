@@ -28,6 +28,7 @@ class StockDB(DuckDB):
     def __init__(self, db_path: Path, df_type: DataFrameStrType = df_types.polars):
         self.path_stock = db_path / "stock"
         self.path_stock_info = self.path_stock / "info"
+        self.path_stock_kline_1m = self.path_stock / "kline_1m"
         self.path_stock_kline_1d = self.path_stock / "kline_1d"
         self.path_stock_kline_1d_nfq = self.path_stock_kline_1d / "nfq"
         self.path_stock_kline_1d_qfq = self.path_stock_kline_1d / "qfq"
@@ -275,6 +276,17 @@ class StockDB(DuckDB):
         logger.success(
             f"Update all parquet file cost: {time.perf_counter() - start_time:.2f}s"
         )
+
+
+    def get_kline_1m(
+        self, start_date: str = "2023-01-01", end_date: str = "2070-01-01"
+    ) -> DuckDBPyRelation:
+        rel = self.con.sql(
+            rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_1m.iterdir()]})"
+        ).filter(
+            f"(date >= TIMESTAMP '{start_date}') and (date < TIMESTAMP '{end_date}')"
+        )
+        return self.transform_to_df(rel)     
 
 
 if __name__ == "__main__":
