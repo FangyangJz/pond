@@ -28,6 +28,7 @@ class StockDB(DuckDB):
     def __init__(self, db_path: Path, df_type: DataFrameStrType = df_types.polars):
         self.path_stock = db_path / "stock"
         self.path_stock_info = self.path_stock / "info"
+        self.path_stock_kline_1m = self.path_stock / "kline_1m"
         self.path_stock_kline_1d = self.path_stock / "kline_1d"
         self.path_stock_kline_1d_nfq = self.path_stock_kline_1d / "nfq"
         self.path_stock_kline_1d_qfq = self.path_stock_kline_1d / "qfq"
@@ -42,6 +43,7 @@ class StockDB(DuckDB):
             self.path_stock,
             self.path_stock_info,
             self.path_stock_kline_1d,
+            self.path_stock_kline_1m,
             self.path_stock_kline_1d_nfq,
             self.path_stock_kline_1d_qfq,
             self.path_stock_level2,
@@ -277,8 +279,40 @@ class StockDB(DuckDB):
         )
 
 
+    def get_kline_1m(
+        self, start_date: str = "2023-01-01", end_date: str = "2070-01-01"
+    ) -> DuckDBPyRelation:
+        rel = self.con.sql(
+            rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_1m.iterdir()]})"
+        ).filter(
+            f"(date >= TIMESTAMP '{start_date}') and (date < TIMESTAMP '{end_date}')"
+        )
+        return self.transform_to_df(rel)     
+
+
+    def update_kline_1m_from_tdx(self, tdx_dir=None):
+        from pond.akshare.stock.all_basic import get_all_stocks_df
+        import os, math, ray
+        from pond.tdx.kline import TdxReaderActor
+
+        symbols = get_all_stocks_df()["代码"]
+        process_counts=(os.cpu_count() -1)
+        readers = []
+        group_size = math.ceil(len(symbols) / process_counts)
+
+        for i in range(process_counts):
+            reader = TdxReaderActor.remote(self.path_stock_kline_1m.absolute(), update=True, fetch_data=False)
+            reader.read.remote(tdx_dir, 'std', symbols[i*group_size : (i+1)*group_size], '1')
+            readers.append(reader)
+
+        for reader in readers:
+            ray.get(reader.get.remote()) 
+
+
 if __name__ == "__main__":
+    import time
     db = StockDB(Path(r"E:\DuckDB"))
+    db.init_db_path()
     # db = StockDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
     # db.update_stock_orders()
 
@@ -289,13 +323,19 @@ if __name__ == "__main__":
     # db.update_kline_1d_nfq()
     # db.update_kline_1d_qfq()
 
-    db.update_level2_trade()
-    db.update_level2_order()
-    db.update_level2_orderbook()
+    #db.update_level2_trade()
+    #db.update_level2_order()
+    #db.update_level2_orderbook()
 
     # r1 = db.con.sql(
     #     rf"SELECT * from read_parquet('{str(db.path_stock_trades / '20230504.parquet')}')")  # order by jj_code, datetime
     #
     # r4 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'basic.parquet')}')")
     # r5 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'calender.parquet')}')")
+    
+    db.update_kline_1m_from_tdx(r"D:\windows\programs\TongDaXin")
+
+    start = time.perf_counter()
+    df = db.get_kline_1m()
+    print(f"fetched data {len(df)}, cost time {time.perf_counter() - start:.2f}")
     print(1)
