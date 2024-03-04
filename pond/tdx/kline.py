@@ -8,11 +8,15 @@ import math
 @ray.remote
 class TdxReaderActor:
 
-    def __init__(self) -> None:
+    def __init__(self, cache_path=None, update=False, parquet_compress='ZSTD', fetch_data=True) -> None:
+        self.cache_path = cache_path
+        self.update = update
+        self.compress = parquet_compress
+        self.fetch_data = fetch_data
         self.dfs = []
 
     def get(self):
-        if len(self.dfs) > 0:
+        if len(self.dfs) > 0 and self.fetch_data:
             return pd.concat(self.dfs)
         return []
 
@@ -21,6 +25,7 @@ class TdxReaderActor:
         for symbol in symbols:
             df = reader.minute(symbol=symbol, suffix=period)
             if df is not None:
+                self.__cache_into_disk__(symbol, df)
                 df = df.reset_index(drop=False)
                 if start_date is not None:
                     df = df[df["date"] >= start_date]
@@ -28,6 +33,12 @@ class TdxReaderActor:
                     df = df[df["date"] <= end_date]
                 self.dfs.append(df)
     
+
+    def __cache_into_disk__(self, symbol, df:pd.DataFrame):
+        if df is None or self.cache_path is None or not self.update:
+            return
+        df.to_parquet(f"{self.cache_path}/{symbol}.parquet", compression=self.compress, index=True)
+
 
 def read_tdx_minute_kline(tdx_dir=tdx_path, market='std', symbols=[], period='1', start_date=None, end_date=None, process_counts=(os.cpu_count() -1)):
     readers = []
