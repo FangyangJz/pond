@@ -50,7 +50,13 @@ def get_klines(
     end: int,
     res_list: list[pl.DataFrame],
 ):
-    dd = client.klines(symbol=symbol, interval=interval, startTime=start, endTime=end, limit=1000)
+    dd = client.klines(
+        symbol=symbol,
+        interval=interval,
+        startTime=start,
+        endTime=end,
+        limit=500 if interval not in ["1s", "1m"] else 1000,
+    )
     dd = pl.from_records(dd, schema=kline_schema)
     res_list.append(dd)
 
@@ -67,7 +73,6 @@ def get_supply_df(
     base += dt.timedelta(days=1).total_seconds()*1e3
     base_dt2 = dt.datetime.utcfromtimestamp(base/1e3)
     """
-
 
     res_list = []
     t_list = []
