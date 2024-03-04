@@ -16,6 +16,8 @@ from loguru import logger
 
 from binance.cm_futures import CMFutures
 from binance.um_futures import UMFutures
+from pond.duckdb.crypto.const import kline_schema
+from pond.binance_history.type import TIMEFRAMES
 
 
 def get_future_info_df(client: CMFutures | UMFutures) -> pd.DataFrame:
@@ -40,24 +42,44 @@ def get_future_symbol_list(client: CMFutures | UMFutures) -> list[str]:
     ]
 
 
-def get_klines(client, symbol, interval, start, end, res_list):
-    dd = client.klines(
-        symbol=symbol, interval="1d", startTime=int(start_dt), endTime=int(end_dt)
-    )
-    dd = pl.from_records(dd, schema=kline_schema).with_columns(
-        (pl.col("open_time") * 1e3).cast(pl.Datetime),
-        (pl.col("close_time") * 1e3).cast(pl.Datetime),
-        jj_code=pl.lit(symbol),
-    )
+def get_klines(
+    client: CMFutures | UMFutures,
+    symbol: str,
+    interval: TIMEFRAMES,
+    start: int,
+    end: int,
+    res_list: list[pl.DataFrame],
+):
+    dd = client.klines(symbol=symbol, interval=interval, startTime=start, endTime=end, limit=1000)
+    dd = pl.from_records(dd, schema=kline_schema)
     res_list.append(dd)
 
 
-def update_res_dict_thread(
-    client, symbols, interval, start: str, end: str, res_list: list[pl.DataFrame]
-):
-    start_time = time.perf_counter()
+def get_supply_df(
+    client: CMFutures | UMFutures,
+    lack_df: pl.DataFrame,
+    symbol: str,
+    interval: TIMEFRAMES = "1d",
+) -> pl.DataFrame:
+    """
+    base = 1577836800000
+    base_dt = dt.datetime.utcfromtimestamp(base/1e3)
+    base += dt.timedelta(days=1).total_seconds()*1e3
+    base_dt2 = dt.datetime.utcfromtimestamp(base/1e3)
+    """
+
+
+    res_list = []
     t_list = []
-    for symbol in tqdm(symbols, desc=""):
+    for i in range(0, len(lack_df), 2):
+        start = lack_df["open_time"][i]
+        end = lack_df["open_time"][i + 1]
+        logger.info(
+            f"[{symbol}] Supplement missing {interval} data: "
+            f"{dt.datetime.utcfromtimestamp(start/1e3)} -> "
+            f"{dt.datetime.utcfromtimestamp(end/1e3)}"
+        )
+
         t = threading.Thread(
             target=get_klines,
             args=(client, symbol, interval, start, end, res_list),
@@ -68,9 +90,7 @@ def update_res_dict_thread(
     if t_list:
         [t.join() for t in t_list]
 
-    logger.success(f"Threading cost: {time.perf_counter() - start_time:.2f}s")
-    ddd = pl.concat(res_list).to_pandas()
-    print(1)
+    return pl.concat(res_list)
 
 
 if __name__ == "__main__":
@@ -92,8 +112,6 @@ if __name__ == "__main__":
 
     res_list = []
     symbols = ["BTCUSDT", "BTSUSDT", "ETHUSDT"]
-    update_res_dict_thread(um_client, symbols, interval, start_dt, end_dt, res_list)
-
     # r = get_future_info_df(um_client)
     dd = um_client.klines(
         symbol=symbol, interval=interval, startTime=int(start_dt), endTime=int(end_dt)

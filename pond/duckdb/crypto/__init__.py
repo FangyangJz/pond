@@ -145,6 +145,7 @@ class CryptoDB(DuckDB):
         skip_symbols: list[str] = [],
     ):
         from pond.duckdb.crypto.const import kline_schema
+        from pond.duckdb.crypto.future import get_supply_df
         from pond.binance_history.utils import (
             get_urls,
             load_data_from_disk,
@@ -172,7 +173,7 @@ class CryptoDB(DuckDB):
             symbol = row["symbol"]
             delivery_date = parser.parse(row["deliveryDate"])
             # TUSDT onboardDate 2023-01-31, but real history data is 2023-02-01
-            onboard_date = parser.parse(row["onboardDate"]) # + dt.timedelta(days=1)
+            onboard_date = parser.parse(row["onboardDate"])  # + dt.timedelta(days=1)
             _start = max(onboard_date, input_start)
             _end = min(delivery_date, input_end)
 
@@ -218,15 +219,37 @@ class CryptoDB(DuckDB):
                     df_list.append(df)
 
             if df_list:
+                df = pl.concat(df_list).with_columns(
+                    (pl.col("open_time").diff() - pl.col("open_time").diff().shift(-1))
+                    .fill_null(0)
+                    .alias("open_time_diff"),
+                )
+
+                lack_df = df.filter(pl.col("open_time_diff") != 0).select(
+                    ["open_time", "close_time"]
+                )
+                if len(lack_df) > 0:
+                    supply_df = get_supply_df(
+                        client=self.get_client(asset_type, proxies),
+                        lack_df=lack_df,
+                        symbol=symbol,
+                        interval=timeframe,
+                    )
+                    df = pl.concat([df.select(pl.exclude("open_time_diff")), supply_df])
+                else:
+                    df = df.select(pl.exclude("open_time_diff"))
+
                 df = (
-                    pl.concat(df_list)
+                    df.select(pl.exclude("ignore"))
                     .with_columns(
                         (pl.col("open_time") * 1e3).cast(pl.Datetime),
                         (pl.col("close_time") * 1e3).cast(pl.Datetime),
                         jj_code=pl.lit(symbol),
                     )
-                    .select(pl.exclude("ignore"))
-                )#.to_pandas()
+                    .sort("open_time")
+                    .unique(maintain_order=True)
+                )
+
                 origin_df_len = len(df)
                 df = df.filter(pl.col("quote_volume") > 0) if timeframe != "1s" else df
                 if (filtered_rows := origin_df_len - len(df)) > 0:
@@ -236,8 +259,6 @@ class CryptoDB(DuckDB):
                 logger.success(
                     f"[{symbol}] Dataframe shape: {df.shape}, {df['open_time'].min()} -> {df['close_time'].max()}."
                 )
-
-                # TODO api data compensate
 
                 df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
             else:
@@ -297,16 +318,17 @@ if __name__ == "__main__":
     # df = db.get_future_info(asset_type=AssetType.future_um)
     # ll = db.get_local_future_perpetual_symbol_list(asset_type=AssetType.future_um)
 
+    interval = '1h'
     db.update_history_data(
         start="2020-1-1",
         end="2024-3-2",
         asset_type=AssetType.future_um,
         data_type=DataType.klines,
-        timeframe="1d",
+        timeframe=interval,
         # proxies={"https://": "https://127.0.0.1:7890"},
     )
 
-    df = pl.read_parquet(db.path_crypto_kline_um / "1m" / "BTCUSDT.parquet").to_pandas()
+    df = pl.read_parquet(db.path_crypto_kline_um / interval / "BTCUSDT.parquet").to_pandas()
     print(1)
 
     # db.update_crypto_trades()
