@@ -5,10 +5,11 @@
 import gc
 import time
 import pandas as pd
-
+import polars as pl
 from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
+from datetime import time as dtime
 
 from duckdb import DuckDBPyRelation
 from pond.duckdb import DuckDB
@@ -27,6 +28,7 @@ class StockDB(DuckDB):
         self.path_stock = db_path / "stock"
         self.path_stock_info = self.path_stock / "info"
         self.path_stock_kline_1m = self.path_stock / "kline_1m"
+        self.path_stock_snapshot_1m = self.path_stock / "snapshot_1m"
         self.path_stock_kline_1d = self.path_stock / "kline_1d"
         self.path_stock_kline_1d_nfq = self.path_stock_kline_1d / "nfq"
         self.path_stock_kline_1d_qfq = self.path_stock_kline_1d / "qfq"
@@ -53,6 +55,7 @@ class StockDB(DuckDB):
             self.path_stock_level2_order,
             self.path_stock_level2_orderbook,
             self.path_stock_level2_orderbook_rebuild,
+            self.path_stock_snapshot_1m,
         ]
 
         super().__init__(db_path, df_type)
@@ -306,6 +309,69 @@ class StockDB(DuckDB):
             ray.get(reader.get.remote())
 
 
+    def get_snapshot_1m_rel(
+        self, start_date: str = "2023-01-01", end_date: str = "2070-01-01"
+    ) -> DuckDBPyRelation:
+        return self.con.sql(
+            rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_snapshot_1m.iterdir()]})"
+        ).filter(
+            f"(date >= TIMESTAMP '{start_date}') and (date < TIMESTAMP '{end_date}')"
+        ) 
+
+
+    def update_snapshot_1m(self):
+        """
+        aggrate 1m kline into market snapshot
+        """
+        def agg_into_snapshots(parquet_file) -> pl.DataFrame:
+            df = pl.scan_parquet(parquet_file).with_columns([
+                pl.col("date").alias("datetime"),
+                pl.col("date").dt.date().alias("date"),
+                pl.col("date").dt.time().alias("time"),
+            ]).sort("datetime").with_columns([
+                (pl.col("close") / pl.col("close").shift(1) -1).alias("chgpct")
+            ]).with_columns([
+                ((1 + pl.col("chgpct") * 10).log(2) * pl.col("amount")).alias("found"),#使用log函数模拟资金流入流出
+            ])
+            df_day = df.group_by("date").agg([
+                pl.col("close").last().alias("d_close")
+            ]).sort("date").with_columns([
+                pl.col("d_close").shift(1).alias("yd_close")
+            ])
+            df_minutes = []
+            for time in pl.time_range(dtime(9,30), dtime(15,0), '1m', eager=True):
+                df_minute = df.filter(pl.col("time") <= time).group_by("date").agg([
+                    pl.col("open").first(),
+                    pl.col("high").max(),
+                    pl.col("low").min(),
+                    pl.col("close").last(),
+                    pl.col("time").last(),
+                    pl.col("datetime").last(),
+                    pl.col("volume").sum(),
+                    pl.col("amount").sum(),
+                    pl.col("found").sum(),
+                    pl.col("chgpct").last().alias("chgpct_1m")
+                ]).with_columns([
+                    pl.lit(parquet_file.stem).alias("code")
+                ])
+                df_minutes.append(df_minute)
+
+            df : pl.LazyFrame = pl.concat(df_minutes)
+            df = df.join(df_day, on='date')
+            df = df.with_columns([
+                (pl.col("close") / pl.col("d_close") -1).alias("d_chgpct"),
+                (pl.col("close") / pl.col("yd_close") -1).alias("yd_chgpct")
+            ])
+            return df.collect().sort("datetime")
+
+        
+        for file in self.path_stock_kline_1m.glob("*.parquet"):
+            df = agg_into_snapshots(file)
+            df.write_parquet(f"{self.path_stock_snapshot_1m / file.name}", compression=self.compress.lower())
+            print(f"writing {self.path_stock_snapshot_1m / file.name}")
+
+
+
 if __name__ == "__main__":
     import time
 
@@ -330,8 +396,10 @@ if __name__ == "__main__":
     #
     # r4 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'basic.parquet')}')")
     # r5 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'calender.parquet')}')")
+    
+    #db.update_kline_1m_from_tdx(r"D:\windows\programs\TongDaXin")
 
-    db.update_kline_1m_from_tdx(r"D:\windows\programs\TongDaXin")
+    db.update_snapshot_1m()
 
     start = time.perf_counter()
     df = db.get_kline_1m()
