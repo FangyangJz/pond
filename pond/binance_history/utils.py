@@ -71,7 +71,7 @@ def get_urls(
     end: datetime,
     timeframe: TIMEFRAMES,
     file_path: Path,
-    proxies: Dict[str, str] = {},
+    proxies: dict[str, str] = {},
 ) -> tuple[list[str], list[str]]:
     # assert start.tz is None and end.tz is None
     assert start <= end, "start cannot be greater than end"

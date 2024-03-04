@@ -130,8 +130,9 @@ class CryptoDB(DuckDB):
             (AssetType.future_cm, DataType.aggTrades): self.path_crypto_agg_trades_cm,
             (AssetType.future_um, DataType.klines): self.path_crypto_kline_um,
             (AssetType.future_um, DataType.aggTrades): self.path_crypto_agg_trades_um,
-        }[(asset_type, data_type)] # type: ignore
-
+        }[
+            (asset_type, data_type)
+        ]  # type: ignore
 
     def update_history_data(
         self,
@@ -238,7 +239,18 @@ class CryptoDB(DuckDB):
                     )
                     .select(pl.exclude("ignore"))
                 )
-                logger.success(f"{symbol} load df shape: {df.shape}")
+                origin_df_len = len(df)
+                df = df.filter(pl.col("quote_volume") > 0) if timeframe != "1s" else df
+                if (filtered_rows := origin_df_len - len(df)) > 0:
+                    logger.warning(
+                        f"[{symbol}] filter(quote_volume==0): {filtered_rows} rows."
+                    )
+                logger.success(
+                    f"[{symbol}] Dataframe shape: {df.shape}, {df['open_time'].min()} -> {df['close_time'].max()}."
+                )
+
+                # TODO api data compensate
+
                 df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
             else:
                 logger.warning(f"{symbol} load df is None")
@@ -298,11 +310,11 @@ if __name__ == "__main__":
     # ll = db.get_local_future_perpetual_symbol_list(asset_type=AssetType.future_um)
 
     db.update_history_data(
-        start="2022-1-1",
-        end="2024-2-10",
+        start="2020-1-1",
+        end="2024-3-2",
         asset_type=AssetType.future_um,
         data_type=DataType.klines,
-        timeframe='1h',
+        timeframe="1d",
         # proxies={"https://": "https://127.0.0.1:7890"},
     )
 
