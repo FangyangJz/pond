@@ -141,7 +141,8 @@ class CryptoDB(DuckDB):
         asset_type: AssetType = AssetType.future_um,
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
-        proxies: ProxiesTypes = {},
+        httpx_proxies: ProxiesTypes = {},
+        requests_proxies: dict[str,str]= {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
     ):
         from pond.duckdb.crypto.const import kline_schema
@@ -205,7 +206,7 @@ class CryptoDB(DuckDB):
                 file_path=self.path_crypto,
             )
 
-            start_async_download_files(download_urls, self.path_crypto, proxies=proxies)
+            start_async_download_files(download_urls, self.path_crypto, proxies=httpx_proxies)
 
             df_list = []
             for url in load_urls:
@@ -230,7 +231,7 @@ class CryptoDB(DuckDB):
                 )
                 if len(lack_df) > 0:
                     supply_df = get_supply_df(
-                        client=self.get_client(asset_type, proxies),
+                        client=self.get_client(asset_type, requests_proxies),
                         lack_df=lack_df,
                         symbol=symbol,
                         interval=timeframe,
@@ -325,7 +326,8 @@ if __name__ == "__main__":
         asset_type=AssetType.future_um,
         data_type=DataType.klines,
         timeframe=interval,
-        # proxies={"https://": "https://127.0.0.1:7890"},
+        # httpx_proxies={"https://": "https://127.0.0.1:7890"},
+        # requests_proxies={"https": "127.0.0.1:7890"},
     )
 
     df = pl.read_parquet(db.path_crypto_kline_um / interval / "BTCUSDT.parquet").to_pandas()
