@@ -3,6 +3,7 @@
 # @Datetime : 2024/2/10 下午 04:57
 # @Author   : Fangyang
 # @Software : PyCharm
+from typing import Callable, Any
 
 import httpx
 import asyncio
@@ -30,20 +31,24 @@ async def download_file(url: str, path: Path, proxies: ProxiesTypes = {}):
             logger.error(f"[{response.status_code}] {url}")
 
 
-async def download_zip_files(
-    url_list: list[str], path: Path, proxies: ProxiesTypes = {}
+async def async_tasks(
+    url_list: list[str],
+    async_func: Callable,
+    func_param_list: list[dict[str, Any]],
 ):
     tasks = []
     for url in url_list:
-        task = asyncio.create_task(download_file(url, path, proxies))
-        tasks.append(task)
+        for func_params in func_param_list:
+            task = asyncio.create_task(async_func(url=url, **func_params))
+            tasks.append(task)
     await asyncio.gather(*tasks)
 
 
 def start_async_download_files(
     url_list: list[str], path: Path, proxies: ProxiesTypes = {}
 ):
-    asyncio.run(download_zip_files(url_list, path, proxies))
+    func_param_list = [{"path": path, "proxies": proxies}]
+    asyncio.run(async_tasks(url_list, download_file, func_param_list))
 
 
 if __name__ == "__main__":
@@ -60,3 +65,5 @@ if __name__ == "__main__":
     ]
 
     start_async_download_files(url_list, Path("./temp"))
+
+

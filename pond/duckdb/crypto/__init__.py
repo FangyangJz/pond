@@ -144,6 +144,7 @@ class CryptoDB(DuckDB):
         proxies: ProxiesTypes = {},
         skip_symbols: list[str] = [],
     ):
+        from pond.duckdb.crypto.const import kline_schema
         from pond.binance_history.utils import (
             get_urls,
             load_data_from_disk,
@@ -171,7 +172,7 @@ class CryptoDB(DuckDB):
             symbol = row["symbol"]
             delivery_date = parser.parse(row["deliveryDate"])
             # TUSDT onboardDate 2023-01-31, but real history data is 2023-02-01
-            onboard_date = parser.parse(row["onboardDate"]) + dt.timedelta(days=1)
+            onboard_date = parser.parse(row["onboardDate"]) # + dt.timedelta(days=1)
             _start = max(onboard_date, input_start)
             _end = min(delivery_date, input_end)
 
@@ -210,20 +211,7 @@ class CryptoDB(DuckDB):
                 df = load_data_from_disk(
                     url,
                     self.path_crypto,
-                    dtypes={
-                        "open_time": pl.Int64,
-                        "open": pl.Float64,
-                        "high": pl.Float64,
-                        "low": pl.Float64,
-                        "close": pl.Float64,
-                        "volume": pl.Float64,
-                        "close_time": pl.Int64,
-                        "quote_volume": pl.Float64,
-                        "count": pl.Int64,
-                        "taker_buy_volume": pl.Float64,
-                        "taker_buy_quote_volume": pl.Float64,
-                        "ignore": pl.Int8,
-                    },
+                    dtypes=kline_schema,
                 )
 
                 if df is not None:
@@ -238,7 +226,7 @@ class CryptoDB(DuckDB):
                         jj_code=pl.lit(symbol),
                     )
                     .select(pl.exclude("ignore"))
-                )
+                )#.to_pandas()
                 origin_df_len = len(df)
                 df = df.filter(pl.col("quote_volume") > 0) if timeframe != "1s" else df
                 if (filtered_rows := origin_df_len - len(df)) > 0:
