@@ -8,8 +8,10 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 from zipfile import ZipFile
+from loguru import logger
 
 import httpx
+from httpx._types import ProxiesTypes
 import polars as pl
 import pandas as pd
 from datetime import datetime
@@ -48,16 +50,17 @@ def gen_data_url(
     return url
 
 
-def exists_month(month_url, proxies):
+def ping_url_is_exist(url: str, proxies: ProxiesTypes):
     try:
-        resp = httpx.head(month_url, proxies=proxies, timeout=None)
+        resp = httpx.head(url, proxies=proxies, timeout=None)
     except (httpx.TimeoutException, httpx.NetworkError) as e:
-        print(month_url)
+        logger.error(url)
         raise NetworkError(e)
 
     if resp.status_code == 200:
         return True
     elif resp.status_code == 404:
+        logger.warning(f"[404] Ping {url}")
         return False
     else:
         raise NetworkError(resp.status_code)
@@ -88,7 +91,7 @@ def get_urls(
         )
 
         while (not get_local_data_path(last_month_url, file_path).exists()) and (
-            not exists_month(last_month_url, proxies)
+            not ping_url_is_exist(last_month_url, proxies)
         ):
             daily_month = months.pop()
             days = pd.date_range(
@@ -141,8 +144,8 @@ def get_urls(
         for url in load_days_urls
         if not get_local_data_path(url, file_path).exists()
     ]
-
-    load_urls = load_months_urls + load_days_urls
+    # https://data.binance.vision/data/spot/monthly/klines/BCCBTC/1d/BCCBTC-1d-2018-11.zip
+    load_urls = load_months_urls + [url for i, url in enumerate(load_days_urls) if (i < 31) and ping_url_is_exist(url, proxies)  ]
     download_urls = download_months_urls + download_days_urls
     return load_urls, download_urls
 
@@ -170,7 +173,7 @@ def load_data_from_disk(
     path = get_local_data_path(url, local_path)
 
     if path.exists():
-        if int(path.stem.split("-")[2]) < 2022:
+        if (int(path.stem.split("-")[2]) < 2022) or ("spot" in path.parts):
             df = (
                 pl.read_csv(
                     ZipFile(path).read(f"{path.stem}.csv"),
@@ -203,6 +206,7 @@ def load_data_from_disk(
 
     else:
         return None
+
 
 if __name__ == "__main__":
     import pandas as pd

@@ -11,27 +11,32 @@ import threading
 import pandas as pd
 import polars as pl
 import datetime as dt
-from tqdm import tqdm
 from loguru import logger
 
+from binance.spot import Spot
 from binance.cm_futures import CMFutures
 from binance.um_futures import UMFutures
 from pond.duckdb.crypto.const import kline_schema
 from pond.binance_history.type import TIMEFRAMES
 
 
-def get_future_info_df(client: CMFutures | UMFutures) -> pd.DataFrame:
+def get_future_info_df(client: CMFutures | UMFutures | Spot) -> pd.DataFrame:
     info = client.exchange_info()
     df = pd.DataFrame.from_records(info["symbols"])
     df["update_datetime"] = dt.datetime.utcfromtimestamp(
         info["serverTime"] / 1000
     ).replace(tzinfo=dt.timezone.utc)
-    df["deliveryDate"] = df["deliveryDate"].apply(
-        lambda x: dt.datetime.utcfromtimestamp(x / 1000).replace(tzinfo=dt.timezone.utc)
-    )
-    df["onboardDate"] = df["onboardDate"].apply(
-        lambda x: dt.datetime.utcfromtimestamp(x / 1000).replace(tzinfo=dt.timezone.utc)
-    )
+    if not isinstance(client, Spot):
+        df["deliveryDate"] = df["deliveryDate"].apply(
+            lambda x: dt.datetime.utcfromtimestamp(x / 1000).replace(
+                tzinfo=dt.timezone.utc
+            )
+        )
+        df["onboardDate"] = df["onboardDate"].apply(
+            lambda x: dt.datetime.utcfromtimestamp(x / 1000).replace(
+                tzinfo=dt.timezone.utc
+            )
+        )
     return df
 
 
@@ -43,7 +48,7 @@ def get_future_symbol_list(client: CMFutures | UMFutures) -> list[str]:
 
 
 def get_klines(
-    client: CMFutures | UMFutures,
+    client: CMFutures | UMFutures | Spot,
     symbol: str,
     interval: TIMEFRAMES,
     start: int,
@@ -62,7 +67,7 @@ def get_klines(
 
 
 def get_supply_df(
-    client: CMFutures | UMFutures,
+    client: CMFutures | UMFutures | Spot,
     lack_df: pl.DataFrame,
     symbol: str,
     interval: TIMEFRAMES = "1d",
