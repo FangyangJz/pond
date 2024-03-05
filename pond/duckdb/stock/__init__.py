@@ -311,6 +311,9 @@ class StockDB(DuckDB):
             ray.get(reader.get.remote())
 
 
+    def get_snapshot_1m(self) -> pl.LazyFrame:
+        return pl.scan_parquet(self.path_stock_snapshot_1m / "*.parquet")
+
     def get_snapshot_1m_rel(
         self, start_date: str = "2023-01-01", end_date: str = "2070-01-01"
     ) -> DuckDBPyRelation:
@@ -388,14 +391,14 @@ class StockDB(DuckDB):
     
 
     def update_indsutry_index(self):
-        pindustry.gen_industry_index(self.path_stock_industry)
+        pindustry.gen_industry_index(self.get_snapshot_1m(),  self.path_stock_industry)
 
 
     def read_industry_index(self) -> pl.LazyFrame:
         return pindustry.read_industry_index(self.path_stock_industry)
 
 
-if __name__ == "__main1__":
+if __name__ == "__main__":
     import time
 
     db = StockDB(Path(r"E:\DuckDB"))
@@ -405,7 +408,7 @@ if __name__ == "__main1__":
     #db.update_indsutry_info()
     #print(f"read indsutry {len(db.read_industry_consituent().collect())}")
 
-if __name__ == "__main__":
+if __name__ == "__main1__":
     import time
     db = StockDB(Path(r"E:\DuckDB"))
     db.init_db_path()
