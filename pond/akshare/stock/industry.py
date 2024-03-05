@@ -66,5 +66,7 @@ def gen_industry_index(df_snapshot:pl.LazyFrame, path:Path, compress='zstd'):
         df_industry_snapshot.collect().write_parquet(cache_dir / f"{industry}.parquet", compression=compress)
 
 
-def read_industry_index(path:Path) -> pl.LazyFrame:
+def read_industry_index(path:Path, industry=None) -> pl.LazyFrame:
+    if industry is not None:
+        return pl.scan_parquet(path / "index" / f"{industry}.parquet")
     return pl.scan_parquet(path / "index" / "*.parquet")

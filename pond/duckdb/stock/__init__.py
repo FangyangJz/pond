@@ -394,8 +394,8 @@ class StockDB(DuckDB):
         pindustry.gen_industry_index(self.get_snapshot_1m(),  self.path_stock_industry)
 
 
-    def read_industry_index(self) -> pl.LazyFrame:
-        return pindustry.read_industry_index(self.path_stock_industry)
+    def read_industry_index(self, industry=None) -> pl.LazyFrame:
+        return pindustry.read_industry_index(self.path_stock_industry, industry)
 
 
 if __name__ == "__main__":
