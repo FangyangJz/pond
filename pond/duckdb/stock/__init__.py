@@ -336,9 +336,9 @@ class StockDB(DuckDB):
                 ((1 + pl.col("chgpct") * 10).log(2) * pl.col("amount")).alias("found"),#使用log函数模拟资金流入流出
             ])
             df_day = df.group_by("date").agg([
-                pl.col("close").last().alias("d_close")
+                pl.col("close").last().alias("dclose")
             ]).sort("date").with_columns([
-                pl.col("d_close").shift(1).alias("yd_close")
+                pl.col("dclose").shift(1).alias("dclose_lag1")
             ])
             df_minutes = []
             for time in pl.time_range(dtime(9,30), dtime(15,0), '1m', eager=True):
@@ -361,8 +361,8 @@ class StockDB(DuckDB):
             df : pl.LazyFrame = pl.concat(df_minutes)
             df = df.join(df_day, on='date')
             df = df.with_columns([
-                (pl.col("close") / pl.col("d_close") -1).alias("d_chgpct"),
-                (pl.col("close") / pl.col("yd_close") -1).alias("yd_chgpct")
+                (pl.col("close") / pl.col("dclose_lag1") -1).alias("dchgpct"),
+                (pl.col("dclose") / pl.col("dclose_lag1") -1).alias("dchgpct_next0")
             ])
             return df.collect().sort("datetime")
 
