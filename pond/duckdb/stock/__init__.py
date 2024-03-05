@@ -10,6 +10,7 @@ from pathlib import Path
 from loguru import logger
 from tqdm import tqdm
 from datetime import time as dtime
+import pond.akshare.stock.industry as pindustry
 
 from duckdb import DuckDBPyRelation
 from pond.duckdb import DuckDB
@@ -56,6 +57,7 @@ class StockDB(DuckDB):
             self.path_stock_level2_orderbook,
             self.path_stock_level2_orderbook_rebuild,
             self.path_stock_snapshot_1m,
+            self.path_stock_industry
         ]
 
         super().__init__(db_path, df_type)
@@ -371,10 +373,25 @@ class StockDB(DuckDB):
             print(f"writing {self.path_stock_snapshot_1m / file.name}")
 
 
+    def update_indsutry_info(self):
+        pindustry.update_industry_list(self.path_stock_industry)
+        pindustry.update_industry_constituent(self.path_stock_industry)
+
+
+    def read_industry_consituent(self) -> pl.LazyFrame:
+        return pindustry.read_industry_consituent(self.path_stock_industry)
+
 
 if __name__ == "__main__":
     import time
 
+    db = StockDB(Path(r"E:\DuckDB"))
+    db.init_db_path()
+    #db.update_indsutry_info()
+    print(f"read indsutry {len(db.read_industry_consituent().collect())}")
+
+if __name__ == "__main1__":
+    import time
     db = StockDB(Path(r"E:\DuckDB"))
     db.init_db_path()
     # db = StockDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
