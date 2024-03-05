@@ -342,6 +342,8 @@ class StockDB(DuckDB):
             ])
             df_minutes = []
             for time in pl.time_range(dtime(9,30), dtime(15,0), '1m', eager=True):
+                if time > dtime(11,30) and time < dtime(13,0):
+                    continue
                 df_minute = df.filter(pl.col("time") <= time).group_by("date").agg([
                     pl.col("open").first(),
                     pl.col("high").max(),
@@ -380,17 +382,27 @@ class StockDB(DuckDB):
 
     def read_industry_consituent(self) -> pl.LazyFrame:
         return pindustry.read_industry_consituent(self.path_stock_industry)
+    
+
+    def update_indsutry_index(self):
+        pindustry.gen_industry_index(self.path_stock_industry)
 
 
-if __name__ == "__main__":
+    def read_industry_index(self) -> pl.LazyFrame:
+        return pindustry.read_industry_index(self.path_stock_industry)
+
+
+if __name__ == "__main1__":
     import time
 
     db = StockDB(Path(r"E:\DuckDB"))
     db.init_db_path()
+    db.update_indsutry_index()
+    #print(f"read indsutry {len(db.read_industry_consituent().collect())}")
     #db.update_indsutry_info()
-    print(f"read indsutry {len(db.read_industry_consituent().collect())}")
+    #print(f"read indsutry {len(db.read_industry_consituent().collect())}")
 
-if __name__ == "__main1__":
+if __name__ == "__main__":
     import time
     db = StockDB(Path(r"E:\DuckDB"))
     db.init_db_path()
