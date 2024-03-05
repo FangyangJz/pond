@@ -307,7 +307,9 @@ class CryptoDB(DuckDB):
 
                 df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
             else:
-                logger.warning(f"{symbol} load df is None")
+                df = pl.DataFrame({}, schema=kline_schema).select(pl.exclude("ignore"))
+                df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
+                logger.warning(f"{symbol} load df is empty.")
 
     def update_crypto_trades(self):
         trades_list = [f.stem for f in self.path_crypto_trades.iterdir()]
