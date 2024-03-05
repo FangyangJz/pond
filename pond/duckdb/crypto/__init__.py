@@ -144,6 +144,19 @@ class CryptoDB(DuckDB):
             (asset_type, data_type)
         ]  # type: ignore
 
+    @staticmethod
+    def filter_quote_volume_0(df: pl.DataFrame, symbol: str, timeframe: TIMEFRAMES):
+        origin_df_len = len(df)
+        df = (
+            df.filter(pl.col("quote_volume") > 0)
+            if timeframe not in ["1s", "1m"]
+            else df
+        )
+        if (filtered_rows := origin_df_len - len(df)) > 0:
+            logger.warning(f"[{symbol}] filter(quote_volume==0): {filtered_rows} rows.")
+
+        return df
+
     def update_history_data(
         self,
         start: str = "2023-1-1",
@@ -246,11 +259,21 @@ class CryptoDB(DuckDB):
                     df_list.append(df)
 
             if df_list:
-                df = pl.concat(df_list).with_columns(
-                    (pl.col("open_time").diff() - pl.col("open_time").diff().shift(-1))
-                    .fill_null(0)
-                    .alias("open_time_diff"),
-                )  # .with_columns((pl.col('open_time')*1e3).cast(pl.Datetime)).to_pandas()
+                df = pl.concat(df_list)
+                df = self.filter_quote_volume_0(df, symbol, timeframe)
+                df = (
+                    df.with_columns(
+                        (
+                            pl.col("open_time").diff()
+                            - pl.col("open_time").diff().shift(-1)
+                        )
+                        .fill_null(0)
+                        .alias("open_time_diff"),
+                    )
+                    # for debug
+                    # .with_columns((pl.col("open_time") * 1e3).cast(pl.Datetime))
+                    # .to_pandas()
+                )
 
                 lack_df = df.filter(pl.col("open_time_diff") != 0).select(
                     ["open_time", "close_time"]
@@ -262,6 +285,7 @@ class CryptoDB(DuckDB):
                         symbol=symbol,
                         interval=timeframe,
                     )
+                    supply_df = self.filter_quote_volume_0(supply_df, symbol, timeframe)
                     df = pl.concat([df.select(pl.exclude("open_time_diff")), supply_df])
                 else:
                     df = df.select(pl.exclude("open_time_diff"))
@@ -277,12 +301,6 @@ class CryptoDB(DuckDB):
                     .unique(maintain_order=True)
                 )
 
-                origin_df_len = len(df)
-                df = df.filter(pl.col("quote_volume") > 0) if timeframe != "1s" else df
-                if (filtered_rows := origin_df_len - len(df)) > 0:
-                    logger.warning(
-                        f"[{symbol}] filter(quote_volume==0): {filtered_rows} rows."
-                    )
                 logger.success(
                     f"[{symbol}] Dataframe shape: {df.shape}, {df['open_time'].min()} -> {df['close_time'].max()}."
                 )
@@ -347,8 +365,8 @@ if __name__ == "__main__":
 
     interval = "1d"
     db.update_history_data(
-        start="2018-1-1",
-        end="2024-3-2",
+        start="2020-1-1",
+        end="2024-2-1",
         asset_type=AssetType.spot,
         data_type=DataType.klines,
         timeframe=interval,

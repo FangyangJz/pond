@@ -48,6 +48,7 @@ def start_async_download_files(
     url_list: list[str], path: Path, proxies: ProxiesTypes = {}
 ):
     func_param_list = [{"path": path, "proxies": proxies}]
+    logger.info('Running asyncio tasks ......')
     asyncio.run(async_tasks(url_list, download_file, func_param_list))
 
 

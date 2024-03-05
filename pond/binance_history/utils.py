@@ -52,6 +52,7 @@ def gen_data_url(
 
 def ping_url_is_exist(url: str, proxies: ProxiesTypes):
     try:
+        logger.info(f'Ping {url}')
         resp = httpx.head(url, proxies=proxies, timeout=None)
     except (httpx.TimeoutException, httpx.NetworkError) as e:
         logger.error(url)
@@ -60,7 +61,7 @@ def ping_url_is_exist(url: str, proxies: ProxiesTypes):
     if resp.status_code == 200:
         return True
     elif resp.status_code == 404:
-        logger.warning(f"[404] Ping {url}")
+        logger.warning(f"[404] {url}")
         return False
     else:
         raise NetworkError(resp.status_code)
@@ -144,9 +145,18 @@ def get_urls(
         for url in load_days_urls
         if not get_local_data_path(url, file_path).exists()
     ]
+
     # https://data.binance.vision/data/spot/monthly/klines/BCCBTC/1d/BCCBTC-1d-2018-11.zip
-    load_urls = load_months_urls + [url for i, url in enumerate(load_days_urls) if (i < 31) and ping_url_is_exist(url, proxies)  ]
-    download_urls = download_months_urls + download_days_urls
+    days_urls = []
+    for i, url in enumerate(load_days_urls):
+        # 31*3 代表 3个月没有 monthly zip 用 day 补全
+        if (i < 3*31) and ping_url_is_exist(url, proxies):
+            days_urls.append(url)
+        else:
+            break
+
+    load_urls = load_months_urls + days_urls
+    download_urls = download_months_urls + days_urls
     return load_urls, download_urls
 
 
