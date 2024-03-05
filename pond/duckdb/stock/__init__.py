@@ -321,7 +321,7 @@ class StockDB(DuckDB):
         ) 
 
 
-    def update_snapshot_1m(self):
+    def update_snapshot_1m(self, force=True):
         """
         aggrate 1m kline into market snapshot
         """
@@ -370,8 +370,11 @@ class StockDB(DuckDB):
 
         
         for file in self.path_stock_kline_1m.glob("*.parquet"):
+            target = self.path_stock_snapshot_1m / file.name
+            if target.exists() and not force:
+                continue
             df = agg_into_snapshots(file)
-            df.write_parquet(f"{self.path_stock_snapshot_1m / file.name}", compression=self.compress.lower())
+            df.write_parquet(target, compression=self.compress.lower())
             print(f"writing {self.path_stock_snapshot_1m / file.name}")
 
 
@@ -428,7 +431,7 @@ if __name__ == "__main__":
     
     #db.update_kline_1m_from_tdx(r"D:\windows\programs\TongDaXin")
 
-    db.update_snapshot_1m()
+    db.update_snapshot_1m(force=False)
 
     start = time.perf_counter()
     df = db.get_kline_1m()
