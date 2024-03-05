@@ -9,13 +9,15 @@ from typing import Any
 from urllib.parse import urlparse
 from zipfile import ZipFile
 from loguru import logger
+from datetime import datetime
+import threading
 
-import httpx
-from httpx._types import ProxiesTypes
 import polars as pl
 import pandas as pd
-from datetime import datetime
+import httpx
+from httpx._types import ProxiesTypes
 
+from pond.utils.crawler import get_mock_headers
 from pond.binance_history.exceptions import NetworkError
 from pond.binance_history.type import TIMEFRAMES, AssetType, DataType, Freq
 
@@ -52,8 +54,10 @@ def gen_data_url(
 
 def ping_url_is_exist(url: str, proxies: ProxiesTypes):
     try:
-        logger.info(f'Ping {url}')
-        resp = httpx.head(url, proxies=proxies, timeout=None)
+        logger.info(f"Ping {url}")
+        resp = httpx.head(
+            url, proxies=proxies, timeout=None, headers=get_mock_headers()
+        )
     except (httpx.TimeoutException, httpx.NetworkError) as e:
         logger.error(url)
         raise NetworkError(e)
@@ -67,6 +71,20 @@ def ping_url_is_exist(url: str, proxies: ProxiesTypes):
         raise NetworkError(resp.status_code)
 
 
+def update_res_dict(
+    last_month_url,
+    timestamp: pd.Timestamp,
+    file_path,
+    proxies,
+    local_dict: dict[str, pd.Timestamp],
+    network_dict: dict[str, pd.Timestamp],
+):
+    if get_local_data_path(last_month_url, file_path).exists():
+        local_dict[last_month_url] = timestamp
+    elif ping_url_is_exist(last_month_url, proxies):
+        network_dict[last_month_url] = timestamp
+
+
 def get_urls(
     data_type: DataType,
     asset_type: AssetType,
@@ -77,86 +95,77 @@ def get_urls(
     file_path: Path,
     proxies: dict[str, str] = {},
 ) -> tuple[list[str], list[str]]:
-    # assert start.tz is None and end.tz is None
     assert start <= end, "start cannot be greater than end"
 
-    days = []
     months = pd.date_range(
         start.replace(day=1),
         end,
         freq="MS",
     ).to_list()
-    if months:
+
+    local_month_dict = {}
+    network_month_dict = {}
+    t_list = []
+    for m in months:
         last_month_url = gen_data_url(
-            data_type, asset_type, Freq.monthly, symbol, months[-1], timeframe=timeframe
+            data_type, asset_type, Freq.monthly, symbol, m, timeframe=timeframe
         )
-
-        while (not get_local_data_path(last_month_url, file_path).exists()) and (
-            not ping_url_is_exist(last_month_url, proxies)
-        ):
-            daily_month = months.pop()
-            days = pd.date_range(
-                daily_month,
-                end,
-                freq="D",
-            ).to_list()
-
-            if months:
-                last_month_url = gen_data_url(
-                    data_type,
-                    asset_type,
-                    Freq.monthly,
-                    symbol,
-                    months[-1],
-                    timeframe=timeframe,
-                )
-            else:
-                break
-    load_months_urls = [
-        gen_data_url(
-            data_type=data_type,
-            asset_type=asset_type,
-            freq=Freq.monthly,
-            symbol=symbol,
-            dt=m,
-            timeframe=timeframe,
+        t = threading.Thread(
+            target=update_res_dict,
+            args=(
+                last_month_url,
+                m,
+                file_path,
+                proxies,
+                local_month_dict,
+                network_month_dict,
+            ),
         )
-        for m in months
-    ]
-    download_months_urls = [
-        url
-        for url in load_months_urls
-        if not get_local_data_path(url, file_path).exists()
-    ]
+        t.start()
+        t_list.append(t)
 
-    load_days_urls = [
-        gen_data_url(
-            data_type=data_type,
-            asset_type=asset_type,
-            freq=Freq.daily,
-            symbol=symbol,
-            dt=m,
-            timeframe=timeframe,
+    if t_list:
+        [t.join() for t in t_list]
+
+    all_dict = network_month_dict | local_month_dict
+    if len(all_dict) == 0:
+        return [], []
+
+    all_keys = list(all_dict.keys())
+    all_keys.sort()
+
+    local_day_dict = {}
+    network_day_dict = {}
+    t_list = []
+    start = all_dict[all_keys[-1]] + pd.DateOffset(months=1)
+    # 3*31 表示 3个月没有月数据, 用3个月的日数据补充
+    days_range_list = pd.date_range(start, end, freq="D").to_list()[: 3 * 31]
+    for d in days_range_list:
+        day_url = gen_data_url(
+            data_type, asset_type, Freq.daily, symbol, d, timeframe=timeframe
         )
-        for m in days
-    ]
-    download_days_urls = [
-        url
-        for url in load_days_urls
-        if not get_local_data_path(url, file_path).exists()
-    ]
+        t = threading.Thread(
+            target=update_res_dict,
+            args=(
+                day_url,
+                d,
+                file_path,
+                proxies,
+                local_day_dict,
+                network_day_dict,
+            ),
+        )
+        t.start()
+        t_list.append(t)
+
+    if t_list:
+        [t.join() for t in t_list]
 
     # https://data.binance.vision/data/spot/monthly/klines/BCCBTC/1d/BCCBTC-1d-2018-11.zip
-    days_urls = []
-    for i, url in enumerate(load_days_urls):
-        # 31*3 代表 3个月没有 monthly zip 用 day 补全
-        if (i < 3*31) and ping_url_is_exist(url, proxies):
-            days_urls.append(url)
-        else:
-            break
-
-    load_urls = load_months_urls + days_urls
-    download_urls = download_months_urls + days_urls
+    download_urls = list(network_month_dict.keys()) + list(network_day_dict.keys())
+    load_urls = (
+        list(local_month_dict.keys()) + list(local_day_dict.keys()) + download_urls
+    )
     return load_urls, download_urls
 
 

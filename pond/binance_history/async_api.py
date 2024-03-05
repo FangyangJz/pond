@@ -7,12 +7,13 @@ from typing import Callable, Any
 
 import httpx
 import asyncio
-
 from pathlib import Path
+
 from loguru import logger
 from urllib.parse import urlparse
-from pond.utils.crawler import get_mock_headers
 from httpx._types import ProxiesTypes
+
+from pond.utils.crawler import get_mock_headers
 
 
 async def download_file(url: str, path: Path, proxies: ProxiesTypes = {}):
