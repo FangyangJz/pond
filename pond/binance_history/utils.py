@@ -5,7 +5,7 @@
 # @Software : PyCharm
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 from zipfile import ZipFile
 from loguru import logger
@@ -18,6 +18,7 @@ import httpx
 from httpx._types import ProxiesTypes
 
 from pond.utils.crawler import get_mock_headers
+from pond.binance_history.vision import get_vision_data_url_list
 from pond.binance_history.exceptions import NetworkError
 from pond.binance_history.type import TIMEFRAMES, AssetType, DataType, Freq
 
@@ -85,7 +86,7 @@ def update_res_dict(
         network_dict[last_month_url] = timestamp
 
 
-def get_urls(
+def get_urls_by_threading_ping(
     data_type: DataType,
     asset_type: AssetType,
     symbol: str,
@@ -167,6 +168,105 @@ def get_urls(
         list(local_month_dict.keys()) + list(local_day_dict.keys()) + download_urls
     )
     return load_urls, download_urls
+
+
+def get_urls_by_xml_parse(
+    data_type: DataType,
+    asset_type: AssetType,
+    symbol: str,
+    start: datetime,
+    end: datetime,
+    timeframe: TIMEFRAMES,
+    file_path: Path,
+    proxies: dict[str, str] = {},
+) -> tuple[list[str], list[str]]:
+    assert start <= end, "start cannot be greater than end"
+
+    months = pd.date_range(
+        start.replace(day=1),
+        end,
+        freq="MS",
+    ).to_list()
+
+    local_month_dict = {}
+    network_month_dict = {}
+    month_url_dict = {
+        gen_data_url(
+            data_type, asset_type, Freq.monthly, symbol, m, timeframe=timeframe
+        ): m
+        for m in months
+    }
+
+    all_dict = {}
+    if month_url_dict:
+        month_url_list_remote = loop_get_url_list_remote(
+            "monthly", asset_type, data_type, symbol, timeframe, proxies
+        )
+
+        for month_url, m in month_url_dict.items():
+            if get_local_data_path(month_url, file_path).exists():
+                local_month_dict[month_url] = m
+            elif month_url in month_url_list_remote:
+                network_month_dict[month_url] = m
+
+        all_dict = local_month_dict | network_month_dict
+
+    if not all_dict:
+        return [], []
+
+    all_keys = list(all_dict.keys())
+    all_keys.sort()
+
+    local_day_list = []
+    network_day_list = []
+    start = all_dict[all_keys[-1]] + pd.DateOffset(months=1)
+    # 4*31 表示 4个月没有月数据, 用4个月的日数据补充
+    days_url_list = [
+        gen_data_url(data_type, asset_type, Freq.daily, symbol, d, timeframe=timeframe)
+        for d in pd.date_range(start, end, freq="D").to_list()[: 4 * 31]
+    ]
+
+    if days_url_list:
+        days_url_list_remote = loop_get_url_list_remote(
+            "daily", asset_type, data_type, symbol, timeframe, proxies
+        )
+
+        for day_url in days_url_list:
+            if get_local_data_path(day_url, file_path).exists():
+                local_day_list.append(day_url)
+            elif day_url in days_url_list_remote:
+                network_day_list.append(day_url)
+
+    # https://data.binance.vision/data/spot/monthly/klines/BCCBTC/1d/BCCBTC-1d-2018-11.zip
+    download_urls = list(network_month_dict.keys()) + network_day_list
+    load_urls = list(local_month_dict.keys()) + local_day_list + download_urls
+    return load_urls, download_urls
+
+
+def loop_get_url_list_remote(
+    freq: Literal["daily", "monthly"],
+    asset_type: AssetType,
+    data_type: DataType,
+    symbol: str,
+    timeframe: TIMEFRAMES,
+    proxies: dict[str, str],
+) -> list[str]:
+    params = {
+        "delimiter": r"/",
+        "prefix": f"data/{asset_type.value}/{freq}/{data_type.value}/{symbol}/{timeframe}/",
+    }
+    is_truncated, day_url_list_remote = get_vision_data_url_list(params, proxies)
+    while is_truncated:
+        params["marker"] = (day_url_list_remote[-1] + ".CHECKSUM").replace(
+            "https://data.binance.vision/", ""
+        )
+
+        is_truncated, temp_day_url_list_remote = get_vision_data_url_list(
+            params, proxies
+        )
+        day_url_list_remote += temp_day_url_list_remote
+
+    return day_url_list_remote
 
 
 def get_local_data_path(url: str, local_path: Path | None = None) -> Path:
@@ -253,7 +353,7 @@ if __name__ == "__main__":
     end = "2023-5-15"
     start = parser.parse(start).replace(tzinfo=tz.tzutc())
     end = parser.parse(end).replace(tzinfo=tz.tzutc())
-    month_urls, day_urls = get_urls(
+    month_urls, day_urls = get_urls_by_threading_ping(
         data_type=DataType.klines,
         asset_type=AssetType.future_um,
         symbol="BTCUSDT",

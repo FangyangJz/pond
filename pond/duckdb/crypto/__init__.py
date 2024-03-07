@@ -171,7 +171,7 @@ class CryptoDB(DuckDB):
         from pond.duckdb.crypto.const import kline_schema
         from pond.duckdb.crypto.future import get_supply_df
         from pond.binance_history.utils import (
-            get_urls,
+            get_urls_by_xml_parse,
             load_data_from_disk,
         )
         from pond.binance_history.async_api import start_async_download_files
@@ -233,7 +233,7 @@ class CryptoDB(DuckDB):
                 f"{symbol}, download {timeframe} {asset_type.value} data from {_start} -> {_end} ..."
             )
 
-            load_urls, download_urls = get_urls(
+            load_urls, download_urls = get_urls_by_xml_parse(
                 data_type=data_type,
                 asset_type=asset_type,
                 symbol=symbol,
@@ -241,6 +241,7 @@ class CryptoDB(DuckDB):
                 end=_end,
                 timeframe=timeframe,
                 file_path=self.path_crypto,
+                proxies=requests_proxies
             )
 
             start_async_download_files(
@@ -368,12 +369,15 @@ if __name__ == "__main__":
     interval = "1d"
     db.update_history_data(
         start="2020-1-1",
-        end="2024-2-1",
+        end="2024-2-15",
         asset_type=AssetType.spot,
         data_type=DataType.klines,
         timeframe=interval,
         # httpx_proxies={"https://": "https://127.0.0.1:7890"},
-        # requests_proxies={"https": "127.0.0.1:7890"},
+        requests_proxies={
+            "http": "127.0.0.1:7890",
+            "https": "127.0.0.1:7890",
+        },
     )
 
     df = pl.read_parquet(
