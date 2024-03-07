@@ -27,8 +27,10 @@ class TdxReaderActor:
         for symbol in symbols:
             df = reader.minute(symbol=symbol, suffix=period)
             if df is not None:
-                self.__cache_into_disk__(symbol, df)
                 df = df.reset_index(drop=False)
+                df["jj_code"] = symbol
+                df["close_time"] = df["date"]
+                self.__cache_into_disk__(symbol, df)
                 if start_date is not None:
                     df = df[df["date"] >= start_date]
                 if end_date is not None:
