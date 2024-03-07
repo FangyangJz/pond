@@ -28,7 +28,7 @@ class StockDB(DuckDB):
     def __init__(self, db_path: Path, df_type: DataFrameStrType = df_types.polars):
         self.path_stock = db_path / "stock"
         self.path_stock_info = self.path_stock / "info"
-        self.path_stock_kline_1m = self.path_stock / "kline_1m"
+        self.path_stock_kline_tdx = self.path_stock / "kline_tdx"
         self.path_stock_snapshot_1m = self.path_stock / "snapshot_1m"
         self.path_stock_kline_1d = self.path_stock / "kline_1d"
         self.path_stock_kline_1d_generated = self.path_stock / "kline_1d_generated"
@@ -48,7 +48,7 @@ class StockDB(DuckDB):
             self.path_stock_info,
             self.path_stock_kline_1d,
             self.path_stock_kline_1d_generated,
-            self.path_stock_kline_1m,
+            self.path_stock_kline_tdx,
             self.path_stock_kline_1d_nfq,
             self.path_stock_kline_1d_qfq,
             self.path_stock_level2,
@@ -282,19 +282,21 @@ class StockDB(DuckDB):
         self, start_date: str = "2023-01-01", end_date: str = "2070-01-01"
     ) -> DuckDBPyRelation:
         rel = self.con.sql(
-            rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_1m.iterdir()]})"
+            rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_kline_tdx.iterdir()]})"
         ).filter(
             f"(date >= TIMESTAMP '{start_date}') and (date < TIMESTAMP '{end_date}')"
         )
         return self.transform_to_df(rel)
 
-    def update_kline_1m_from_tdx(self, tdx_dir=None):
+    def update_kline_from_tdx(self, tdx_dir=None, period='1'):
         from pond.akshare.stock.all_basic import get_all_stocks_df
         import os
         import math
         import ray
         from pond.tdx.kline import TdxReaderActor
 
+        cache_path = self.path_stock_kline_tdx / period
+        cache_path.mkdir(exist_ok=True)
         symbols = get_all_stocks_df()["代码"]
         process_counts = os.cpu_count() - 1
         readers = []
@@ -341,7 +343,7 @@ class StockDB(DuckDB):
             return df_day.collect().sort("close_time")
 
         
-        for file in tqdm(self.path_stock_kline_1m.glob("*.parquet")):
+        for file in tqdm((self.path_stock_kline_tdx / '1').glob("*.parquet")):
             target = self.path_stock_kline_1d_generated / file.name
             if target.exists() and not force:
                 continue
@@ -410,7 +412,7 @@ class StockDB(DuckDB):
             return df.collect().sort("datetime")
 
         
-        for file in self.path_stock_kline_1m.glob("*.parquet"):
+        for file in (self.path_stock_kline_tdx / '1').glob("*.parquet"):
             target = self.path_stock_snapshot_1m / file.name
             if target.exists() and not force:
                 continue
@@ -456,8 +458,8 @@ if __name__ == "__main__":
     # rel = db.get_kline_1d_qfq_rel()
     # df = db.get_kline_1d_qfq_df().to_pandas()
 
-    # db.update_stock_info()
-    # db.update_kline_1d_nfq()
+    #db.update_stock_info()
+    #db.update_kline_1d_nfq()
     # db.update_kline_1d_qfq()
 
     # db.update_level2_trade()
@@ -470,11 +472,11 @@ if __name__ == "__main__":
     # r4 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'basic.parquet')}')")
     # r5 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'calender.parquet')}')")
     
-    #db.update_kline_1m_from_tdx(r"D:\windows\programs\TongDaXin")
+    db.update_kline_from_tdx(r"D:\windows\programs\TongDaXin", 'd')
 
-    db.update_kline_1d_by_1m()
+    #db.update_kline_1d_by_1m()
 
     start = time.perf_counter()
-    df = db.get_kline_1m()
-    print(f"fetched data {len(df)}, cost time {time.perf_counter() - start:.2f}")
+    #df = db.get_kline_1m()
+    #print(f"fetched data {len(df)}, cost time {time.perf_counter() - start:.2f}")
     print(1)
