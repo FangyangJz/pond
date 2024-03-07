@@ -34,7 +34,10 @@ def get_vision_data_url_list(
     }
 
     try:
-        logger.info(f"Ping {url}")
+        marker_str = f"&marker={params.get('marker')}" if "marker" in params else ""
+        logger.info(
+            f"Get {url}?delimiter={params.get('delimiter')}&prefix={params.get('prefix')}{marker_str}"
+        )
         resp = requests.get(
             url,
             params=params,
