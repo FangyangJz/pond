@@ -32,6 +32,7 @@ sqlalchemy = "^2.0.25"
 clickhouse-sqlalchemy = "^0.3.0"
 binance-connector = "^3.5.1"
 binance-futures-connector = "^4.0.0"
+pre-commit = "*"
 
 
 [build-system]
