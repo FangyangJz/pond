@@ -26,13 +26,13 @@ pip install -e .
 from pathlib import Path
 from pond.duckdb.bond import BondDB
 
-# assign a directory of path and init BondDB 
+# assign a directory of path and init BondDB
 db = BondDB(Path(r'D:\DuckDB'))
 
 # download bond info and redeem data
 db.update_bond_info()
 
-# save bond daily kline by reading local data 
+# save bond daily kline by reading local data
 db.update_bond_kline_1d()
 
 # read bond daily kline data from disk
@@ -44,7 +44,7 @@ df = db.kline_1d_df()
 from pathlib import Path
 from pond.duckdb.stock import StockDB
 
-# assign a directory of path and init StockDB 
+# assign a directory of path and init StockDB
 db = StockDB(Path(r'D:\DuckDB'))
 
 # download stock info data and calender data
@@ -86,11 +86,11 @@ import polars as pl
 from pathlib import Path
 from pond.duckdb.crypto import CryptoDB
 
-# assign a directory of path and init BondDB 
+# assign a directory of path and init BondDB
 # db = CryptoDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
 db = CryptoDB(Path(r'D:\DuckDB'))
 
-# update CM and UM future info in E:\DuckDB\crypto\info
+# update Spot, CM and UM future info in E:\DuckDB\crypto\info
 db.update_future_info()
 
 # download history future data to D:\DuckDB\crypto\data
