@@ -1,17 +1,24 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from pond.clickhouse.downoader import Downloader
 import akshare as ak
+from pond.clickhouse.holders import (
+    FreeHoldingDetail,
+    FreeHoldingStatistic,
+    HolderCounts,
+    HoldingDetail,
+    HoldingStatistic,
+    StockRestrictedReleaseDetail,
+)
 import ray
 from pond.utils.times import datestr
 import pandas as pd
 from pond.clickhouse import metadata, TsTable
-from pond.clickhouse.holders import *
 from typing import List
 from pond.akshare.stock import get_all_stocks_df
 from pond.clickhouse.kline import KlineDailyHFQ, stock_zh_a_hist
-from sqlalchemy import create_engine, Column, literal, text, func, desc
+from sqlalchemy import create_engine, desc
 
-from clickhouse_sqlalchemy import make_session, get_declarative_base, types, engines
+from clickhouse_sqlalchemy import make_session
 
 
 class Task:
@@ -80,9 +87,9 @@ class ClickHouseManager:
         if record is not None:
             df = df[df["datetime"] > record.datetime]
         df.drop_duplicates(inplace=True)
-        rows = df.to_sql(
-            table.__tablename__, self.engine, index=False, if_exists="append"
-        )
+        # rows = df.to_sql(
+        #     table.__tablename__, self.engine, index=False, if_exists="append"
+        # )
         print(f"saved {len(df)} into table {table.__tablename__}")
 
     def get_syncing_tasks(self, date) -> List[Task]:
@@ -175,7 +182,6 @@ class ClickHouseManager:
 
 if __name__ == "__main__":
     import os
-    import time
 
     password = os.environ.get("CLICKHOUSE_PWD")
     conn_str = f"clickhouse://default:{password}@localhost:8123/quant"

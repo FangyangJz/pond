@@ -1,3 +1,4 @@
+from typing import Never
 import duckdb
 from pathlib import Path
 
@@ -17,7 +18,7 @@ class DuckDB:
     def init_db_path(self):
         raise NotImplementedError
 
-    def transform_to_df(self, rel: DuckDBPyRelation) -> DataFrameType:
+    def transform_to_df(self, rel: DuckDBPyRelation) -> DataFrameType | Never:
         if self.df_type == df_types.pandas:
             return rel.df()
         elif self.df_type == df_types.polars:

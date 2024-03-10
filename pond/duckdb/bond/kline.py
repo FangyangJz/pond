@@ -54,12 +54,16 @@ def get_bond_daily_df_by_reader(
         dd["trans_stock_value"] = (
             100 / trans_stock_price * stock_daily_df["stock_close"]
         )  # 转股价值
-        dd["trans_stock_premium"] = dd["close"] / dd["trans_stock_value"] - 1  # 转股溢价率
+        dd["trans_stock_premium"] = (
+            dd["close"] / dd["trans_stock_value"] - 1
+        )  # 转股溢价率
         # dd['bond_value'] =  # 纯债价值
         # dd['bond_premium'] =  # 纯债溢价率
         dd["duallow"] = dd["close"] + dd["trans_stock_premium"]
         dd["jj_code"] = row["jj_code"]
-        dd["bond_scale"] = row["发行规模"] if np.isnan(row["剩余规模"]) else row["剩余规模"]
+        dd["bond_scale"] = (
+            row["发行规模"] if np.isnan(row["剩余规模"]) else row["剩余规模"]
+        )
         dd["listing_date"] = pd.to_datetime(row["上市时间"])
         dd["stock_name"] = row["正股简称"]
         dd["market"] = row["market"]

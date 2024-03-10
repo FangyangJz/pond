@@ -5,7 +5,6 @@
 import time
 from pathlib import Path
 
-import pandas as pd
 import matplotlib.pyplot as plt
 from pond.duckdb.stock import StockDB
 from tqdm import tqdm

@@ -6,7 +6,6 @@
 from pathlib import Path
 import polars as pl
 import pandas as pd
-import datetime as dt
 from tqdm import tqdm
 from loguru import logger
 from dateutil import parser, tz
@@ -139,9 +138,7 @@ class CryptoDB(DuckDB):
             (AssetType.future_cm, DataType.aggTrades): self.path_crypto_agg_trades_cm,
             (AssetType.future_um, DataType.klines): self.path_crypto_kline_um,
             (AssetType.future_um, DataType.aggTrades): self.path_crypto_agg_trades_um,
-        }[
-            (asset_type, data_type)
-        ]  # type: ignore
+        }[(asset_type, data_type)]  # type: ignore
 
     @staticmethod
     def filter_quote_volume_0(df: pl.DataFrame, symbol: str, timeframe: TIMEFRAMES):
@@ -355,8 +352,6 @@ class CryptoDB(DuckDB):
 
 
 if __name__ == "__main__":
-    from pond.binance_history.exceptions import DataNotFound
-
     db = CryptoDB(Path(r"E:\DuckDB"))
     # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
 

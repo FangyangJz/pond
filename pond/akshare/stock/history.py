@@ -72,7 +72,12 @@ def get_stock_hist_df(
 
         hfq_df = hfq_df[hfq_df_columns_dict.keys()].rename(columns=hfq_df_columns_dict)
 
-        nfq_df_columns_dict = {"开盘": "open", "收盘": "close", "最高": "high", "最低": "low"}
+        nfq_df_columns_dict = {
+            "开盘": "open",
+            "收盘": "close",
+            "最高": "high",
+            "最低": "low",
+        }
         nfq_df = stock_zh_a_hist(
             symbol=code,
             period="daily",
@@ -142,7 +147,7 @@ if __name__ == "__main__":
     )
 
     res_list = []
-    for k, v in tqdm(res_dict.items(), desc=f"Concating res_df"):
+    for k, v in tqdm(res_dict.items(), desc="Concating res_df"):
         # copy: 00:01:24
         # no copy : 00:02:35
         # list append then concat once: 00:00:00

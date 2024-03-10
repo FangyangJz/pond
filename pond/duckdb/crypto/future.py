@@ -4,7 +4,6 @@
 # @Software : PyCharm
 # https://github.com/binance/binance-futures-connector-python
 
-import time
 import threading
 
 import pandas as pd

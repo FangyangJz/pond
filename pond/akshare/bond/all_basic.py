@@ -52,7 +52,9 @@ def get_bond_basic_df(
         bond_zh_cov_df = bond_zh_cov_df.merge(
             bond_cb_redeem_jsl_df, on=["债券代码", "正股代码"]
         )
-        bond_zh_cov_df = bond_zh_cov_df[bond_zh_cov_df["强赎状态"].str.contains("不强赎")]
+        bond_zh_cov_df = bond_zh_cov_df[
+            bond_zh_cov_df["强赎状态"].str.contains("不强赎")
+        ]
 
     bond_zh_cov_df.drop(
         labels=[
@@ -76,7 +78,9 @@ def get_bond_basic_df(
 
     bond_zh_cov_df.reset_index(drop=True, inplace=True)
 
-    bond_zh_cov_df["jj_code"] = bond_zh_cov_df["market"] + "." + bond_zh_cov_df["债券代码"]
+    bond_zh_cov_df["jj_code"] = (
+        bond_zh_cov_df["market"] + "." + bond_zh_cov_df["债券代码"]
+    )
     redeem_df["jj_code"] = redeem_df["债券代码"].apply(trans_to_juejin_code)
 
     return bond_zh_cov_df, redeem_df

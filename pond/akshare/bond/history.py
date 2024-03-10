@@ -247,7 +247,8 @@ if __name__ == "__main__":
     df1, df2 = get_bond_basic_df(data_delist_status="exclude")
     res_dict = dict()
     update_bond_daily_res_dict_thread(
-        bond_basic_df=df1, res_dict=res_dict  # .iloc[:70],
+        bond_basic_df=df1,
+        res_dict=res_dict,  # .iloc[:70],
     )
     print(1)
 

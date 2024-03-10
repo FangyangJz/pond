@@ -56,7 +56,7 @@ class BondDB(DuckDB):
 
         (
             self.con.sql("select * from bond_basic_df").write_parquet(
-                str(self.path_bond_info / f"basic.parquet"), compression=self.compress
+                str(self.path_bond_info / "basic.parquet"), compression=self.compress
             )
         )
         logger.success(
@@ -65,7 +65,7 @@ class BondDB(DuckDB):
 
         (
             self.con.sql("select * from bond_redeem_df").write_parquet(
-                str(self.path_bond_info / f"redeem.parquet"), compression=self.compress
+                str(self.path_bond_info / "redeem.parquet"), compression=self.compress
             )
         )
         logger.success(

@@ -35,7 +35,7 @@ def update_cw_data():
     remote_files = Affair.files()  # 远程财务文件列表
 
     if len(remote_files) == len(local_files):
-        logger.info(f"Remote file length == local file length, no need to update.")
+        logger.info("Remote file length == local file length, no need to update.")
 
     for remote_file in remote_files:
         remote_filename = remote_file["filename"]
@@ -107,7 +107,7 @@ def get_cw_dict_acc(pool: PoolType = None) -> dict[str, pd.DataFrame]:
 
     build_in_pool = False
     if not isinstance(pool, PoolType):
-        logger.info(f"Not pass multiprocess pool in parameter, build in function.")
+        logger.info("Not pass multiprocess pool in parameter, build in function.")
         build_in_pool = True
         pool = Pool(os.cpu_count() - 1)
     else:

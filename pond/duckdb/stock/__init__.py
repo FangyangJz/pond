@@ -18,7 +18,6 @@ from pond.duckdb.stock.level2 import (
     get_order_script,
     get_orderbook_script,
     Task,
-    TaskConfig,
 )
 from pond.duckdb.type import DataFrameStrType, df_types, DataFrameType
 
@@ -91,16 +90,16 @@ class StockDB(DuckDB):
 
         (
             self.con.sql("select * from stock_basic_df").write_parquet(
-                str(self.path_stock_info / f"basic.parquet"), compression=self.compress
+                str(self.path_stock_info / "basic.parquet"), compression=self.compress
             )
         )
         logger.success(
-            f"Update basic.parquet cost: {time.perf_counter() - start_time}s"
+            f"Update {stock_basic_df.shape} basic.parquet cost: {time.perf_counter() - start_time}s"
         )
 
         (
             self.con.sql("select * from calender_df").write_parquet(
-                str(self.path_stock_info / f"calender.parquet"),
+                str(self.path_stock_info / "calender.parquet"),
                 compression=self.compress,
             )
         )
@@ -121,7 +120,6 @@ class StockDB(DuckDB):
                 if target_file.exists():
                     continue
                 df = get_level2_daily_df_with_threading(Task(dir_path).trade)
-
                 start_time = time.perf_counter()
                 (
                     self.con.sql(get_trade_script()).write_parquet(
@@ -130,11 +128,9 @@ class StockDB(DuckDB):
                     )
                 )
                 logger.success(
-                    f"Update level2 trade {date_str}.parquet, "
+                    f"Update {df.shape} level2 trade {date_str}.parquet, "
                     f"time cost: {time.perf_counter() - start_time:.4f}s"
                 )
-
-                df = None
                 gc.collect()
 
     def update_level2_order(self):
@@ -160,11 +156,9 @@ class StockDB(DuckDB):
                     )
                 )
                 logger.success(
-                    f"Update level2 order {date_str}.parquet, "
+                    f"Update {df.shape} level2 order {date_str}.parquet, "
                     f"time cost: {time.perf_counter() - start_time:.4f}s"
                 )
-
-                df = None
                 gc.collect()
 
     def update_level2_orderbook(self):
@@ -190,11 +184,9 @@ class StockDB(DuckDB):
                     )
                 )
                 logger.success(
-                    f"Update level2 orderbook {date_str}.parquet, "
+                    f"Update {df.shape} level2 orderbook {date_str}.parquet, "
                     f"time cost: {time.perf_counter() - start_time:.4f}s"
                 )
-
-                df = None
                 gc.collect()
 
     def update_kline_1d_nfq(self, offset: int = 0):
@@ -291,7 +283,9 @@ class StockDB(DuckDB):
 
     def update_kline_1m_from_tdx(self, tdx_dir=None):
         from pond.akshare.stock.all_basic import get_all_stocks_df
-        import os, math, ray
+        import os
+        import math
+        import ray
         from pond.tdx.kline import TdxReaderActor
 
         symbols = get_all_stocks_df()["代码"]

@@ -1,12 +1,9 @@
-from sqlalchemy import create_engine, Column, MetaData, func
+from sqlalchemy import Column, func
 from clickhouse_sqlalchemy import (
-    Table,
-    make_session,
-    get_declarative_base,
     types,
     engines,
 )
-from pond.clickhouse import TsTable, Base
+from pond.clickhouse import TsTable
 
 
 class FreeHoldingDetail(TsTable):
@@ -37,7 +34,6 @@ class FreeHoldingDetail(TsTable):
 
 
 class HoldingDetail(TsTable):
-
     __tablename__ = "HoldingDetail"
 
     """
@@ -75,15 +71,33 @@ class FreeHoldingStatistic(TsTable):
     name = Column(types.String, comment="股东名称")
     nature = Column(types.String, comment="股东类型")
     stat_counts = Column(types.Float64, comment="统计次数")
-    avg_chg_pct_day10 = Column(types.Float64, comment="公告日后涨幅统计-10个交易日-平均涨幅")
-    max_chg_pct_day10 = Column(types.Float64, comment="公告日后涨幅统计-10个交易日-最大涨幅")
-    min_chg_pct_day10 = Column(types.Float64, comment="公告日后涨幅统计-10个交易日-最小涨幅")
-    avg_chg_pct_day30 = Column(types.Float64, comment="公告日后涨幅统计-30个交易日-平均涨幅")
-    max_chg_pct_day30 = Column(types.Float64, comment="公告日后涨幅统计-30个交易日-最大涨幅")
-    min_chg_pct_day30 = Column(types.Float64, comment="公告日后涨幅统计-30个交易日-最小涨幅")
-    avg_chg_pct_day60 = Column(types.Float64, comment="公告日后涨幅统计-60个交易日-平均涨幅")
-    max_chg_pct_day60 = Column(types.Float64, comment="公告日后涨幅统计-60个交易日-最大涨幅")
-    min_chg_pct_day60 = Column(types.Float64, comment="公告日后涨幅统计-60个交易日-最小涨幅")
+    avg_chg_pct_day10 = Column(
+        types.Float64, comment="公告日后涨幅统计-10个交易日-平均涨幅"
+    )
+    max_chg_pct_day10 = Column(
+        types.Float64, comment="公告日后涨幅统计-10个交易日-最大涨幅"
+    )
+    min_chg_pct_day10 = Column(
+        types.Float64, comment="公告日后涨幅统计-10个交易日-最小涨幅"
+    )
+    avg_chg_pct_day30 = Column(
+        types.Float64, comment="公告日后涨幅统计-30个交易日-平均涨幅"
+    )
+    max_chg_pct_day30 = Column(
+        types.Float64, comment="公告日后涨幅统计-30个交易日-最大涨幅"
+    )
+    min_chg_pct_day30 = Column(
+        types.Float64, comment="公告日后涨幅统计-30个交易日-最小涨幅"
+    )
+    avg_chg_pct_day60 = Column(
+        types.Float64, comment="公告日后涨幅统计-60个交易日-平均涨幅"
+    )
+    max_chg_pct_day60 = Column(
+        types.Float64, comment="公告日后涨幅统计-60个交易日-最大涨幅"
+    )
+    min_chg_pct_day60 = Column(
+        types.Float64, comment="公告日后涨幅统计-60个交易日-最小涨幅"
+    )
     holding_codes = Column(types.String, comment="持有个股")
 
     __table_args__ = (
@@ -107,15 +121,33 @@ class HoldingStatistic(TsTable):
     name = Column(types.String, comment="股东名称")
     nature = Column(types.String, comment="股东类型")
     stat_counts = Column(types.Float64, comment="统计次数")
-    avg_chg_pct_day10 = Column(types.Float64, comment="公告日后涨幅统计-10个交易日-平均涨幅")
-    max_chg_pct_day10 = Column(types.Float64, comment="公告日后涨幅统计-10个交易日-最大涨幅")
-    min_chg_pct_day10 = Column(types.Float64, comment="公告日后涨幅统计-10个交易日-最小涨幅")
-    avg_chg_pct_day30 = Column(types.Float64, comment="公告日后涨幅统计-30个交易日-平均涨幅")
-    max_chg_pct_day30 = Column(types.Float64, comment="公告日后涨幅统计-30个交易日-最大涨幅")
-    min_chg_pct_day30 = Column(types.Float64, comment="公告日后涨幅统计-30个交易日-最小涨幅")
-    avg_chg_pct_day60 = Column(types.Float64, comment="公告日后涨幅统计-60个交易日-平均涨幅")
-    max_chg_pct_day60 = Column(types.Float64, comment="公告日后涨幅统计-60个交易日-最大涨幅")
-    min_chg_pct_day60 = Column(types.Float64, comment="公告日后涨幅统计-60个交易日-最小涨幅")
+    avg_chg_pct_day10 = Column(
+        types.Float64, comment="公告日后涨幅统计-10个交易日-平均涨幅"
+    )
+    max_chg_pct_day10 = Column(
+        types.Float64, comment="公告日后涨幅统计-10个交易日-最大涨幅"
+    )
+    min_chg_pct_day10 = Column(
+        types.Float64, comment="公告日后涨幅统计-10个交易日-最小涨幅"
+    )
+    avg_chg_pct_day30 = Column(
+        types.Float64, comment="公告日后涨幅统计-30个交易日-平均涨幅"
+    )
+    max_chg_pct_day30 = Column(
+        types.Float64, comment="公告日后涨幅统计-30个交易日-最大涨幅"
+    )
+    min_chg_pct_day30 = Column(
+        types.Float64, comment="公告日后涨幅统计-30个交易日-最小涨幅"
+    )
+    avg_chg_pct_day60 = Column(
+        types.Float64, comment="公告日后涨幅统计-60个交易日-平均涨幅"
+    )
+    max_chg_pct_day60 = Column(
+        types.Float64, comment="公告日后涨幅统计-60个交易日-最大涨幅"
+    )
+    min_chg_pct_day60 = Column(
+        types.Float64, comment="公告日后涨幅统计-60个交易日-最小涨幅"
+    )
     holding_codes = Column(types.String, comment="持有个股")
 
     __table_args__ = (
@@ -128,7 +160,6 @@ class HoldingStatistic(TsTable):
 
 
 class HolderCounts(TsTable):
-
     """
     股东户数
     """
@@ -160,7 +191,6 @@ class HolderCounts(TsTable):
 
 
 class StockRestrictedReleaseDetail(TsTable):
-
     __tablename__ = "StockRestrictedReleaseDetail"
 
     datetime = Column(types.DateTime64, comment="时间", primary_key=True)

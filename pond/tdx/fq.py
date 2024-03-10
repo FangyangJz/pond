@@ -60,7 +60,7 @@ def qfq_acc(
 ) -> dict[str, pd.DataFrame]:
     build_in_pool = False
     if not isinstance(pool, PoolType):
-        logger.info(f"Not pass multiprocess pool in parameter, build in function.")
+        logger.info("Not pass multiprocess pool in parameter, build in function.")
         build_in_pool = True
         pool = Pool(os.cpu_count() - 1)
     else:
@@ -216,7 +216,9 @@ def make_fq(
     # 如果没有‘adj'列，表示没进行过复权处理，当作新股处理
     if "adj" in code_df.columns:
         if True in code_df["adj"].isna().to_list():
-            first_index = np.where(code_df.isna())[0][0]  # 有NaN值，设为第一个NaN值所在的行
+            first_index = np.where(code_df.isna())[0][
+                0
+            ]  # 有NaN值，设为第一个NaN值所在的行
         else:
             return ""
     else:
@@ -231,7 +233,8 @@ def make_fq(
     # 提取该股除权除息行保存到DF df_cqcx，提取其他信息行到df_gbbq
     df_cqcx = gbbq_df.loc[(gbbq_df["code"] == code) & (gbbq_df["类别"] == "除权除息")]
     gbbq_df = gbbq_df.loc[
-        (gbbq_df["code"] == code) & (gbbq_df["类别"].isin(["股本变化", "送配股上市", "转配股上市"]))
+        (gbbq_df["code"] == code)
+        & (gbbq_df["类别"].isin(["股本变化", "送配股上市", "转配股上市"]))
     ]
 
     # 清洗df_gbbq，可能出现同一日期有 配股上市、股本变化两行数据。不清洗后面合并会索引冲突。
@@ -245,7 +248,7 @@ def make_fq(
             if v:
                 del_index.append(gbbq_df.at[k, "送转股-后流通盘"])
                 # 如果dup_index有1个以上的值，且K+1的元素是False，或K+1不存在也返回False，表示下一个元素 不是 重复行
-                if len(del_index) > 1 and (tmp_dict.get(k + 1, False) == False):
+                if len(del_index) > 1 and (tmp_dict.get(k + 1, False) is False):
                     del_index.remove(max(del_index))  # 删除最大值
                     # 选择剩余的值，取反，则相当于保留了最大值，删除了其余的值
                     gbbq_df = gbbq_df[~gbbq_df["送转股-后流通盘"].isin(del_index)]
@@ -264,7 +267,9 @@ def make_fq(
     gbbq_df.set_index(
         "date", drop=True, inplace=True
     )  # 设置权息日为索引  (字符串表示的日期 "19910101")
-    if len(df_cqcx) > 0:  # =0表示股本变迁中没有该股的除权除息信息。gbbq_lastest_date设置为今天，当作新股处理
+    if (
+        len(df_cqcx) > 0
+    ):  # =0表示股本变迁中没有该股的除权除息信息。gbbq_lastest_date设置为今天，当作新股处理
         cqcx_lastest_date = df_cqcx.index[-1]  # 提取最新的除权除息日
     else:
         cqcx_lastest_date = str(datetime.date.today())
@@ -315,10 +320,14 @@ def make_fq(
         df_ltg["date"] = code_df["date"]
         df_ltg["流通股"] = np.nan
         df_ltg.at[0, "流通股"] = ltg_lastest_value
-    gbbq_df = gbbq_df.rename(columns={"送转股-后流通盘": "流通股"})  # 列改名，为了update可以匹配
+    gbbq_df = gbbq_df.rename(
+        columns={"送转股-后流通盘": "流通股"}
+    )  # 列改名，为了update可以匹配
     # 用df_gbbq update data，由于只有流通股列重复，因此只会更新流通股列对应索引的NaN值
     # df_ltg['date'] = pd.to_datetime(df_ltg['date'], format='%Y-%m-%d')  # 转为时间格式
-    df_ltg.set_index("date", drop=True, inplace=True)  # 时间为索引。方便与另外复权的DF表对齐合并
+    df_ltg.set_index(
+        "date", drop=True, inplace=True
+    )  # 时间为索引。方便与另外复权的DF表对齐合并
     df_ltg.update(gbbq_df, overwrite=False)  # 使用update方法更新df_ltg
     if not flag_attach:  # 附加模式则单位已经调整过，无需再调整
         # 股本变迁里的流通股单位是万股。转换与财报的单位：股 统一
@@ -334,7 +343,9 @@ def make_fq(
     data = pd.concat([code_df, df_cqcx[["category"]][code_df.index[0] :]], axis=1)
     # print(data)
 
-    data["if_trade"].fillna(value=False, inplace=True)  # if_trade列，无效的值填充为False
+    data["if_trade"].fillna(
+        value=False, inplace=True
+    )  # if_trade列，无效的值填充为False
     data.fillna(method="ffill", inplace=True)  # 向下填充无效值
 
     # 提取info表的'fenhong', 'peigu', 'peigujia',‘songzhuangu'列的值，按日期一一对应，列拼接到data表。
@@ -342,7 +353,9 @@ def make_fq(
     data = pd.concat(
         [
             data,
-            df_cqcx[["分红-前流通盘", "配股-后总股本", "配股价-前总股本", "送转股-后流通盘"]][code_df.index[0] :],
+            df_cqcx[
+                ["分红-前流通盘", "配股-后总股本", "配股价-前总股本", "送转股-后流通盘"]
+            ][code_df.index[0] :],
         ],
         axis=1,
     )
@@ -378,7 +391,9 @@ def make_fq(
     # 计算换手率
     # 财报数据公开后，股本才变更。因此有效时间是“当前财报日至未来日期”。故将结束日期设置为2099年。每次财报更新后更新对应的日期时间段
     e_date = "20990101"
-    for cw_date in cw_dict:  # 遍历财报字典  cw_date=财报日期  cw_dict[cw_date]=具体的财报内容
+    for (
+        cw_date
+    ) in cw_dict:  # 遍历财报字典  cw_date=财报日期  cw_dict[cw_date]=具体的财报内容
         # 如果复权数据表的首行日期>当前要读取的财务报表日期，则表示此财务报表发布时股票还未上市，跳过此次循环。有例外情况：003001
         # (cw_dict[cw_date][0] == code).any() 表示当前股票code在财务DF里有数据
         if (

@@ -1,14 +1,9 @@
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, Column, MetaData, func
-from datetime import datetime
+from sqlalchemy import Column, MetaData
 import pandas as pd
 
 from clickhouse_sqlalchemy import (
-    Table,
-    make_session,
     get_declarative_base,
     types,
-    engines,
 )
 
 metadata = MetaData()
@@ -16,7 +11,6 @@ Base = get_declarative_base(metadata=metadata)
 
 
 class TsTable(Base):
-
     __abstract__ = True
 
     datetime = Column(types.DateTime64, comment="时间", primary_key=True)

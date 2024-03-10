@@ -53,9 +53,6 @@ def start_async_download_files(
 
 
 if __name__ == "__main__":
-    from zipfile import ZipFile
-    import polars as pl
-
     # df = pl.read_csv(ZipFile("results/DEFIUSDT-1m-2023-05.zip").read("DEFIUSDT-1m-2023-05.csv")).to_pandas()
     url_list = [
         # https://data.binance.vision/data/spot/monthly/klines/BCCBTC/1d/BCCBTC-1d-2018-10.zip

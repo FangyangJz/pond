@@ -130,7 +130,7 @@ def gen_gbbq_df():
         14: "送认沽权证",
     }
 
-    logger.info(f"Start to decode gbbq(股本变迁) file...")
+    logger.info("Start to decode gbbq(股本变迁) file...")
     gbbq_df = GbbqReader().get_df(gbbq_path / "gbbq")
     gbbq_df.drop(columns=["market"], inplace=True)
     gbbq_df.columns = [

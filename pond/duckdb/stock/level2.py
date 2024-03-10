@@ -277,8 +277,12 @@ class TaskConfig:
 
 class Task:
     def __init__(self, dir_path: Path):
-        self.trade = TaskConfig(dir_path=dir_path, file_name="逐笔成交", func=get_trade_df)
-        self.order = TaskConfig(dir_path=dir_path, file_name="逐笔委托", func=get_order_df)
+        self.trade = TaskConfig(
+            dir_path=dir_path, file_name="逐笔成交", func=get_trade_df
+        )
+        self.order = TaskConfig(
+            dir_path=dir_path, file_name="逐笔委托", func=get_order_df
+        )
         self.orderbook = TaskConfig(
             dir_path=dir_path, file_name="行情", func=get_orderbook_df
         )
@@ -291,7 +295,7 @@ def get_level2_daily_df_with_threading(task_cfg: TaskConfig) -> pd.DataFrame:
     df_list = []
     t_list = []
     for f in (pbar := tqdm(files_list)):
-        pbar.set_postfix_str(f)
+        pbar.set_postfix_str(str(f))
         t = threading.Thread(target=task_cfg.func, args=(f, df_list))
         t.start()
         t_list.append(t)
@@ -346,7 +350,7 @@ def get_level2_daily_df_with_multiprocess(task_cfg: TaskConfig) -> pd.DataFrame:
     pool.join()
     pbar.close()
 
-    logger.info(f"Start concat dataframe ... ")
+    logger.info("Start concat dataframe ... ")
     start_time = time.perf_counter()
     # total_df = pl.concat(res_list)  # 57.6s
     total_df = pd.concat(res_list)  # with dropna col, time cost 57.3s -> 37.3s
@@ -363,7 +367,7 @@ if __name__ == "__main__":
 
     con = duckdb.connect()
 
-    dir_path = Path(rf"E:\DuckDB\stock\trades\origin\20230508")
+    dir_path = Path(r"E:\DuckDB\stock\trades\origin\20230508")
     # dir_path = Path(rf'/home/fangyang/zhitai5000/DuckDB/stock/trades/origin/20230508/')
     # df = get_trade_df(dir_path / '000001.SZ' / '逐笔成交.csv')
 
@@ -377,6 +381,7 @@ if __name__ == "__main__":
 
     compress = "ZSTD"
     start_time = time.perf_counter()
+    date_str = ""
     con.sql("select * from df2").write_parquet(
         f"trade_{date_str}.parquet", compression=compress
     )
