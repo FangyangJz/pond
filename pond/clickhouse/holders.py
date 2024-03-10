@@ -1,8 +1,13 @@
 from sqlalchemy import create_engine, Column, MetaData, func
 from clickhouse_sqlalchemy import (
-    Table, make_session, get_declarative_base, types, engines
+    Table,
+    make_session,
+    get_declarative_base,
+    types,
+    engines,
 )
 from pond.clickhouse import TsTable, Base
+
 
 class FreeHoldingDetail(TsTable):
     """
@@ -26,14 +31,15 @@ class FreeHoldingDetail(TsTable):
         engines.MergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
-            primary_key=(datetime, code)
+            primary_key=(datetime, code),
         ),
     )
+
 
 class HoldingDetail(TsTable):
 
     __tablename__ = "HoldingDetail"
-    
+
     """
     持股明细-十大股东
     """
@@ -53,14 +59,16 @@ class HoldingDetail(TsTable):
         engines.MergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
-            primary_key=(datetime, code)
+            primary_key=(datetime, code),
         ),
     )
+
 
 class FreeHoldingStatistic(TsTable):
     """
     持股统计-十大流通股东
     """
+
     __tablename__ = "FreeHoldingStatistic"
 
     datetime = Column(types.DateTime64, comment="时间", primary_key=True)
@@ -82,7 +90,7 @@ class FreeHoldingStatistic(TsTable):
         engines.MergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime),
-            primary_key=(datetime)
+            primary_key=(datetime),
         ),
     )
 
@@ -91,8 +99,9 @@ class HoldingStatistic(TsTable):
     """
     持股统计-十大股东
     """
+
     __tablename__ = "HoldingStatistic"
-    
+
     datetime = Column(types.DateTime64, comment="时间", primary_key=True)
     code = Column(types.String, comment="股票代码")
     name = Column(types.String, comment="股东名称")
@@ -113,7 +122,7 @@ class HoldingStatistic(TsTable):
         engines.MergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
-            primary_key=(datetime, code)
+            primary_key=(datetime, code),
         ),
     )
 
@@ -123,6 +132,7 @@ class HolderCounts(TsTable):
     """
     股东户数
     """
+
     __tablename__ = "HolderCounts"
 
     datetime = Column(types.DateTime64, comment="时间", primary_key=True)
@@ -144,13 +154,13 @@ class HolderCounts(TsTable):
         engines.MergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
-            primary_key=(datetime, code)
+            primary_key=(datetime, code),
         ),
     )
 
 
 class StockRestrictedReleaseDetail(TsTable):
-    
+
     __tablename__ = "StockRestrictedReleaseDetail"
 
     datetime = Column(types.DateTime64, comment="时间", primary_key=True)
@@ -168,6 +178,6 @@ class StockRestrictedReleaseDetail(TsTable):
         engines.MergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
-            primary_key=(datetime, code)
+            primary_key=(datetime, code),
         ),
     )

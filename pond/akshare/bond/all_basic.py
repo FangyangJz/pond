@@ -1,5 +1,4 @@
 # !/usr/bin/env python3
-# -*- coding:utf-8 -*-
 # @Datetime : 2023/10/9 22:37
 # @Author   : Fangyang
 # @Software : PyCharm
@@ -37,10 +36,10 @@ def get_bond_basic_df(
     bond_zh_cov_df = ak.bond_zh_cov()
 
     bond_zh_cov_df.loc[
-        bond_zh_cov_df["债券代码"].str.contains("^12\d{4}"), "market"
+        bond_zh_cov_df["债券代码"].str.contains(r"^12\d{4}"), "market"
     ] = JUEJIN_MARKET_MAP[MARKET_SZ]
     bond_zh_cov_df.loc[
-        bond_zh_cov_df["债券代码"].str.contains("^11\d{4}"), "market"
+        bond_zh_cov_df["债券代码"].str.contains(r"^11\d{4}"), "market"
     ] = JUEJIN_MARKET_MAP[MARKET_SH]
 
     bond_cb_redeem_jsl_df, redeem_df = get_bond_cb_redeem_jsl_df()

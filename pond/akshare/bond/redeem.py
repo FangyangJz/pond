@@ -109,9 +109,7 @@ def bond_cb_redeem_jsl() -> pd.DataFrame:
 
 
 def get_bond_cb_redeem_jsl_df() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    bond_cb_redeem_jsl_df = bond_cb_redeem_jsl().drop(
-        labels=["正股价", "转股价"], axis=1
-    )
+    bond_cb_redeem_jsl_df = bond_cb_redeem_jsl().drop(labels=["正股价", "转股价"], axis=1)
     bond_cb_redeem_jsl_df["强赎天计数"] = bond_cb_redeem_jsl_df["强赎天计数"].replace(
         to_replace=r"\<.*\>", value="", regex=True
     )

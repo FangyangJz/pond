@@ -38,6 +38,6 @@ if __name__ == "__main__":
     df2 = pd_db.get_kline_1d_qfq_df()
     df3 = pa_db.get_kline_1d_qfq_df()
 
-    err_db = StockDB(Path(r"E:\DuckDB"), df_type='unknow')
+    err_db = StockDB(Path(r"E:\DuckDB"), df_type="unknow")
     err_db.transform_to_df("dd")
     print(1)

@@ -1,5 +1,4 @@
 # !/usr/bin/env python3
-# -*- coding:utf-8 -*-
 # @Datetime : 2023/12/18 上午 08:04
 # @Author   : Fangyang
 # @Software : PyCharm

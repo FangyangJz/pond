@@ -1,5 +1,4 @@
 # !/usr/bin/env python3
-# -*- coding:utf-8 -*-
 # @Datetime : 2023/11/17 下午 03:31
 # @Author   : Fangyang
 # @Software : PyCharm
@@ -33,12 +32,12 @@ if __name__ == "__main__":
     rel = db.con.read_parquet(str(db.path_stock_level2_trade / "20230508.parquet"))
 
     start_time = time.perf_counter()
-    sh_rel1 = rel.filter("jj_code in ('SHSE.600000')").select('*, price*volume as amt')
+    sh_rel1 = rel.filter("jj_code in ('SHSE.600000')").select("*, price*volume as amt")
     sh_rel1.show()
 
-    sh_rel1_df = sh_rel1.df().set_index('datetime')
+    sh_rel1_df = sh_rel1.df().set_index("datetime")
     sh_rel1_df_desc = sh_rel1_df.describe()
-    sh_rel1_df.hist('amt', bins=200)
+    sh_rel1_df.hist("amt", bins=200)
     plt.show()
     # sh_rel1_df['amount'] = sh_rel1_df['price'] * sh_rel1_df['volume']
     # sh_rel1_df = sh_rel1_df.between_time("09:30:00", "10:00:00").groupby(['jj_code', 'BS']).sum()

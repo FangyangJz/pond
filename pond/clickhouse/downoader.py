@@ -3,9 +3,9 @@ from datetime import datetime
 import akshare as ak
 import pandas as pd
 
+
 @ray.remote
 class Downloader:
-    
     def __init__(self) -> None:
         self.dfs = []
 

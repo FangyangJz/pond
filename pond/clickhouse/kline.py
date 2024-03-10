@@ -1,18 +1,18 @@
 from sqlalchemy import Column, func
-from clickhouse_sqlalchemy import (
-    types, engines
-)
+from clickhouse_sqlalchemy import types, engines
 from pond.clickhouse import TsTable
 
 import akshare as ak
+
 
 def stock_zh_a_hist(**kwargs):
     print(f"stock_zh_a_hist {kwargs}")
     df = ak.stock_zh_a_hist(**kwargs)
     if df is not None:
-        df["代码"] = kwargs['symbol']
+        df["代码"] = kwargs["symbol"]
         print(f"stock_zh_a_hist {kwargs['symbol']}, size {len(df)}")
     return df
+
 
 class KlineDailyHFQ(TsTable):
     """
@@ -30,11 +30,11 @@ class KlineDailyHFQ(TsTable):
     volume = Column(types.Float64, comment="成交量")
     amount = Column(types.Float64, comment="成交额")
     turn = Column(types.Float64, comment="换手率")
-    
+
     __table_args__ = (
         engines.MergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
-            primary_key=(datetime, code)
+            primary_key=(datetime, code),
         ),
     )

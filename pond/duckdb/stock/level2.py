@@ -1,5 +1,4 @@
 # !/usr/bin/env python3
-# -*- coding:utf-8 -*-
 # @Datetime : 2023/11/7 23:01
 # @Author   : Fangyang
 # @Software : PyCharm
@@ -20,7 +19,9 @@ from loguru import logger
 csv_engine: CSVEngine = "c"
 
 
-def get_trade_df(csv_file: Path, df_list: list[pd.DataFrame] | None = None) -> pd.DataFrame:
+def get_trade_df(
+    csv_file: Path, df_list: list[pd.DataFrame] | None = None
+) -> pd.DataFrame:
     """
     From 海通证券 选股因子系列研究75 限价订单簿LOB的还原与应用
 
@@ -97,7 +98,9 @@ def get_trade_script() -> str:
 #     return df[keep_cols]
 
 
-def get_order_df(csv_file: Path, df_list: list[pd.DataFrame] | None = None) -> pd.DataFrame:
+def get_order_df(
+    csv_file: Path, df_list: list[pd.DataFrame] | None = None
+) -> pd.DataFrame:
     dtype_dict = {
         "万得代码": str,  # keep convert to jj_code
         # '交易所代码': int,

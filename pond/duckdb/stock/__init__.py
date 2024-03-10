@@ -1,5 +1,4 @@
 # !/usr/bin/env python3
-# -*- coding:utf-8 -*-
 # @Datetime : 2023/11/7 23:00
 # @Author   : Fangyang
 # @Software : PyCharm
@@ -38,7 +37,9 @@ class StockDB(DuckDB):
         self.path_stock_level2_trade_agg = self.path_stock_level2 / "trade_agg"
         self.path_stock_level2_order = self.path_stock_level2 / "order"
         self.path_stock_level2_orderbook = self.path_stock_level2 / "orderbook"
-        self.path_stock_level2_orderbook_rebuild = self.path_stock_level2 / "orderbook_rebuild"
+        self.path_stock_level2_orderbook_rebuild = (
+            self.path_stock_level2 / "orderbook_rebuild"
+        )
         self.path_stock_list = [
             self.path_stock,
             self.path_stock_info,
@@ -49,7 +50,7 @@ class StockDB(DuckDB):
             self.path_stock_level2,
             self.path_stock_level2_origin,
             self.path_stock_level2_trade,
-            self.path_stock_level2_trade_agg, 
+            self.path_stock_level2_trade_agg,
             self.path_stock_level2_order,
             self.path_stock_level2_orderbook,
             self.path_stock_level2_orderbook_rebuild,
@@ -148,7 +149,7 @@ class StockDB(DuckDB):
                 target_file = self.path_stock_level2_order / f"{date_str}.parquet"
                 if target_file.exists():
                     continue
-                
+
                 df = get_level2_daily_df_with_threading(Task(dir_path).order)
 
                 start_time = time.perf_counter()
@@ -278,7 +279,6 @@ class StockDB(DuckDB):
             f"Update all parquet file cost: {time.perf_counter() - start_time:.2f}s"
         )
 
-
     def get_kline_1m(
         self, start_date: str = "2023-01-01", end_date: str = "2070-01-01"
     ) -> DuckDBPyRelation:
@@ -287,8 +287,7 @@ class StockDB(DuckDB):
         ).filter(
             f"(date >= TIMESTAMP '{start_date}') and (date < TIMESTAMP '{end_date}')"
         )
-        return self.transform_to_df(rel)     
-
+        return self.transform_to_df(rel)
 
     def update_kline_1m_from_tdx(self, tdx_dir=None):
         from pond.akshare.stock.all_basic import get_all_stocks_df
@@ -296,43 +295,48 @@ class StockDB(DuckDB):
         from pond.tdx.kline import TdxReaderActor
 
         symbols = get_all_stocks_df()["代码"]
-        process_counts=(os.cpu_count() -1)
+        process_counts = os.cpu_count() - 1
         readers = []
         group_size = math.ceil(len(symbols) / process_counts)
 
         for i in range(process_counts):
-            reader = TdxReaderActor.remote(self.path_stock_kline_1m.absolute(), update=True, fetch_data=False)
-            reader.read.remote(tdx_dir, 'std', symbols[i*group_size : (i+1)*group_size], '1')
+            reader = TdxReaderActor.remote(
+                self.path_stock_kline_1m.absolute(), update=True, fetch_data=False
+            )
+            reader.read.remote(
+                tdx_dir, "std", symbols[i * group_size : (i + 1) * group_size], "1"
+            )
             readers.append(reader)
 
         for reader in readers:
-            ray.get(reader.get.remote()) 
+            ray.get(reader.get.remote())
 
 
 if __name__ == "__main__":
     import time
+
     db = StockDB(Path(r"E:\DuckDB"))
     db.init_db_path()
     # db = StockDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
     # db.update_stock_orders()
 
-    #rel = db.get_kline_1d_qfq_rel()
-    #df = db.get_kline_1d_qfq_df().to_pandas()
+    # rel = db.get_kline_1d_qfq_rel()
+    # df = db.get_kline_1d_qfq_df().to_pandas()
 
     # db.update_stock_info()
     # db.update_kline_1d_nfq()
     # db.update_kline_1d_qfq()
 
-    #db.update_level2_trade()
-    #db.update_level2_order()
-    #db.update_level2_orderbook()
+    # db.update_level2_trade()
+    # db.update_level2_order()
+    # db.update_level2_orderbook()
 
     # r1 = db.con.sql(
     #     rf"SELECT * from read_parquet('{str(db.path_stock_trades / '20230504.parquet')}')")  # order by jj_code, datetime
     #
     # r4 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'basic.parquet')}')")
     # r5 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'calender.parquet')}')")
-    
+
     db.update_kline_1m_from_tdx(r"D:\windows\programs\TongDaXin")
 
     start = time.perf_counter()

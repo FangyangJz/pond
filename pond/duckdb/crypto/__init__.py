@@ -1,5 +1,4 @@
 # !/usr/bin/env python3
-# -*- coding:utf-8 -*-
 # @Datetime : 2023/11/9 0:09
 # @Author   : Fangyang
 # @Software : PyCharm
@@ -241,7 +240,7 @@ class CryptoDB(DuckDB):
                 end=_end,
                 timeframe=timeframe,
                 file_path=self.path_crypto,
-                proxies=requests_proxies
+                proxies=requests_proxies,
             )
 
             start_async_download_files(
