@@ -355,14 +355,14 @@ if __name__ == "__main__":
     db = CryptoDB(Path(r"E:\DuckDB"))
     # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
 
-    # db.update_future_info()
+    db.update_future_info()
 
     # df = db.get_future_info(asset_type=AssetType.future_um)
     # ll = db.get_local_future_perpetual_symbol_list(asset_type=AssetType.future_um)
 
     interval = "1d"
     db.update_history_data(
-        start="2019-1-1",
+        start="2017-1-1",
         end="2024-3-15",
         asset_type=AssetType.spot,
         data_type=DataType.klines,

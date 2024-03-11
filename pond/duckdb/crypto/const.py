@@ -17,7 +17,7 @@ kline_schema = {
     "count": pl.Int64,
     "taker_buy_volume": pl.Float64,
     "taker_buy_quote_volume": pl.Float64,
-    "ignore": pl.Int8,
+    "ignore": pl.Float64,
 }
 
 if __name__ == "__main__":
