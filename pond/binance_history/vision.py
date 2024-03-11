@@ -51,11 +51,15 @@ def get_vision_data_url_list(
     if resp.status_code == 200:
         r = xmltodict.parse(resp.content.decode("utf-8"))["ListBucketResult"]
         is_truncated = True if r["IsTruncated"] == "true" else False
-        return is_truncated, [
-            f"https://{r['Name']}/{e['Key']}"
-            for e in r["Contents"]
-            if "CHECKSUM" not in e["Key"]
-        ]
+
+        if "Contents" in r:
+            return is_truncated, [
+                f"https://{r['Name']}/{e['Key']}"
+                for e in r["Contents"]
+                if "CHECKSUM" not in e["Key"]
+            ]
+        else:
+            return False, []
 
     elif resp.status_code == 404:
         logger.warning(f"[404] {url}")
