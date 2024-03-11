@@ -259,7 +259,7 @@ class CryptoDB(DuckDB):
                 df = pl.concat(df_list)
                 df = self.filter_quote_volume_0(df, symbol, timeframe)
                 df = (
-                    df.with_columns(
+                    df.sort("open_time").with_columns(
                         (
                             pl.col("open_time").diff()
                             - pl.col("open_time").diff().shift(-1)
@@ -362,8 +362,8 @@ if __name__ == "__main__":
 
     interval = "1d"
     db.update_history_data(
-        start="2020-1-1",
-        end="2024-2-15",
+        start="2019-1-1",
+        end="2024-3-15",
         asset_type=AssetType.spot,
         data_type=DataType.klines,
         timeframe=interval,
