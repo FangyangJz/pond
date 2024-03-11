@@ -276,6 +276,11 @@ class CryptoDB(DuckDB):
                     ["open_time", "close_time"]
                 )
                 if len(lack_df) > 0:
+                    if len(lack_df) % 2 != 0:
+                        lack_df = pl.concat(
+                            [lack_df, df.select(["open_time", "close_time"])[-1]]
+                        )
+
                     supply_df = get_supply_df(
                         client=self.get_client(asset_type, requests_proxies),
                         lack_df=lack_df,
