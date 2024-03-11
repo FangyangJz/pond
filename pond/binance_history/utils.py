@@ -291,34 +291,38 @@ def load_data_from_disk(
     path = get_local_data_path(url, local_path)
 
     if path.exists():
-        if (int(path.stem.split("-")[2]) < 2022) or ("spot" in path.parts):
-            df = (
-                pl.read_csv(
-                    ZipFile(path).read(f"{path.stem}.csv"),
-                    dtypes=dtypes,
-                    # columns=list(dtypes.keys()) if dtypes else None,
-                    has_header=False,
+        try:
+            if (int(path.stem.split("-")[2]) < 2022) or ("spot" in path.parts):
+                df = (
+                    pl.read_csv(
+                        ZipFile(path).read(f"{path.stem}.csv"),
+                        dtypes=dtypes,
+                        # columns=list(dtypes.keys()) if dtypes else None,
+                        has_header=False,
+                    )
+                    # .with_columns(
+                    #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
+                    #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
+                    # )
+                    # .to_pandas()
                 )
-                # .with_columns(
-                #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
-                #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
-                # )
-                # .to_pandas()
-            )
-        else:
-            df = (
-                pl.read_csv(
-                    ZipFile(path).read(f"{path.stem}.csv"),
-                    dtypes=dtypes,
-                    columns=list(dtypes.keys()) if dtypes else None,
-                    has_header=True,
+            else:
+                df = (
+                    pl.read_csv(
+                        ZipFile(path).read(f"{path.stem}.csv"),
+                        dtypes=dtypes,
+                        columns=list(dtypes.keys()) if dtypes else None,
+                        has_header=True,
+                    )
+                    # .with_columns(
+                    #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
+                    #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
+                    # )
+                    # .to_pandas()
                 )
-                # .with_columns(
-                #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
-                #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
-                # )
-                # .to_pandas()
-            )
+        except Exception as e:
+            logger.error(f"load_data_from_disk error: {e}")
+            return None
 
         return df
 
