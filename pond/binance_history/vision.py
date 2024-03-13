@@ -7,10 +7,16 @@ from typing import Any
 import requests
 import xmltodict
 from loguru import logger
+from tenacity import retry, stop_after_attempt
 
 from pond.binance_history.exceptions import NetworkError
 
 
+# Define the retry decorator
+@retry(
+    stop=stop_after_attempt(4),  # Maximum number of retries
+    # wait=wait_exponential(multiplier=1, min=0.1, max=60),  # Exponential backoff
+)
 def get_vision_data_url_list(
     params: dict[str, Any], proxies: dict[str, str]
 ) -> tuple[bool, list[str]]:
@@ -41,7 +47,7 @@ def get_vision_data_url_list(
             url,
             params=params,
             proxies=proxies,
-            timeout=None,
+            timeout=5,
             headers=headers,
         )
     except Exception as e:
