@@ -7,7 +7,9 @@ def get_all_index(cache_path:Path=None, update=False):
     if cache_path is not None and not update:
         cache_file = cache_path / "all_index.csv"
         if cache_file.exists():
-            return pd.read_csv(cache_file)
+            df = pd.read_csv(cache_file)
+            df["index_code"] = df["index_code"].apply(lambda x : f"000000{x}"[-6:])
+            return df
     df = ak.index_stock_info()
     if cache_file is not None:
         cache_file.parent.mkdir(exist_ok=True)
