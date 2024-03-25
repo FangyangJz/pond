@@ -15,7 +15,7 @@ import pandas as pd
 from pond.clickhouse import metadata, TsTable
 from typing import List
 from pond.akshare.stock import get_all_stocks_df
-from pond.clickhouse.kline import KlineDailyHFQ, stock_zh_a_hist
+from pond.clickhouse.kline import KlineDailyNFQ, stock_zh_a_hist
 from sqlalchemy import create_engine, desc
 
 from clickhouse_sqlalchemy import make_session
@@ -87,37 +87,40 @@ class ClickHouseManager:
         if record is not None:
             df = df[df["datetime"] > record.datetime]
         df.drop_duplicates(inplace=True)
-        # rows = df.to_sql(
-        #     table.__tablename__, self.engine, index=False, if_exists="append"
-        # )
-        print(f"saved {len(df)} into table {table.__tablename__}")
+        rows = df.to_sql(
+            table.__tablename__, self.engine, index=False, if_exists="append"
+        )
+        print(f"total {rows} saved {len(df)} into table {table.__tablename__}")
 
     def get_syncing_tasks(self, date) -> List[Task]:
         tasks: List[Task] = []
         args = {"date": datestr(date)}
-        holder_types = ["个人", "基金", "QFII", "社保", "券商", "信托"]
-        changements = ["新进", "增加", "不变", "减少"]
-        tasks.append(
-            Task(FreeHoldingDetail, ak.stock_gdfx_free_holding_detail_em, [args])
-        )
 
         # kline daily hfq
         stock_basic = get_all_stocks_df()
-        begin = self.get_cache_date(KlineDailyHFQ)
-        kline_daily_args = []
+        begin = self.get_cache_date(KlineDailyNFQ)
+        kline_nfq_daily_args = []
         for symbol in stock_basic["代码"]:
-            kline_daily_args.append(
+            kline_nfq_daily_args.append(
                 {
                     "symbol": symbol,
                     "start_date": datestr(begin),
                     "end_date": datestr(date),
                     "period": "daily",
-                    "adjust": "hfq",
+                    "adjust": "",
                 }
             )
-        tasks.append(Task(KlineDailyHFQ, stock_zh_a_hist, kline_daily_args))
+        tasks.append(Task(KlineDailyNFQ, stock_zh_a_hist, kline_nfq_daily_args))
+        return tasks
+    
+        # free hoding detail
+        tasks.append(
+            Task(FreeHoldingDetail, ak.stock_gdfx_free_holding_detail_em, [args])
+        )
 
         # holding detail
+        holder_types = ["个人", "基金", "QFII", "社保", "券商", "信托"]
+        changements = ["新进", "增加", "不变", "减少"]
         holding_detail_arg_groups = []
         for holder_type in holder_types:
             for changement in changements:
@@ -186,8 +189,8 @@ if __name__ == "__main__":
     password = os.environ.get("CLICKHOUSE_PWD")
     conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
     manager = ClickHouseManager(conn_str, data_start=datetime(2018, 1, 1))
-    begin = datetime(2024, 1, 26)
-    manager.sync(date=begin)
+    begin = datetime(2021, 1, 1)
+    manager.sync()
 
     # end = datetime.now()
     # while begin < end:
