@@ -38,6 +38,12 @@ class ClickHouseManager:
         self.session = make_session(self.engine)
         self.data_start = data_start
 
+    def get_engin(self):
+        return self.engine
+    
+    def get_session(self):
+        return self.session
+
     def sync(self, date=datetime.now()):
         print(f"click house manager syncing at {date.isoformat()}")
         tasks = self.get_syncing_tasks(date)
