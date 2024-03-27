@@ -34,6 +34,7 @@ binance-connector = "^3.5.1"
 binance-futures-connector = "^4.0.0"
 pre-commit = "*"
 ruff = "^0.3.2"
+xmltodict = "^0.13.0"
 
 
 [build-system]
