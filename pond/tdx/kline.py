@@ -25,10 +25,15 @@ class TdxReaderActor:
     def read(self, tdx_dir, market, symbols, period, start_date=None, end_date=None):
         reader = Reader.factory(market=market, tdxdir=tdx_dir)
         for symbol in symbols:
-            df = reader.minute(symbol=symbol, suffix=period)
-            if df is not None:
-                self.__cache_into_disk__(symbol, df)
+            if period == 'd':
+                df = reader.daily(symbol=symbol)
+            else:
+                df = reader.minute(symbol=symbol, suffix=period)
+            if df is not None and len(df) > 0:
                 df = df.reset_index(drop=False)
+                df["jj_code"] = symbol
+                df["close_time"] = df["date"]
+                self.__cache_into_disk__(symbol, df)
                 if start_date is not None:
                     df = df[df["date"] >= start_date]
                 if end_date is not None:
