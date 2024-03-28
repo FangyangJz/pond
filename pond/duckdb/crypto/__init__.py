@@ -365,25 +365,38 @@ if __name__ == "__main__":
     # df = db.get_future_info(asset_type=AssetType.future_um)
     # ll = db.get_local_future_perpetual_symbol_list(asset_type=AssetType.future_um)
 
-    interval = "1d"
-    db.update_history_data(
-        start="2017-1-1",
-        end="2024-3-15",
-        asset_type=AssetType.spot,
-        data_type=DataType.klines,
-        timeframe=interval,
-        # httpx_proxies={"https://": "https://127.0.0.1:7890"},
-        requests_proxies={
-            "http": "127.0.0.1:7890",
-            "https": "127.0.0.1:7890",
-        },
-    )
-
-    df = pl.read_parquet(
-        db.path_crypto_kline_um / interval / "BTCUSDT.parquet"
-    ).to_pandas()
-    print(1)
-
+    def try_update_data(interval) -> bool:
+        try:
+            db.update_history_data(
+                start="2020-1-1",
+                end="2024-3-15",
+                asset_type=AssetType.future_um,
+                data_type=DataType.klines,
+                timeframe=interval,
+                # httpx_proxies={"https://": "https://127.0.0.1:7890"},
+                requests_proxies={
+                    "http": "127.0.0.1:7890",
+                    "https": "127.0.0.1:7890",
+                },
+            )
+        except BaseException as e:
+            print(e)
+            return False
+        return True
+    
+    #...start downloading...
+    interval = "1h"
+    complete = False
+    retry = 0
+    while not complete:
+        complete = try_update_data(interval)
+        retry += 1
+        if retry < 100:
+            continue
+        else:
+            break
+    print(f"complete : {complete}, retried {retry}")
+    
     # db.update_crypto_trades()
 
     # for f in (pbar := tqdm(db.path_crypto_agg_trades_origin.glob("*.csv"))):
