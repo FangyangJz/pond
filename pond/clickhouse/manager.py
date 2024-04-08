@@ -40,7 +40,7 @@ class ClickHouseManager:
 
     def get_engin(self):
         return self.engine
-    
+
     def get_session(self):
         return self.session
 
@@ -82,16 +82,12 @@ class ClickHouseManager:
                 final_df["时间"] = date
                 self.save_to_db(task.table, final_df)
 
-    def save_to_db(self, table: TsTable, df: pd.DataFrame):
+    def save_to_db(self, table: TsTable, df: pd.DataFrame, last_record_filters):
+        # format data
         df = table().format_dataframe(df)
-        record = (
-            self.session.query(table)
-            .order_by(desc(table.datetime))
-            .limit(1)
-            .one_or_none()
-        )
-        if record is not None:
-            df = df[df["datetime"] > record.datetime]
+        lastet_record_time = self.get_latest_record_time(table, last_record_filters)
+        if lastet_record_time is not None:
+            df = df[df["datetime"] > lastet_record_time]
         df.drop_duplicates(inplace=True)
         rows = df.to_sql(
             table.__tablename__, self.engine, index=False, if_exists="append"
@@ -104,7 +100,7 @@ class ClickHouseManager:
 
         # kline daily hfq
         stock_basic = get_all_stocks_df()
-        begin = self.get_cache_date(KlineDailyNFQ)
+        begin = self.get_latest_record_time(KlineDailyNFQ)
         kline_nfq_daily_args = []
         for symbol in stock_basic["代码"]:
             kline_nfq_daily_args.append(
@@ -118,7 +114,7 @@ class ClickHouseManager:
             )
         tasks.append(Task(KlineDailyNFQ, stock_zh_a_hist, kline_nfq_daily_args))
         return tasks
-    
+
         # free hoding detail
         tasks.append(
             Task(FreeHoldingDetail, ak.stock_gdfx_free_holding_detail_em, [args])
@@ -161,7 +157,7 @@ class ClickHouseManager:
         )
 
         # restricted release detail
-        begin = self.get_cache_date(StockRestrictedReleaseDetail)
+        begin = self.get_latest_record_time(StockRestrictedReleaseDetail)
         restricted_release_detail_args = {
             "start_date": datestr(begin),
             "end_date": datestr(date),
@@ -175,13 +171,14 @@ class ClickHouseManager:
         )
         return tasks
 
-    def get_cache_date(self, table: TsTable):
-        record = (
-            self.session.query(table)
-            .order_by(desc(table.datetime))
-            .limit(1)
-            .one_or_none()
-        )
+    def get_latest_record_time(self, table: TsTable, filters=None):
+        query = self.session.query(table)
+        if filters is not None:
+            if not isinstance(filters, list):
+                filters = [filters]
+            for f in filters:
+                query = query.filter(f)
+        record = query.order_by(desc(table.datetime)).limit(1).one_or_none()
         if record is not None:
             begin = record.datetime
         else:
