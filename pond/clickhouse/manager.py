@@ -17,7 +17,7 @@ from typing import List
 from pond.akshare.stock import get_all_stocks_df
 from pond.clickhouse.kline import KlineDailyNFQ, stock_zh_a_hist
 from sqlalchemy import create_engine, desc
-
+import polars as pl
 from clickhouse_sqlalchemy import make_session
 
 
@@ -81,6 +81,21 @@ class ClickHouseManager:
                 final_df = pd.concat(dfs)
                 final_df["时间"] = date
                 self.save_to_db(task.table, final_df)
+
+    def read_table(self, table:TsTable, start_date:datetime, end_date:datetime, filters=None) -> pl.DataFrame:
+        query = self.session.query(table)
+        if start_date is not None:
+            query = query.filter(table.datetime >= start_date)
+        if end_date is not None:
+            query = query.filter(table.datetime <= end_date)
+        if filters is not None:
+            if not isinstance(filters, list):
+                filters = [filters]
+            for f in filters:
+                query = query.filter(f)
+        df = pl.read_database(query.statement, self.session.connection())
+        return df      
+
 
     def save_to_db(self, table: TsTable, df: pd.DataFrame, last_record_filters):
         # format data
