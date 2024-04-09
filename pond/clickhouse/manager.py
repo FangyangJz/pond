@@ -96,13 +96,16 @@ class ClickHouseManager:
         df = pl.read_database(query.statement, self.session.connection())
         return df      
 
+    def a(self):
+        self.session.query(KlineDailyNFQ).filter(KlineDailyNFQ.code.in_)
+
 
     def save_to_db(self, table: TsTable, df: pd.DataFrame, last_record_filters):
         # format data
         df = table().format_dataframe(df)
         lastet_record_time = self.get_latest_record_time(table, last_record_filters)
         if lastet_record_time is not None:
-            df = df[df["datetime"] > lastet_record_time]
+            df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         df.drop_duplicates(inplace=True)
         rows = df.to_sql(
             table.__tablename__, self.engine, index=False, if_exists="append"
