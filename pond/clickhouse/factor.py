@@ -8,7 +8,6 @@ class StockFactor(TsTable):
 
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
     code = Column(types.String, comment="jj_code")
-    clazz = Column(types.String, comment="factor_class")
     interval = Column(types.String, comment="interval")
     name = Column(types.String, comment="factor_name")
     value = Column(types.Float64, comment="value")
@@ -26,9 +25,8 @@ class CryptoFactor(TsTable):
 
     __tablename__ = "crypto_factor"
 
-    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    datetime = Column(types.DateTime64, comment="date", primary_key=True)
     code = Column(types.String, comment="pair")
-    clazz = Column(types.String, comment="factor_class")
     interval = Column(types.String, comment="interval")
     name = Column(types.String, comment="factor_name")
     value = Column(types.Float64, comment="value")
@@ -45,9 +43,8 @@ class FuturesFactor(TsTable):
 
     __tablename__ = "futures_factor"
 
-    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    datetime = Column(types.DateTime64, comment="date", primary_key=True)
     code = Column(types.String, comment="pair")
-    clazz = Column(types.String, comment="factor_class")
     interval = Column(types.String, comment="interval")
     name = Column(types.String, comment="factor_name")
     value = Column(types.Float64, comment="value")

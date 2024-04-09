@@ -24,8 +24,8 @@ class CryptoPrediction(TsTable):
 
     __tablename__ = "crypto_prediction"
 
-    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
-    code = Column(types.String, comment="jj_code")
+    datetime = Column(types.DateTime64, comment="date", primary_key=True)
+    code = Column(types.String, comment="pair")
     model = Column(types.String, comment="model")
     value = Column(types.Float64, comment="y_pred")
 
@@ -41,8 +41,8 @@ class FuturesPrediction(TsTable):
 
     __tablename__ = "futures_prediction"
 
-    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
-    code = Column(types.String, comment="jj_code")
+    datetime = Column(types.DateTime64, comment="date", primary_key=True)
+    code = Column(types.String, comment="pair")
     model = Column(types.String, comment="model")
     value = Column(types.Float64, comment="y_pred")
 
