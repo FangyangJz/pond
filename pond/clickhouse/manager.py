@@ -105,7 +105,8 @@ class ClickHouseManager:
         df = table().format_dataframe(df)
         lastet_record_time = self.get_latest_record_time(table, last_record_filters)
         if lastet_record_time is not None:
-            df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
+            df = df[df["datetime"] > lastet_record_time]
+            #df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         df.drop_duplicates(inplace=True)
         rows = df.to_sql(
             table.__tablename__, self.engine, index=False, if_exists="append"
