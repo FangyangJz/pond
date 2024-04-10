@@ -17,17 +17,19 @@ class TsTable(Base):
     code = Column(types.String, comment="代码")
 
     def format_dataframe(self, df: pd.DataFrame):
+        all_cols =[]
         columns = {}
         for column in self.__dict__[
             "_sa_instance_state"
         ].class_.__table__.columns._all_columns:
             col: Column = column
-            if col.comment in df.columns:
+            all_cols.append(col.name)
+            if col.comment in df.columns and col.name not in df.columns:
                 columns[col.comment] = col.name
                 df[col.comment] = self.format_col(col, df[col.comment])
 
         df = df.rename(columns=columns)
-        return df[columns.values()]
+        return df[all_cols]
 
     def format_col(self, col: Column, series: pd.Series):
         if isinstance(col.type, types.common.String):
