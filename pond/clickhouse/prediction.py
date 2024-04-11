@@ -2,8 +2,8 @@ from sqlalchemy import Column, func
 from clickhouse_sqlalchemy import types, engines
 from pond.clickhouse import TsTable
 
-class StockPrediction(TsTable):
 
+class StockPrediction(TsTable):
     __tablename__ = "stock_prediction"
 
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
@@ -21,7 +21,6 @@ class StockPrediction(TsTable):
 
 
 class CryptoPrediction(TsTable):
-
     __tablename__ = "crypto_prediction"
 
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
@@ -37,8 +36,8 @@ class CryptoPrediction(TsTable):
         ),
     )
 
-class FuturesPrediction(TsTable):
 
+class FuturesPrediction(TsTable):
     __tablename__ = "futures_prediction"
 
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)

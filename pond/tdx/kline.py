@@ -25,7 +25,7 @@ class TdxReaderActor:
     def read(self, tdx_dir, market, symbols, period, start_date=None, end_date=None):
         reader = Reader.factory(market=market, tdxdir=tdx_dir)
         for symbol in symbols:
-            if period == 'd':
+            if period == "d":
                 df = reader.daily(symbol=symbol)
             else:
                 df = reader.minute(symbol=symbol, suffix=period)

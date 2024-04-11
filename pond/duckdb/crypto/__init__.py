@@ -383,8 +383,8 @@ if __name__ == "__main__":
             print(e)
             return False
         return True
-    
-    #...start downloading...
+
+    # ...start downloading...
     interval = "1h"
     complete = False
     retry = 0
@@ -396,7 +396,7 @@ if __name__ == "__main__":
         else:
             break
     print(f"complete : {complete}, retried {retry}")
-    
+
     # db.update_crypto_trades()
 
     # for f in (pbar := tqdm(db.path_crypto_agg_trades_origin.glob("*.csv"))):
