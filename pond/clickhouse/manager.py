@@ -102,7 +102,7 @@ class ClickHouseManager:
                 query = query.filter(f)
         df = pl.read_database(query.statement, self.session.connection())
         if rename:
-            df = df.rename(table.get_colcom_names())
+            df = df.rename(table().get_colcom_names())
         return df
 
     def a(self):
