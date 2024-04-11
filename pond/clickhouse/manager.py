@@ -82,7 +82,14 @@ class ClickHouseManager:
                 final_df["时间"] = date
                 self.save_to_db(task.table, final_df)
 
-    def read_table(self, table:TsTable, start_date:datetime, end_date:datetime, filters=None) -> pl.DataFrame:
+    def read_table(
+        self,
+        table: TsTable,
+        start_date: datetime,
+        end_date: datetime,
+        filters=None,
+        rename=False,
+    ) -> pl.DataFrame:
         query = self.session.query(table)
         if start_date is not None:
             query = query.filter(table.datetime >= start_date)
@@ -94,11 +101,12 @@ class ClickHouseManager:
             for f in filters:
                 query = query.filter(f)
         df = pl.read_database(query.statement, self.session.connection())
-        return df      
+        if rename:
+            df = df.rename(table.get_colcom_names())
+        return df
 
     def a(self):
         self.session.query(KlineDailyNFQ).filter(KlineDailyNFQ.code.in_)
-
 
     def save_to_db(self, table: TsTable, df: pd.DataFrame, last_record_filters):
         # format data
@@ -106,7 +114,7 @@ class ClickHouseManager:
         lastet_record_time = self.get_latest_record_time(table, last_record_filters)
         if lastet_record_time is not None:
             df = df[df["datetime"] > lastet_record_time]
-            #df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
+            # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         df.drop_duplicates(inplace=True)
         rows = df.to_sql(
             table.__tablename__, self.engine, index=False, if_exists="append"

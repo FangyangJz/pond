@@ -17,7 +17,7 @@ class TsTable(Base):
     code = Column(types.String, comment="代码")
 
     def format_dataframe(self, df: pd.DataFrame):
-        all_cols =[]
+        all_cols = []
         columns = {}
         for column in self.__dict__[
             "_sa_instance_state"
@@ -40,3 +40,15 @@ class TsTable(Base):
             return series.astype("int")
         else:
             return series.astype("Float64")
+
+    def get_colcom_names(self):
+        """
+        return column-comment dict
+        """
+        ret_dict = {}
+        for column in self.__dict__[
+            "_sa_instance_state"
+        ].class_.__table__.columns._all_columns:
+            col: Column = column
+            ret_dict[col.name] = col.comment
+        return ret_dict
