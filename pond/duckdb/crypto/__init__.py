@@ -163,6 +163,7 @@ class CryptoDB(DuckDB):
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
+        ignore_cache=False,
     ):
         from pond.duckdb.crypto.const import kline_schema
         from pond.duckdb.crypto.future import get_supply_df
@@ -217,7 +218,7 @@ class CryptoDB(DuckDB):
                 )
                 continue
 
-            if symbol in exist_files:
+            if symbol in exist_files and not ignore_cache:
                 logger.warning(f"{symbol} is existed, skip download.")
                 continue
 
@@ -368,8 +369,8 @@ if __name__ == "__main__":
     def try_update_data(interval) -> bool:
         try:
             db.update_history_data(
-                start="2020-1-1",
-                end="2024-3-15",
+                start="2024-3-1",
+                end="2024-4-16",
                 asset_type=AssetType.future_um,
                 data_type=DataType.klines,
                 timeframe=interval,
@@ -378,6 +379,7 @@ if __name__ == "__main__":
                     "http": "127.0.0.1:7890",
                     "https": "127.0.0.1:7890",
                 },
+                ignore_cache=True,
             )
         except BaseException as e:
             print(e)
