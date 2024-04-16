@@ -10,7 +10,7 @@ from tqdm import tqdm
 from loguru import logger
 from dateutil import parser, tz
 from httpx._types import ProxiesTypes
-
+from datetime import datetime
 from binance.spot import Spot
 from binance.cm_futures import CMFutures
 from binance.um_futures import UMFutures
@@ -207,7 +207,7 @@ class CryptoDB(DuckDB):
             )
             threads.append(t)
             t.start()
-        for t in threads():
+        for t in threads:
             t.join()
 
     def update_history_data(
@@ -223,14 +223,6 @@ class CryptoDB(DuckDB):
         skip_symbols: list[str] = [],
         ignore_cache=False,
     ):
-        from pond.duckdb.crypto.const import kline_schema
-        from pond.duckdb.crypto.future import get_supply_df
-        from pond.binance_history.utils import (
-            get_urls_by_xml_parse,
-            load_data_from_disk,
-        )
-        from pond.binance_history.async_api import start_async_download_files
-
         assert isinstance(asset_type, AssetType)
         assert isinstance(data_type, DataType)
 
@@ -268,95 +260,121 @@ class CryptoDB(DuckDB):
 
             if symbol in skip_symbols:
                 continue
+            df = self.load_history_data(
+                symbol,
+                _start,
+                _end,
+                asset_type,
+                data_type,
+                timeframe,
+                httpx_proxies,
+                requests_proxies,
+            )
+            if len(df) == 0:
+                logger.warning(f"{symbol} load df is empty.")
+            df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
 
             pbar.set_description_str(f"Total {total_len}", refresh=False)
             pbar.set_postfix_str(
                 f"{symbol}, download {timeframe} {asset_type.value} data from {_start} -> {_end} ..."
             )
 
-            load_urls, download_urls = get_urls_by_xml_parse(
-                data_type=data_type,
-                asset_type=asset_type,
-                symbol=symbol,
-                start=_start,
-                end=_end,
-                timeframe=timeframe,
-                file_path=self.path_crypto,
-                proxies=requests_proxies,
+    def load_history_data(
+        self,
+        symbol,
+        start: datetime,
+        end: datetime,
+        asset_type: AssetType = AssetType.future_um,
+        data_type: DataType = DataType.klines,
+        timeframe: TIMEFRAMES = "1m",
+        httpx_proxies: ProxiesTypes = {},
+        requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
+    ) -> pl.DataFrame:
+        from pond.binance_history.utils import (
+            get_urls_by_xml_parse,
+            load_data_from_disk,
+        )
+        from pond.binance_history.async_api import start_async_download_files
+        from pond.duckdb.crypto.const import kline_schema
+        from pond.duckdb.crypto.future import get_supply_df
+
+        load_urls, download_urls = get_urls_by_xml_parse(
+            data_type=data_type,
+            asset_type=asset_type,
+            symbol=symbol,
+            start=start,
+            end=end,
+            timeframe=timeframe,
+            file_path=self.path_crypto,
+            proxies=requests_proxies,
+        )
+
+        start_async_download_files(
+            download_urls, self.path_crypto, proxies=httpx_proxies
+        )
+
+        df_list = []
+        for url in load_urls:
+            df = load_data_from_disk(
+                url,
+                self.path_crypto,
+                dtypes=kline_schema,
+            )
+            if df is not None:
+                df_list.append(df)
+
+        if df_list:
+            df = pl.concat(df_list)
+            df = self.filter_quote_volume_0(df, symbol, timeframe)
+            df = (
+                df.sort("open_time").with_columns(
+                    (pl.col("open_time").diff() - pl.col("open_time").diff().shift(-1))
+                    .fill_null(0)
+                    .alias("open_time_diff"),
+                )
+                # for debug
+                # .with_columns((pl.col("open_time") * 1e3).cast(pl.Datetime))
+                # .to_pandas()
             )
 
-            start_async_download_files(
-                download_urls, self.path_crypto, proxies=httpx_proxies
+            lack_df = df.filter(pl.col("open_time_diff") != 0).select(
+                ["open_time", "close_time"]
             )
-
-            df_list = []
-            for url in load_urls:
-                df = load_data_from_disk(
-                    url,
-                    self.path_crypto,
-                    dtypes=kline_schema,
-                )
-
-                if df is not None:
-                    df_list.append(df)
-
-            if df_list:
-                df = pl.concat(df_list)
-                df = self.filter_quote_volume_0(df, symbol, timeframe)
-                df = (
-                    df.sort("open_time").with_columns(
-                        (
-                            pl.col("open_time").diff()
-                            - pl.col("open_time").diff().shift(-1)
-                        )
-                        .fill_null(0)
-                        .alias("open_time_diff"),
+            if len(lack_df) > 0:
+                if len(lack_df) % 2 != 0:
+                    lack_df = pl.concat(
+                        [lack_df, df.select(["open_time", "close_time"])[-1]]
                     )
-                    # for debug
-                    # .with_columns((pl.col("open_time") * 1e3).cast(pl.Datetime))
-                    # .to_pandas()
+
+                supply_df = get_supply_df(
+                    client=self.get_client(asset_type, requests_proxies),
+                    lack_df=lack_df,
+                    symbol=symbol,
+                    interval=timeframe,
                 )
-
-                lack_df = df.filter(pl.col("open_time_diff") != 0).select(
-                    ["open_time", "close_time"]
-                )
-                if len(lack_df) > 0:
-                    if len(lack_df) % 2 != 0:
-                        lack_df = pl.concat(
-                            [lack_df, df.select(["open_time", "close_time"])[-1]]
-                        )
-
-                    supply_df = get_supply_df(
-                        client=self.get_client(asset_type, requests_proxies),
-                        lack_df=lack_df,
-                        symbol=symbol,
-                        interval=timeframe,
-                    )
-                    supply_df = self.filter_quote_volume_0(supply_df, symbol, timeframe)
-                    df = pl.concat([df.select(pl.exclude("open_time_diff")), supply_df])
-                else:
-                    df = df.select(pl.exclude("open_time_diff"))
-
-                df = (
-                    df.select(pl.exclude("ignore"))
-                    .with_columns(
-                        (pl.col("open_time") * 1e3).cast(pl.Datetime),
-                        (pl.col("close_time") * 1e3).cast(pl.Datetime),
-                        jj_code=pl.lit(symbol),
-                    )
-                    .sort("open_time")
-                    .unique(maintain_order=True)
-                )
-
-                logger.success(
-                    f"[{symbol}] Dataframe shape: {df.shape}, {df['open_time'].min()} -> {df['close_time'].max()}."
-                )
-
-                df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
+                supply_df = self.filter_quote_volume_0(supply_df, symbol, timeframe)
+                df = pl.concat([df.select(pl.exclude("open_time_diff")), supply_df])
             else:
-                df = pl.DataFrame({}, schema=kline_schema).select(pl.exclude("ignore"))
-                df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
-                logger.warning(f"{symbol} load df is empty.")
+                df = df.select(pl.exclude("open_time_diff"))
+
+            df = (
+                df.select(pl.exclude("ignore"))
+                .with_columns(
+                    (pl.col("open_time") * 1e3).cast(pl.Datetime),
+                    (pl.col("close_time") * 1e3).cast(pl.Datetime),
+                    jj_code=pl.lit(symbol),
+                )
+                .sort("open_time")
+                .unique(maintain_order=True)
+            )
+
+            logger.success(
+                f"[{symbol}] Dataframe shape: {df.shape}, {df['open_time'].min()} -> {df['close_time'].max()}."
+            )
+
+        else:
+            df = pl.DataFrame({}, schema=kline_schema).select(pl.exclude("ignore"))
+        return df
 
     def update_crypto_trades(self):
         trades_list = [f.stem for f in self.path_crypto_trades.iterdir()]
@@ -413,7 +431,7 @@ if __name__ == "__main__":
     def try_update_data(interval) -> bool:
         try:
             db.update_history_data_parallel(
-                start="2024-3-1",
+                start="2022-1-1",
                 end="2024-4-16",
                 asset_type=AssetType.future_um,
                 data_type=DataType.klines,
@@ -424,7 +442,7 @@ if __name__ == "__main__":
                     "https": "127.0.0.1:7890",
                 },
                 ignore_cache=True,
-                workers=20,
+                workers=1,
             )
         except BaseException as e:
             print(e)

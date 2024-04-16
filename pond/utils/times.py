@@ -34,6 +34,15 @@ def datestr(date: datetime, spliter=""):
     return date.date().isoformat().replace("-", spliter)
 
 
+def timeframe2minutes(tf: str):
+    if tf.endswith("m"):
+        return int(tf[:-1])
+    if tf.endswith("h"):
+        return int(tf[:-1]) * 60
+    if tf.endswith("d"):
+        return int(tf[:-1]) * 60 * 24
+
+
 def timeit_function_wrapper(func):
     @wraps(func)  # --> 4
     def clocked(*args, **kwargs):  # -- 1
