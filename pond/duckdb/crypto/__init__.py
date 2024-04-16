@@ -373,7 +373,11 @@ class CryptoDB(DuckDB):
             )
 
         else:
-            df = pl.DataFrame({}, schema=kline_schema).select(pl.exclude("ignore"))
+            df = (
+                pl.DataFrame({}, schema=kline_schema)
+                .with_columns(jj_code=pl.lit(symbol))
+                .select(pl.exclude("ignore"))
+            )
         return df
 
     def update_crypto_trades(self):
