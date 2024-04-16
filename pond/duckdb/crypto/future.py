@@ -26,14 +26,10 @@ def get_future_info_df(client: CMFutures | UMFutures | Spot) -> pd.DataFrame:
     ).replace(tzinfo=dt.timezone.utc)
     if not isinstance(client, Spot):
         df["deliveryDate"] = df["deliveryDate"].apply(
-            lambda x: dt.datetime.utcfromtimestamp(x / 1000).replace(
-                tzinfo=dt.timezone.utc
-            )
+            lambda x: dt.datetime.fromtimestamp(x / 1000, dt.timezone.utc)
         )
         df["onboardDate"] = df["onboardDate"].apply(
-            lambda x: dt.datetime.utcfromtimestamp(x / 1000).replace(
-                tzinfo=dt.timezone.utc
-            )
+            lambda x: dt.datetime.fromtimestamp(x / 1000, tz=dt.timezone.utc)
         )
     return df
 
@@ -84,8 +80,8 @@ def get_supply_df(
         end = lack_df["open_time"][i + 1]
         logger.info(
             f"[{symbol}] Supplement missing {interval} data: "
-            f"{dt.datetime.utcfromtimestamp(start/1e3)} -> "
-            f"{dt.datetime.utcfromtimestamp(end/1e3)}"
+            f"{dt.datetime.fromtimestamp(start/1e3, dt.timezone.utc)} -> "
+            f"{dt.datetime.fromtimestamp(end/1e3, dt.timezone.utc)}"
         )
 
         t = threading.Thread(
