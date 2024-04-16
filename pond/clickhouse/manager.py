@@ -17,8 +17,9 @@ from typing import List
 from pond.akshare.stock import get_all_stocks_df
 from pond.clickhouse.kline import KlineDailyNFQ, stock_zh_a_hist
 from sqlalchemy import create_engine, desc
-
+import polars as pl
 from clickhouse_sqlalchemy import make_session
+import datetime as dtm
 
 
 class Task:
@@ -40,7 +41,7 @@ class ClickHouseManager:
 
     def get_engin(self):
         return self.engine
-    
+
     def get_session(self):
         return self.session
 
@@ -82,16 +83,52 @@ class ClickHouseManager:
                 final_df["时间"] = date
                 self.save_to_db(task.table, final_df)
 
-    def save_to_db(self, table: TsTable, df: pd.DataFrame):
+    def read_table(
+        self,
+        table: TsTable,
+        start_date: datetime,
+        end_date: datetime,
+        filters=None,
+        rename=False,
+    ) -> pl.DataFrame:
+        query = self.session.query(table)
+        if start_date is not None:
+            query = query.filter(table.datetime >= start_date)
+        if end_date is not None:
+            query = query.filter(table.datetime <= end_date)
+        if filters is not None:
+            if not isinstance(filters, list):
+                filters = [filters]
+            for f in filters:
+                query = query.filter(f)
+        df = pl.read_database(query.statement, self.session.connection())
+        if rename:
+            df = df.rename(table().get_colcom_names())
+        return df
+
+    def a(self):
+        self.session.query(KlineDailyNFQ).filter(KlineDailyNFQ.code.in_)
+
+    def save_to_db(self, table: TsTable, df: pd.DataFrame, last_record_filters):
+        # format data
         df = table().format_dataframe(df)
-        record = (
-            self.session.query(table)
-            .order_by(desc(table.datetime))
-            .limit(1)
-            .one_or_none()
-        )
-        if record is not None:
-            df = df[df["datetime"] > record.datetime]
+        lastet_record_time = self.get_latest_record_time(table, last_record_filters)
+        if lastet_record_time is not None:
+            tz = None
+            try:
+                tz = getattr(df.dtypes["datetime"], "tz")
+                if lastet_record_time.tzinfo is None:
+                    lastet_record_time = lastet_record_time.replace(
+                        tzinfo=dtm.timezone.utc
+                    ).astimezone(tz)
+                else:
+                    lastet_record_time = lastet_record_time.astimezone(tz)
+            except Exception:
+                lastet_record_time = lastet_record_time.astimezone(tz).replace(
+                    tzinfo=None
+                )
+            df = df[df["datetime"] > lastet_record_time]
+            # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         df.drop_duplicates(inplace=True)
         rows = df.to_sql(
             table.__tablename__, self.engine, index=False, if_exists="append"
@@ -104,7 +141,7 @@ class ClickHouseManager:
 
         # kline daily hfq
         stock_basic = get_all_stocks_df()
-        begin = self.get_cache_date(KlineDailyNFQ)
+        begin = self.get_latest_record_time(KlineDailyNFQ)
         kline_nfq_daily_args = []
         for symbol in stock_basic["代码"]:
             kline_nfq_daily_args.append(
@@ -118,7 +155,7 @@ class ClickHouseManager:
             )
         tasks.append(Task(KlineDailyNFQ, stock_zh_a_hist, kline_nfq_daily_args))
         return tasks
-    
+
         # free hoding detail
         tasks.append(
             Task(FreeHoldingDetail, ak.stock_gdfx_free_holding_detail_em, [args])
@@ -161,7 +198,7 @@ class ClickHouseManager:
         )
 
         # restricted release detail
-        begin = self.get_cache_date(StockRestrictedReleaseDetail)
+        begin = self.get_latest_record_time(StockRestrictedReleaseDetail)
         restricted_release_detail_args = {
             "start_date": datestr(begin),
             "end_date": datestr(date),
@@ -175,13 +212,14 @@ class ClickHouseManager:
         )
         return tasks
 
-    def get_cache_date(self, table: TsTable):
-        record = (
-            self.session.query(table)
-            .order_by(desc(table.datetime))
-            .limit(1)
-            .one_or_none()
-        )
+    def get_latest_record_time(self, table: TsTable, filters=None):
+        query = self.session.query(table)
+        if filters is not None:
+            if not isinstance(filters, list):
+                filters = [filters]
+            for f in filters:
+                query = query.filter(f)
+        record = query.order_by(desc(table.datetime)).limit(1).one_or_none()
         if record is not None:
             begin = record.datetime
         else:
