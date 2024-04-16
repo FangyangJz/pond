@@ -19,6 +19,7 @@ from pond.clickhouse.kline import KlineDailyNFQ, stock_zh_a_hist
 from sqlalchemy import create_engine, desc
 import polars as pl
 from clickhouse_sqlalchemy import make_session
+import datetime as dtm
 
 
 class Task:
@@ -113,6 +114,19 @@ class ClickHouseManager:
         df = table().format_dataframe(df)
         lastet_record_time = self.get_latest_record_time(table, last_record_filters)
         if lastet_record_time is not None:
+            tz = None
+            try:
+                tz = getattr(df.dtypes["datetime"], "tz")
+                if lastet_record_time.tzinfo is None:
+                    lastet_record_time = lastet_record_time.replace(
+                        tzinfo=dtm.timezone.utc
+                    ).astimezone(tz)
+                else:
+                    lastet_record_time = lastet_record_time.astimezone(tz)
+            except Exception:
+                lastet_record_time = lastet_record_time.astimezone(tz).replace(
+                    tzinfo=None
+                )
             df = df[df["datetime"] > lastet_record_time]
             # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         df.drop_duplicates(inplace=True)
