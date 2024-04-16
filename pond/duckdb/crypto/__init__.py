@@ -153,8 +153,66 @@ class CryptoDB(DuckDB):
 
         return df
 
+    def update_history_data_parallel(
+        self,
+        start: str = "2023-1-1",
+        end: str = "2023-11-1",
+        asset_type: AssetType = AssetType.future_um,
+        data_type: DataType = DataType.klines,
+        timeframe: TIMEFRAMES = "1m",
+        httpx_proxies: ProxiesTypes = {},
+        requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
+        skip_symbols: list[str] = [],
+        ignore_cache=False,
+        workers=None,
+    ):
+        from threading import Thread
+        import math
+        import os
+
+        if workers is None:
+            workers = int(os.cpu_count() / 2)
+
+        df = self.get_future_info(asset_type)
+        if self.is_future_type(asset_type):
+            df = df[df["contractType"] == "PERPETUAL"][
+                [
+                    "symbol",
+                    "contractType",
+                    "deliveryDate",
+                    "onboardDate",
+                    "update_datetime",
+                ]
+            ]
+        else:
+            df = df[["symbol"]]
+
+        task_size = math.ceil(len(df) / workers)
+        threads = []
+        for i in range(workers):
+            t = Thread(
+                target=self.update_history_data,
+                args=(
+                    df[i * task_size : (i + 1) * task_size],
+                    start,
+                    end,
+                    asset_type,
+                    data_type,
+                    timeframe,
+                    httpx_proxies,
+                    requests_proxies,
+                    skip_symbols,
+                    ignore_cache,
+                ),
+            )
+            threads.append(t)
+            t.start()
+        for t in threads():
+            t.join()
+
     def update_history_data(
         self,
+        asset_info_df: pd.DataFrame,
         start: str = "2023-1-1",
         end: str = "2023-11-1",
         asset_type: AssetType = AssetType.future_um,
@@ -176,28 +234,14 @@ class CryptoDB(DuckDB):
         assert isinstance(asset_type, AssetType)
         assert isinstance(data_type, DataType)
 
-        df = self.get_future_info(asset_type)
-        if self.is_future_type(asset_type):
-            df = df[df["contractType"] == "PERPETUAL"][
-                [
-                    "symbol",
-                    "contractType",
-                    "deliveryDate",
-                    "onboardDate",
-                    "update_datetime",
-                ]
-            ]
-        else:
-            df = df[["symbol"]]
-
         base_path = self.get_base_path(asset_type, data_type)
         exist_files = [f.stem for f in (base_path / timeframe).glob("*.parquet")]
 
         input_start = parser.parse(start).replace(tzinfo=tz.tzutc())
         input_end = parser.parse(end).replace(tzinfo=tz.tzutc())
-        total_len = len(df)
+        total_len = len(asset_info_df)
 
-        for idx, row in (pbar := tqdm(df.iterrows())):
+        for idx, row in (pbar := tqdm(asset_info_df.iterrows())):
             symbol = row["symbol"]
 
             if self.is_future_type(asset_type):
@@ -368,7 +412,7 @@ if __name__ == "__main__":
 
     def try_update_data(interval) -> bool:
         try:
-            db.update_history_data(
+            db.update_history_data_parallel(
                 start="2024-3-1",
                 end="2024-4-16",
                 asset_type=AssetType.future_um,
@@ -380,6 +424,7 @@ if __name__ == "__main__":
                     "https": "127.0.0.1:7890",
                 },
                 ignore_cache=True,
+                workers=20,
             )
         except BaseException as e:
             print(e)
@@ -393,7 +438,7 @@ if __name__ == "__main__":
     while not complete:
         complete = try_update_data(interval)
         retry += 1
-        if retry < 100:
+        if retry < 1:
             continue
         else:
             break
