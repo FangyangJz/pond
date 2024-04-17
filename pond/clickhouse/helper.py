@@ -1,5 +1,6 @@
 from pond.clickhouse.manager import ClickHouseManager
 from typing import Optional
+import datetime as dtm
 from datetime import datetime
 from binance.um_futures import UMFutures
 from pond.clickhouse.kline import FuturesKline1H
@@ -54,34 +55,48 @@ class FuturesHelper:
         pass
 
     def sync_futures_kline(self, interval) -> bool:
-        signal = datetime.now()
+        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
         table = self.get_futures_table(interval)
         if table is None:
             return
         data_limit = 720  # 1 month, max 1000
         error_count = 0
+        interval_seconds = timeframe2minutes(interval) * 60
+        limit_seconds = data_limit * timeframe2minutes(interval) * 60
+
         for symbol in tqdm(self.get_perpetual_symbols(signal)):
             code = symbol["pair"]
             lastest_record = self.clickhouse.get_latest_record_time(
                 table, table.code == code
             )
-            limit_seconds = data_limit * 60 * timeframe2minutes(interval)
-            if (signal - lastest_record).total_seconds() > limit_seconds:
+            data_duration_seconds = (signal - lastest_record).total_seconds()
+
+            # load history data and save into db
+            if data_duration_seconds > limit_seconds:
                 local_klines_df = self.crypto_db.load_history_data(
                     code, lastest_record, signal, timeframe=interval, **self.configs
                 )
                 self.clickhouse.save_to_db(
                     table, local_klines_df.to_pandas(), table.code == code
                 )
+                # refresh data duration
                 lastest_record = self.clickhouse.get_latest_record_time(
                     table, table.code == code
                 )
-                if (signal - lastest_record).seconds > limit_seconds:
-                    error_count += 1
-                    logger.warning(
-                        f"futures helper sync kline ignore too long period {lastest_record}-{signal}"
-                    )
-                    continue
+                data_duration_seconds = (signal - lastest_record).total_seconds()
+
+            # check data duration
+            if data_duration_seconds > limit_seconds:
+                error_count += 1
+                logger.warning(
+                    f"futures helper sync kline ignore too long duration {lastest_record}-{signal}"
+                )
+                continue
+            if data_duration_seconds < interval_seconds:
+                logger.debug(
+                    f"futures helper sync kline ignore too short duration {lastest_record}-{signal}"
+                )
+                continue
 
             startTime = datetime2utctimestamp_milli(lastest_record)
             klines_list = self.exchange.continuous_klines(
