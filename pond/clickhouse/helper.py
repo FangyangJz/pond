@@ -51,8 +51,23 @@ class FuturesHelper:
             return FuturesKline1H
         return None
 
-    def sync_futures_historic_kline(self, pair, interval, start, end):
-        pass
+    def gen_stub_kline_as_list(self, start: datetime, end: datetime):
+        open_time_mill = datetime2utctimestamp_milli(start)
+        close_time_mill = datetime2utctimestamp_milli(end)
+        stub_list = [
+            open_time_mill,
+            0,
+            0,
+            0,
+            0,
+            0,
+            close_time_mill,
+            0,
+            0,
+            0,
+            0,
+        ]
+        return stub_list
 
     def sync_futures_kline(self, interval) -> bool:
         signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
@@ -60,7 +75,6 @@ class FuturesHelper:
         if table is None:
             return
         data_limit = 720  # 1 month, max 1000
-        error_count = 0
         interval_seconds = timeframe2minutes(interval) * 60
         limit_seconds = data_limit * timeframe2minutes(interval) * 60
 
@@ -85,13 +99,6 @@ class FuturesHelper:
                 )
                 data_duration_seconds = (signal - lastest_record).total_seconds()
 
-            # check data duration
-            if data_duration_seconds > limit_seconds:
-                error_count += 1
-                logger.warning(
-                    f"futures helper sync kline ignore too long duration {lastest_record}-{signal}"
-                )
-                continue
             if data_duration_seconds < interval_seconds:
                 logger.debug(
                     f"futures helper sync kline ignore too short duration {lastest_record}-{signal}"
@@ -106,6 +113,9 @@ class FuturesHelper:
                 startTime=startTime,
                 limit=1000,
             )
+            if not klines_list:
+                # generate stub kline to mark latest sync time.
+                klines_list = [self.gen_stub_kline_as_list(lastest_record, signal)]
             cols = list(table().get_colcom_names().values())[1:] + ["stub"]
             klines_df = pd.DataFrame(klines_list, columns=cols)
             klines_df["code"] = code
@@ -116,7 +126,8 @@ class FuturesHelper:
                 utcstamp_mill2datetime
             )
             self.clickhouse.save_to_db(table, klines_df, table.code == code)
-        return error_count == 0
+
+        return True
 
 
 if __name__ == "__main__":
