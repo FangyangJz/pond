@@ -21,9 +21,9 @@ from pond.binance_history.type import TIMEFRAMES
 def get_future_info_df(client: CMFutures | UMFutures | Spot) -> pd.DataFrame:
     info = client.exchange_info()
     df = pd.DataFrame.from_records(info["symbols"])
-    df["update_datetime"] = dt.datetime.utcfromtimestamp(
-        info["serverTime"] / 1000
-    ).replace(tzinfo=dt.timezone.utc)
+    df["update_datetime"] = dt.datetime.fromtimestamp(
+        info["serverTime"] / 1000, dt.timezone.utc
+    )
     if not isinstance(client, Spot):
         df["deliveryDate"] = df["deliveryDate"].apply(
             lambda x: dt.datetime.fromtimestamp(x / 1000, dt.timezone.utc)
