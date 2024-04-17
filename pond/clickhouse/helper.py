@@ -1,10 +1,13 @@
+import os
+import math
 from pond.clickhouse.manager import ClickHouseManager
 from typing import Optional
 import datetime as dtm
 from datetime import datetime
 from binance.um_futures import UMFutures
 from pond.clickhouse.kline import FuturesKline1H
-from tqdm import tqdm
+from threading import Thread
+import threading
 import pandas as pd
 from loguru import logger
 from pathlib import Path
@@ -69,16 +72,42 @@ class FuturesHelper:
         ]
         return stub_list
 
-    def sync_futures_kline(self, interval) -> bool:
-        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+    def sync_futures_kline(self, interval, workers=None) -> bool:
         table = self.get_futures_table(interval)
         if table is None:
-            return
-        data_limit = 720  # 1 month, max 1000
-        interval_seconds = timeframe2minutes(interval) * 60
-        limit_seconds = data_limit * timeframe2minutes(interval) * 60
+            return False
+        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        if workers is None:
+            workers = math.ceil(os.cpu_count() / 2)
+        symbols = self.get_perpetual_symbols(signal)
+        task_counts = math.ceil(len(symbols) / workers)
+        res_dict = {}
+        threads = []
+        for i in range(0, workers):
+            worker_symbols = symbols[i * task_counts : (i + 1) * task_counts]
+            worker = Thread(
+                target=self.__sync_futures_kline,
+                args=(signal, table, worker_symbols, interval, res_dict),
+            )
+            worker.start()
+            threads.append(worker)
 
-        for symbol in tqdm(self.get_perpetual_symbols(signal)):
+        [t.join() for t in threads]
+
+        for tid in res_dict.keys():
+            if not res_dict[tid]:
+                # return false if any thread failed.
+                return False
+        return True
+
+    def __sync_futures_kline(self, signal, table, symbols, interval, res_dict: dict):
+        tid = threading.current_thread().ident
+        res_dict[tid] = False
+        interval_seconds = timeframe2minutes(interval) * 60
+        data_limit = 720  # 1 month, max 1000
+        limit_seconds = data_limit * timeframe2minutes(interval) * 60
+        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        for symbol in symbols:
             code = symbol["pair"]
             lastest_record = self.clickhouse.get_latest_record_time(
                 table, table.code == code
@@ -126,8 +155,7 @@ class FuturesHelper:
                 utcstamp_mill2datetime
             )
             self.clickhouse.save_to_db(table, klines_df, table.code == code)
-
-        return True
+        res_dict[tid] = True
 
 
 if __name__ == "__main__":
