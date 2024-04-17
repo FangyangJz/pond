@@ -105,7 +105,7 @@ class FuturesHelper:
                 )
                 continue
 
-            startTime = datetime2utctimestamp_milli(lastest_record)
+            startTime = datetime2utctimestamp_milli(signal) - limit_seconds * 1000
             klines_list = self.exchange.continuous_klines(
                 code,
                 "PERPETUAL",
