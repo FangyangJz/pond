@@ -213,6 +213,7 @@ class ClickHouseManager:
         return tasks
 
     def get_latest_record_time(self, table: TsTable, filters=None):
+        self.session.commit()
         query = self.session.query(table)
         if filters is not None:
             if not isinstance(filters, list):
