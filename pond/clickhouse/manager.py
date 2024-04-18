@@ -127,6 +127,7 @@ class ClickHouseManager:
                 lastet_record_time = lastet_record_time.astimezone(tz).replace(
                     tzinfo=None
                 )
+            df["datetime"] = df["datetime"].dt.floor(freq="1s")
             df = df[df["datetime"] > lastet_record_time]
             # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         df.drop_duplicates(inplace=True)
