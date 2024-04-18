@@ -154,6 +154,10 @@ class FuturesHelper:
             klines_df["close_time"] = klines_df["close_time"].apply(
                 utcstamp_mill2datetime
             )
+            klines_df = klines_df[
+                klines_df["close_time"] <= datetime.now(tz=dtm.timezone.utc)
+            ]
+            klines_df = klines_df.drop_duplicates(subset=["close_time"])
             self.clickhouse.save_to_db(table, klines_df, table.code == code)
         res_dict[tid] = True
 
