@@ -106,9 +106,6 @@ class ClickHouseManager:
             df = df.rename(table().get_colcom_names())
         return df
 
-    def a(self):
-        self.session.query(KlineDailyNFQ).filter(KlineDailyNFQ.code.in_)
-
     def save_to_db(self, table: TsTable, df: pd.DataFrame, last_record_filters):
         # format data
         df = table().format_dataframe(df)
