@@ -18,7 +18,7 @@ from pond.akshare.stock import get_all_stocks_df
 from pond.clickhouse.kline import KlineDailyNFQ, stock_zh_a_hist
 from sqlalchemy import create_engine, desc
 import polars as pl
-from clickhouse_sqlalchemy import make_session
+from sqlalchemy.orm import Session
 import datetime as dtm
 
 
@@ -36,27 +36,18 @@ class ClickHouseManager:
     def __init__(self, db_uri, data_start: datetime) -> None:
         self.engine = create_engine(db_uri)
         metadata.create_all(self.engine)
-        self.session = make_session(self.engine)
         self.data_start = data_start
 
     def get_engin(self):
         return self.engine
-
-    def get_session(self):
-        return self.session
 
     def sync(self, date=datetime.now()):
         print(f"click house manager syncing at {date.isoformat()}")
         tasks = self.get_syncing_tasks(date)
         max_dowloader_size = int(os.cpu_count() / len(tasks)) + 1
         for task in tasks:
-            record = (
-                self.session.query(task.table)
-                .order_by(desc(task.table.datetime))
-                .limit(1)
-                .one_or_none()
-            )
-            if record is not None and record.datetime >= date:
+            latest_record_time = self.get_latest_record_time(task.table)
+            if latest_record_time >= date:
                 continue
             for i in range(len(task.arg_groups)):
                 kwargs = task.arg_groups[i]
@@ -91,19 +82,20 @@ class ClickHouseManager:
         filters=None,
         rename=False,
     ) -> pl.DataFrame:
-        query = self.session.query(table)
-        if start_date is not None:
-            query = query.filter(table.datetime >= start_date)
-        if end_date is not None:
-            query = query.filter(table.datetime <= end_date)
-        if filters is not None:
-            if not isinstance(filters, list):
-                filters = [filters]
-            for f in filters:
-                query = query.filter(f)
-        df = pl.read_database(query.statement, self.session.connection())
-        if rename:
-            df = df.rename(table().get_colcom_names())
+        with Session(self.engine) as session:
+            query = session.query(table)
+            if start_date is not None:
+                query = query.filter(table.datetime >= start_date)
+            if end_date is not None:
+                query = query.filter(table.datetime <= end_date)
+            if filters is not None:
+                if not isinstance(filters, list):
+                    filters = [filters]
+                for f in filters:
+                    query = query.filter(f)
+            df = pl.read_database(query.statement, session.connection())
+            if rename:
+                df = df.rename(table().get_colcom_names())
         return df
 
     def save_to_db(self, table: TsTable, df: pd.DataFrame, last_record_filters):
@@ -128,9 +120,8 @@ class ClickHouseManager:
             df = df[df["datetime"] > lastet_record_time]
             # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         df.drop_duplicates(inplace=True)
-        rows = df.to_sql(
-            table.__tablename__, self.engine, index=False, if_exists="append"
-        )
+        with self.engine.connect() as conn:
+            rows = df.to_sql(table.__tablename__, conn, index=False, if_exists="append")
         print(f"total {rows} saved {len(df)} into table {table.__tablename__}")
 
     def get_syncing_tasks(self, date) -> List[Task]:
@@ -211,14 +202,14 @@ class ClickHouseManager:
         return tasks
 
     def get_latest_record_time(self, table: TsTable, filters=None):
-        self.session.commit()
-        query = self.session.query(table)
-        if filters is not None:
-            if not isinstance(filters, list):
-                filters = [filters]
-            for f in filters:
-                query = query.filter(f)
-        record = query.order_by(desc(table.datetime)).limit(1).one_or_none()
+        with Session(self.engine) as session:
+            query = session.query(table)
+            if filters is not None:
+                if not isinstance(filters, list):
+                    filters = [filters]
+                for f in filters:
+                    query = query.filter(f)
+            record = query.order_by(desc(table.datetime)).limit(1).one_or_none()
         if record is not None:
             begin = record.datetime
         else:
