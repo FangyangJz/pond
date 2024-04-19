@@ -11,6 +11,7 @@ import threading
 import pandas as pd
 from loguru import logger
 from pathlib import Path
+from datetime import timedelta
 from pond.duckdb.crypto import CryptoDB
 from pond.utils.times import (
     datetime2utctimestamp_milli,
@@ -98,6 +99,25 @@ class FuturesHelper:
             if not res_dict[tid]:
                 # return false if any thread failed.
                 return False
+
+        request_count = len(symbols)
+        latest_kline_df = self.clickhouse.read_table(
+            table,
+            signal - timedelta(minutes=timeframe2minutes(interval) * 2),
+            signal,
+            filters=None,
+            rename=True,
+        )
+        if len(latest_kline_df) == 0:
+            return False
+        lastest_count = (
+            latest_kline_df.group_by("close_time")
+            .count()
+            .sort("close_time")[-1, "count"]
+        )
+        # current about 300 futues, allow 5 target kline missing.
+        if lastest_count / request_count < 0.98:
+            return False
         return True
 
     def __sync_futures_kline(self, signal, table, symbols, interval, res_dict: dict):
