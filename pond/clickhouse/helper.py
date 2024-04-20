@@ -1,12 +1,17 @@
+import os
+import math
 from pond.clickhouse.manager import ClickHouseManager
 from typing import Optional
+import datetime as dtm
 from datetime import datetime
 from binance.um_futures import UMFutures
 from pond.clickhouse.kline import FuturesKline1H
-from tqdm import tqdm
+from threading import Thread
+import threading
 import pandas as pd
 from loguru import logger
 from pathlib import Path
+from datetime import timedelta
 from pond.duckdb.crypto import CryptoDB
 from pond.utils.times import (
     datetime2utctimestamp_milli,
@@ -50,40 +55,106 @@ class FuturesHelper:
             return FuturesKline1H
         return None
 
-    def sync_futures_historic_kline(self, pair, interval, start, end):
-        pass
+    def gen_stub_kline_as_list(self, start: datetime, end: datetime):
+        open_time_mill = datetime2utctimestamp_milli(start)
+        close_time_mill = datetime2utctimestamp_milli(end)
+        stub_list = [
+            open_time_mill,
+            0,
+            0,
+            0,
+            0,
+            0,
+            close_time_mill,
+            0,
+            0,
+            0,
+            0,
+        ]
+        return stub_list
 
-    def sync_futures_kline(self, interval) -> bool:
-        signal = datetime.now()
+    def sync_futures_kline(self, interval, workers=None) -> bool:
         table = self.get_futures_table(interval)
         if table is None:
-            return
+            return False
+        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        if workers is None:
+            workers = math.ceil(os.cpu_count() / 2)
+        symbols = self.get_perpetual_symbols(signal)
+        task_counts = math.ceil(len(symbols) / workers)
+        res_dict = {}
+        threads = []
+        for i in range(0, workers):
+            worker_symbols = symbols[i * task_counts : (i + 1) * task_counts]
+            worker = Thread(
+                target=self.__sync_futures_kline,
+                args=(signal, table, worker_symbols, interval, res_dict),
+            )
+            worker.start()
+            threads.append(worker)
+
+        [t.join() for t in threads]
+
+        for tid in res_dict.keys():
+            if not res_dict[tid]:
+                # return false if any thread failed.
+                return False
+
+        request_count = len(symbols)
+        latest_kline_df = self.clickhouse.read_table(
+            table,
+            signal - timedelta(minutes=timeframe2minutes(interval) * 2),
+            signal,
+            filters=None,
+            rename=True,
+        )
+        if len(latest_kline_df) == 0:
+            return False
+        lastest_count = (
+            latest_kline_df.group_by("close_time")
+            .count()
+            .sort("close_time")[-1, "count"]
+        )
+        # current about 300 futues, allow 5 target kline missing.
+        if lastest_count / request_count < 0.98:
+            return False
+        return True
+
+    def __sync_futures_kline(self, signal, table, symbols, interval, res_dict: dict):
+        tid = threading.current_thread().ident
+        res_dict[tid] = False
+        interval_seconds = timeframe2minutes(interval) * 60
         data_limit = 720  # 1 month, max 1000
-        error_count = 0
-        for symbol in tqdm(self.get_perpetual_symbols(signal)):
+        limit_seconds = data_limit * timeframe2minutes(interval) * 60
+        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        for symbol in symbols:
             code = symbol["pair"]
             lastest_record = self.clickhouse.get_latest_record_time(
                 table, table.code == code
             )
-            limit_seconds = data_limit * 60 * timeframe2minutes(interval)
-            if (signal - lastest_record).total_seconds() > limit_seconds:
+            data_duration_seconds = (signal - lastest_record).total_seconds()
+
+            # load history data and save into db
+            if data_duration_seconds > limit_seconds:
                 local_klines_df = self.crypto_db.load_history_data(
                     code, lastest_record, signal, timeframe=interval, **self.configs
                 )
                 self.clickhouse.save_to_db(
                     table, local_klines_df.to_pandas(), table.code == code
                 )
+                # refresh data duration
                 lastest_record = self.clickhouse.get_latest_record_time(
                     table, table.code == code
                 )
-                if (signal - lastest_record).seconds > limit_seconds:
-                    error_count += 1
-                    logger.warning(
-                        f"futures helper sync kline ignore too long period {lastest_record}-{signal}"
-                    )
-                    continue
+                data_duration_seconds = (signal - lastest_record).total_seconds()
 
-            startTime = datetime2utctimestamp_milli(lastest_record)
+            if data_duration_seconds < interval_seconds:
+                logger.debug(
+                    f"futures helper sync kline ignore too short duration {lastest_record}-{signal}"
+                )
+                continue
+
+            startTime = datetime2utctimestamp_milli(signal) - limit_seconds * 1000
             klines_list = self.exchange.continuous_klines(
                 code,
                 "PERPETUAL",
@@ -91,6 +162,9 @@ class FuturesHelper:
                 startTime=startTime,
                 limit=1000,
             )
+            if not klines_list:
+                # generate stub kline to mark latest sync time.
+                klines_list = [self.gen_stub_kline_as_list(lastest_record, signal)]
             cols = list(table().get_colcom_names().values())[1:] + ["stub"]
             klines_df = pd.DataFrame(klines_list, columns=cols)
             klines_df["code"] = code
@@ -100,8 +174,12 @@ class FuturesHelper:
             klines_df["close_time"] = klines_df["close_time"].apply(
                 utcstamp_mill2datetime
             )
+            klines_df = klines_df[
+                klines_df["close_time"] <= datetime.now(tz=dtm.timezone.utc)
+            ]
+            klines_df = klines_df.drop_duplicates(subset=["close_time"])
             self.clickhouse.save_to_db(table, klines_df, table.code == code)
-        return error_count == 0
+        res_dict[tid] = True
 
 
 if __name__ == "__main__":
