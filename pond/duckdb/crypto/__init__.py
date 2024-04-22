@@ -446,7 +446,7 @@ if __name__ == "__main__":
                     "https": "127.0.0.1:7890",
                 },
                 ignore_cache=True,
-                workers=1,
+                workers=10,
             )
         except BaseException as e:
             print(e)
