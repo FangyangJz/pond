@@ -10,7 +10,7 @@ class StockFactor(TsTable):
     code = Column(types.String, comment="jj_code")
     interval = Column(types.String, comment="interval")
     name = Column(types.String, comment="factor_name")
-    value = Column(types.Float64, comment="value")
+    value = Column(types.String, comment="value")
 
     __table_args__ = (
         engines.MergeTree(
@@ -28,7 +28,7 @@ class CryptoFactor(TsTable):
     code = Column(types.String, comment="jj_code")
     interval = Column(types.String, comment="interval")
     name = Column(types.String, comment="factor_name")
-    value = Column(types.Float64, comment="value")
+    value = Column(types.String, comment="value")
 
     __table_args__ = (
         engines.MergeTree(
@@ -46,7 +46,7 @@ class FuturesFactor(TsTable):
     code = Column(types.String, comment="jj_code")
     interval = Column(types.String, comment="interval")
     name = Column(types.String, comment="factor_name")
-    value = Column(types.Float64, comment="value")
+    value = Column(types.String, comment="value")
 
     __table_args__ = (
         engines.MergeTree(
