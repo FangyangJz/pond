@@ -119,7 +119,7 @@ class ClickHouseManager:
             df["datetime"] = df["datetime"].dt.floor(freq="1s")
             df = df[df["datetime"] > lastet_record_time]
             # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
-        df.drop_duplicates(inplace=True)
+        df.drop_duplicates(subset=["datetime", "code"], inplace=True)
         with self.engine.connect() as conn:
             rows = df.to_sql(table.__tablename__, conn, index=False, if_exists="append")
         print(f"total {rows} saved {len(df)} into table {table.__tablename__}")
