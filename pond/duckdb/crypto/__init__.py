@@ -2,7 +2,7 @@
 # @Datetime : 2023/11/9 0:09
 # @Author   : Fangyang
 # @Software : PyCharm
-
+import time
 from pathlib import Path
 import polars as pl
 import pandas as pd
@@ -203,6 +203,7 @@ class CryptoDB(DuckDB):
                     requests_proxies,
                     skip_symbols,
                     ignore_cache,
+                    i
                 ),
             )
             threads.append(t)
@@ -222,6 +223,7 @@ class CryptoDB(DuckDB):
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
         ignore_cache=False,
+        worker_id:int=0
     ):
         assert isinstance(asset_type, AssetType)
         assert isinstance(data_type, DataType)
@@ -233,7 +235,7 @@ class CryptoDB(DuckDB):
         input_end = parser.parse(end).replace(tzinfo=tz.tzutc())
         total_len = len(asset_info_df)
 
-        for idx, row in (pbar := tqdm(asset_info_df.iterrows())):
+        for idx, row in (pbar := tqdm(asset_info_df.iterrows(), position=worker_id)):
             symbol = row["symbol"]
 
             if self.is_future_type(asset_type):
@@ -274,7 +276,7 @@ class CryptoDB(DuckDB):
                 logger.warning(f"{symbol} load df is empty.")
             df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
 
-            pbar.set_description_str(f"Total {total_len}", refresh=False)
+            pbar.set_description_str(f"[Worker_{worker_id}] Total {total_len}", refresh=False)
             pbar.set_postfix_str(
                 f"{symbol}, download {timeframe} {asset_type.value} data from {_start} -> {_end} ..."
             )
@@ -435,8 +437,8 @@ if __name__ == "__main__":
     def try_update_data(interval) -> bool:
         try:
             db.update_history_data_parallel(
-                start="2022-1-1",
-                end="2024-4-16",
+                start="2020-1-1",
+                end="2024-4-22",
                 asset_type=AssetType.future_um,
                 data_type=DataType.klines,
                 timeframe=interval,
@@ -446,7 +448,7 @@ if __name__ == "__main__":
                     "https": "127.0.0.1:7890",
                 },
                 ignore_cache=True,
-                workers=1,
+                workers=12,
             )
         except BaseException as e:
             print(e)
@@ -457,6 +459,7 @@ if __name__ == "__main__":
     interval = "1h"
     complete = False
     retry = 0
+    start_time = time.perf_counter()
     while not complete:
         complete = try_update_data(interval)
         retry += 1
@@ -464,7 +467,7 @@ if __name__ == "__main__":
             continue
         else:
             break
-    print(f"complete : {complete}, retried {retry}")
+    print(f"complete: {complete}, retried: {retry}, time cost: {time.perf_counter() - start_time:.2f}s")
 
     # db.update_crypto_trades()
 

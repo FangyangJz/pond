@@ -11,10 +11,12 @@ from pathlib import Path
 from loguru import logger
 from urllib.parse import urlparse
 from httpx._types import ProxiesTypes
+from tenacity import retry, wait_fixed
 
 from pond.utils.crawler import get_mock_headers
 
 
+@retry(wait=wait_fixed(3))
 async def download_file(url: str, path: Path, proxies: ProxiesTypes = {}):
     async with httpx.AsyncClient(proxies=proxies) as client:
         response = await client.get(url, timeout=None, headers=get_mock_headers())
