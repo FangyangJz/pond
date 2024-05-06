@@ -36,7 +36,10 @@ class Freq(Enum):
 
 class DataType(Enum):
     klines = "klines"
+    trades = "trades"
     aggTrades = "aggTrades"
+    metrics = "metrics"
+    fundingRate = "fundingRate"
 
 
 class AssetType(Enum):

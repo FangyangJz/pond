@@ -20,5 +20,16 @@ kline_schema = {
     "ignore": pl.Float64,
 }
 
+metric_schema = {
+    "create_time": pl.String,
+    "symbol": pl.String,
+    "sum_open_interest": pl.Float64,  # 持仓总数量
+    "sum_open_interest_value": pl.Float64,  # 持仓总价值
+    "count_toptrader_long_short_ratio": pl.Float64,  # 大户多空比例
+    "sum_toptrader_long_short_ratio": pl.Float64,
+    "count_long_short_ratio": pl.Float64,
+    "sum_taker_long_short_vol_ratio": pl.Float64,
+}
+
 if __name__ == "__main__":
     pass
