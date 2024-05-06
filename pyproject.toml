@@ -35,7 +35,7 @@ binance-futures-connector = "^4.0.0"
 pre-commit = "*"
 ruff = "^0.3.2"
 xmltodict = "^0.13.0"
-
+deprecated = "*"
 
 [build-system]
 requires = ["poetry-core"]

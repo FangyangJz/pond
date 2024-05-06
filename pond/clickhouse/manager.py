@@ -20,6 +20,8 @@ from sqlalchemy import create_engine, desc
 import polars as pl
 from sqlalchemy.orm import Session
 import datetime as dtm
+from clickhouse_driver import Client
+from deprecated import deprecated
 
 
 class Task:
@@ -33,10 +35,11 @@ class Task:
 
 
 class ClickHouseManager:
-    def __init__(self, db_uri, data_start: datetime) -> None:
+    def __init__(self, db_uri, data_start: datetime = None, native_uri=None) -> None:
         self.engine = create_engine(db_uri)
         metadata.create_all(self.engine)
         self.data_start = data_start
+        self.client = Client.from_url(native_uri)
 
     def get_engin(self):
         return self.engine
@@ -74,6 +77,37 @@ class ClickHouseManager:
                 final_df["时间"] = date
                 self.save_to_db(task.table, final_df)
 
+    def native_read_table(
+        self,
+        table: TsTable,
+        start_date: datetime,
+        end_date: datetime,
+        filters=None,
+        params=None,
+        rename=False,
+    ) -> pd.DataFrame:
+        sql = f"select * from {table.__tablename__}"
+        query_params = {}
+        if start_date is None:
+            start_date = self.data_start
+        sql += " where datetime >= %(start)s "
+        query_params["start"] = start_date
+        if end_date is not None:
+            sql += " AND datetime <= %(end)s "
+            query_params["end"] = end_date
+        if filters is not None:
+            if not isinstance(filters, list):
+                filters = [filters]
+            for filter in filters:
+                sql += f" {filter} "
+        if params is not None:
+            query_params.update(params)
+        df = self.client.query_dataframe(query=sql, params=query_params)
+        if rename:
+            df = df.rename(columns=table().get_colcom_names())
+        return df
+
+    @deprecated("this method works quite slowly, use native read table instead.")
     def read_table(
         self,
         table: TsTable,
