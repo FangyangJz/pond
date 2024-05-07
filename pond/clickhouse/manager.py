@@ -102,6 +102,7 @@ class ClickHouseManager:
                 sql += f" {filter} "
         if params is not None:
             query_params.update(params)
+        self.client.establish_connection()
         df = self.client.query_dataframe(query=sql, params=query_params)
         if rename:
             df = df.rename(columns=table().get_colcom_names())
@@ -155,7 +156,9 @@ class ClickHouseManager:
             # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         df.drop_duplicates(subset=["datetime", "code"], inplace=True)
         query = f"INSERT INTO {table.__tablename__} (*) VALUES"
-        rows = self.client.insert_dataframe(query=query, dataframe=df)
+        rows = self.client.insert_dataframe(
+            query=query, dataframe=df, settings=dict(use_numpy=True)
+        )
         print(f"total {len(df)} saved {rows} into table {table.__tablename__}")
 
     def get_syncing_tasks(self, date) -> List[Task]:
