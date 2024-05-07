@@ -154,9 +154,9 @@ class ClickHouseManager:
             df = df[df["datetime"] > lastet_record_time]
             # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         df.drop_duplicates(subset=["datetime", "code"], inplace=True)
-        with self.engine.connect() as conn:
-            rows = df.to_sql(table.__tablename__, conn, index=False, if_exists="append")
-        print(f"total {rows} saved {len(df)} into table {table.__tablename__}")
+        query = f"INSERT INTO {table.__tablename__} (*) VALUES"
+        rows = self.client.insert_dataframe(query=query, dataframe=df)
+        print(f"total {len(df)} saved {rows} into table {table.__tablename__}")
 
     def get_syncing_tasks(self, date) -> List[Task]:
         tasks: List[Task] = []
