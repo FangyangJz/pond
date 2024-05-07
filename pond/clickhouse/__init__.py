@@ -37,9 +37,9 @@ class TsTable(Base):
         elif isinstance(col.type, types.common.DateTime64):
             return pd.to_datetime(series)
         elif isinstance(col.type, types.common.Int64):
-            return series.astype("int")
+            return series.astype(int)
         else:
-            return series.astype("Float64")
+            return series.astype(float)
 
     def get_colcom_names(self):
         """
