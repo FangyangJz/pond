@@ -39,7 +39,7 @@ class ClickHouseManager:
         self.engine = create_engine(db_uri)
         metadata.create_all(self.engine)
         self.data_start = data_start
-        self.client = Client.from_url(native_uri)
+        self.native_uri = native_uri
 
     def get_engin(self):
         return self.engine
@@ -102,8 +102,8 @@ class ClickHouseManager:
                 sql += f" {filter} "
         if params is not None:
             query_params.update(params)
-        self.client.establish_connection()
-        df = self.client.query_dataframe(query=sql, params=query_params)
+        with Client.from_url(self.native_uri) as client:
+            df = client.query_dataframe(query=sql, params=query_params)
         if rename:
             df = df.rename(columns=table().get_colcom_names())
         return df
@@ -156,10 +156,11 @@ class ClickHouseManager:
             # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         df.drop_duplicates(subset=["datetime", "code"], inplace=True)
         query = f"INSERT INTO {table.__tablename__} (*) VALUES"
-        rows = self.client.insert_dataframe(
-            query=query, dataframe=df, settings=dict(use_numpy=True)
-        )
-        print(f"total {len(df)} saved {rows} into table {table.__tablename__}")
+        with Client.from_url(self.native_uri) as client:
+            rows = client.insert_dataframe(
+                query=query, dataframe=df, settings=dict(use_numpy=True)
+            )
+            print(f"total {len(df)} saved {rows} into table {table.__tablename__}")
 
     def get_syncing_tasks(self, date) -> List[Task]:
         tasks: List[Task] = []
