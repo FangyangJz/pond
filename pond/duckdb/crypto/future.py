@@ -16,24 +16,22 @@ from binance.cm_futures import CMFutures
 from binance.um_futures import UMFutures
 from pond.duckdb.crypto.const import kline_schema
 from pond.binance_history.type import TIMEFRAMES
+from tenacity import retry, wait_fixed
 
 
+@retry(wait=wait_fixed(3))
 def get_future_info_df(client: CMFutures | UMFutures | Spot) -> pd.DataFrame:
     info = client.exchange_info()
     df = pd.DataFrame.from_records(info["symbols"])
-    df["update_datetime"] = dt.datetime.utcfromtimestamp(
-        info["serverTime"] / 1000
-    ).replace(tzinfo=dt.timezone.utc)
+    df["update_datetime"] = dt.datetime.fromtimestamp(
+        info["serverTime"] / 1000, dt.timezone.utc
+    )
     if not isinstance(client, Spot):
         df["deliveryDate"] = df["deliveryDate"].apply(
-            lambda x: dt.datetime.utcfromtimestamp(x / 1000).replace(
-                tzinfo=dt.timezone.utc
-            )
+            lambda x: dt.datetime.fromtimestamp(x / 1000, dt.timezone.utc)
         )
         df["onboardDate"] = df["onboardDate"].apply(
-            lambda x: dt.datetime.utcfromtimestamp(x / 1000).replace(
-                tzinfo=dt.timezone.utc
-            )
+            lambda x: dt.datetime.fromtimestamp(x / 1000, tz=dt.timezone.utc)
         )
     return df
 
@@ -45,6 +43,7 @@ def get_future_symbol_list(client: CMFutures | UMFutures) -> list[str]:
     ]
 
 
+@retry(wait=wait_fixed(3))
 def get_klines(
     client: CMFutures | UMFutures | Spot,
     symbol: str,
@@ -84,8 +83,8 @@ def get_supply_df(
         end = lack_df["open_time"][i + 1]
         logger.info(
             f"[{symbol}] Supplement missing {interval} data: "
-            f"{dt.datetime.utcfromtimestamp(start/1e3)} -> "
-            f"{dt.datetime.utcfromtimestamp(end/1e3)}"
+            f"{dt.datetime.fromtimestamp(start / 1e3, dt.timezone.utc)} -> "
+            f"{dt.datetime.fromtimestamp(end / 1e3, dt.timezone.utc)}"
         )
 
         t = threading.Thread(
