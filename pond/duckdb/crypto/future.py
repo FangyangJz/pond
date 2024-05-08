@@ -14,7 +14,7 @@ from loguru import logger
 from binance.spot import Spot
 from binance.cm_futures import CMFutures
 from binance.um_futures import UMFutures
-from pond.duckdb.crypto.const import kline_schema
+from pond.duckdb.crypto.const import klines_schema
 from pond.binance_history.type import TIMEFRAMES
 from tenacity import retry, wait_fixed
 
@@ -59,7 +59,7 @@ def get_klines(
         endTime=end,
         limit=500 if interval not in ["1s", "1m"] else 1000,
     )
-    dd = pl.from_records(dd, schema=kline_schema)
+    dd = pl.from_records(dd, schema=klines_schema)
     res_list.append(dd)
 
 
@@ -102,7 +102,7 @@ def get_supply_df(
 
 if __name__ == "__main__":
     import polars as pl
-    from pond.duckdb.crypto.const import kline_schema
+    from pond.duckdb.crypto.const import klines_schema
 
     symbol = "BTSUSDT"
     interval = "1d"
@@ -124,7 +124,7 @@ if __name__ == "__main__":
         symbol=symbol, interval=interval, startTime=int(start_dt), endTime=int(end_dt)
     )
     df = (
-        pl.from_records(dd, schema=kline_schema)
+        pl.from_records(dd, schema=klines_schema)
         .with_columns(
             (pl.col("open_time") * 1e3).cast(pl.Datetime),
             (pl.col("close_time") * 1e3).cast(pl.Datetime),

@@ -105,7 +105,7 @@ class CryptoDB(DuckDB):
 
     @staticmethod
     def get_common_interval_path_list(base_path: Path):
-        return [base_path / freq for freq in ["1m", "1h", "1d"]]
+        return [base_path / freq for freq in timeframe_data_types_dict.keys()]
 
     def init_db_path(self):
         [f.mkdir() for f in self.path_crypto_list if not f.exists()]
@@ -587,7 +587,7 @@ if __name__ == "__main__":
                 start="2020-1-1",
                 end="2024-5-22",
                 asset_type=AssetType.future_um,
-                data_type=DataType.fundingRate,
+                data_type=DataType.klines,
                 timeframe=interval,
                 # httpx_proxies={"https://": "https://127.0.0.1:7890"},
                 requests_proxies={
@@ -603,7 +603,7 @@ if __name__ == "__main__":
         return True
 
     # ...start downloading...
-    interval = "1M"
+    interval = "5m"
     complete = False
     retry = 0
     start_time = time.perf_counter()

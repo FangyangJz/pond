@@ -255,7 +255,7 @@ def loop_get_url_list_remote(
     params = {
         "delimiter": r"/",
         "prefix": prefix + f"{timeframe}/"
-        if asset_type in [DataType.klines]
+        if data_type in [DataType.klines]
         else prefix,
     }
     is_truncated, day_url_list_remote = get_vision_data_url_list(params, proxies)
