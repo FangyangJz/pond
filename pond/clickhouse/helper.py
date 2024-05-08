@@ -188,7 +188,10 @@ if __name__ == "__main__":
     crypto_db = CryptoDB(Path(r"E:\DuckDB"))
     password = os.environ.get("CLICKHOUSE_PWD")
     conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
-    manager = ClickHouseManager(conn_str, data_start=datetime(2022, 5, 1))
+    native_conn_str = f"clickhouse+native://default:{password}@localhost:9000/quant?tcp_keepalive=true"
+    manager = ClickHouseManager(
+        conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
+    )
     helper = FuturesHelper(crypto_db, manager)
     ret = helper.sync_futures_kline("1h")
     print(f"sync ret {ret}")
