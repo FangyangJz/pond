@@ -4,8 +4,6 @@
 # @Software : PyCharm
 # https://github.com/binance/binance-futures-connector-python
 
-import threading
-
 import pandas as pd
 import polars as pl
 import datetime as dt
@@ -17,6 +15,7 @@ from binance.um_futures import UMFutures
 from pond.duckdb.crypto.const import klines_schema
 from pond.binance_history.type import TIMEFRAMES
 from tenacity import retry, wait_fixed
+from concurrent.futures import ThreadPoolExecutor
 
 
 @retry(wait=wait_fixed(3))
@@ -75,27 +74,26 @@ def get_supply_df(
     base += dt.timedelta(days=1).total_seconds()*1e3
     base_dt2 = dt.datetime.utcfromtimestamp(base/1e3)
     """
-
     res_list = []
-    t_list = []
-    for i in range(0, len(lack_df), 2):
-        start = lack_df["open_time"][i]
-        end = lack_df["open_time"][i + 1]
-        logger.info(
-            f"[{symbol}] Supplement missing {interval} data: "
-            f"{dt.datetime.fromtimestamp(start / 1e3, dt.timezone.utc)} -> "
-            f"{dt.datetime.fromtimestamp(end / 1e3, dt.timezone.utc)}"
-        )
+    with ThreadPoolExecutor(max_workers=20) as executor:  # 设置线程池的最大线程数为10
+        futures = []
+        for i in range(0, len(lack_df), 2):
+            start = lack_df["open_time"][i]
+            end = lack_df["open_time"][i + 1]
+            logger.info(
+                f"[{symbol}] Supplement missing {interval} data: "
+                f"{dt.datetime.fromtimestamp(start / 1e3, dt.timezone.utc)} -> "
+                f"{dt.datetime.fromtimestamp(end / 1e3, dt.timezone.utc)}"
+            )
+            # 使用线程池提交任务
+            future = executor.submit(
+                get_klines, client, symbol, interval, start, end, res_list
+            )
+            futures.append(future)
 
-        t = threading.Thread(
-            target=get_klines,
-            args=(client, symbol, interval, start, end, res_list),
-        )
-        t.start()
-        t_list.append(t)
-
-    if t_list:
-        [t.join() for t in t_list]
+    # 等待所有线程任务完成
+    for future in futures:
+        future.result()
 
     return pl.concat(res_list)
 
