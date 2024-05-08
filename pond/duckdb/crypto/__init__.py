@@ -438,11 +438,17 @@ class CryptoDB(DuckDB):
         if df_list:
             df = pl.concat(df_list)
             if data_type == DataType.klines:
-                df = self.transform_klines_dataframe(
+                df = self.transform_klines(
                     df, symbol, asset_type, timeframe, requests_proxies
                 )
+            elif data_type == DataType.trades:
+                pass
+            elif data_type == DataType.aggTrades:
+                pass
             elif data_type == DataType.metrics:
-                df = self.transform_metrics_dataframe(df)
+                df = self.transform_metrics(df)
+            elif data_type == DataType.fundingRate:
+                df = self.transform_fundingRate(df, symbol)
         else:
             df = (
                 pl.DataFrame({}, schema=csv_schema)
@@ -452,12 +458,18 @@ class CryptoDB(DuckDB):
 
         return df
 
-    def transform_metrics_dataframe(self, df: pl.DataFrame):
+    def transform_fundingRate(self, df: pl.DataFrame, symbol: str):
+        return df.with_columns(
+            (pl.col("calc_time") * 1e3).cast(pl.Datetime),
+            jj_code=pl.lit(symbol),
+        )
+
+    def transform_metrics(self, df: pl.DataFrame):
         return df.with_columns(
             pl.col("create_time").str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S")
         ).rename({"symbol": "jj_code"})
 
-    def transform_klines_dataframe(
+    def transform_klines(
         self,
         df: pl.DataFrame,
         symbol: str,
