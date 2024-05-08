@@ -145,6 +145,7 @@ class CryptoDB(DuckDB):
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
+        if_skip_usdc: bool = True,
         ignore_cache=False,
         workers=None,
     ):
@@ -182,6 +183,7 @@ class CryptoDB(DuckDB):
             #     httpx_proxies,
             #     requests_proxies,
             #     skip_symbols,
+            #     if_skip_usdc,
             #     ignore_cache,
             #     i,
             # )
@@ -198,6 +200,7 @@ class CryptoDB(DuckDB):
                     httpx_proxies,
                     requests_proxies,
                     skip_symbols,
+                    if_skip_usdc,
                     ignore_cache,
                     i,
                 ),
@@ -218,6 +221,7 @@ class CryptoDB(DuckDB):
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
+        if_skip_usdc: bool = True,
         ignore_cache=False,
         worker_id: int = 0,
     ):
@@ -258,7 +262,12 @@ class CryptoDB(DuckDB):
                 continue
 
             if symbol in skip_symbols:
+                logger.warning(f"{symbol} in skip_symbols, skip download.")
                 continue
+            if if_skip_usdc and symbol.endswith("USDC"):
+                logger.warning(f"{symbol} is USDC, skip download.")
+                continue
+
             df = self.load_history_data(
                 symbol,
                 _start,
@@ -485,6 +494,8 @@ if __name__ == "__main__":
                     "http": "127.0.0.1:7890",
                     "https": "127.0.0.1:7890",
                 },
+                skip_symbols=["ETHBTC"],
+                if_skip_usdc=True,
                 ignore_cache=False,
                 workers=os.cpu_count() - 2,
             )
