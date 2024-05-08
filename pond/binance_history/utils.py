@@ -20,6 +20,7 @@ from pond.utils.crawler import get_mock_headers
 from pond.binance_history.vision import get_vision_data_url_list
 from pond.binance_history.exceptions import NetworkError
 from pond.binance_history.type import TIMEFRAMES, AssetType, DataType, Freq
+from pond.duckdb.crypto.const import timeframe_data_types_dict
 
 
 def gen_data_url(
@@ -42,13 +43,12 @@ def gen_data_url(
             f"https://data.binance.vision/data/{asset_type.value}/{freq.value}/{data_type.value}/{symbol}/{timeframe}"
             f"/{symbol}-{timeframe}-{date_str}.zip"
         )
-    elif data_type in [DataType.trades, DataType.aggTrades, DataType.metrics]:
+    else:
         url = (
             f"https://data.binance.vision/data/{asset_type.value}/{freq.value}/{data_type.value}/{symbol}"
             f"/{symbol}-{data_type.value}-{date_str}.zip"
         )
-    else:
-        raise ValueError(f"data_type must be 'DataType', but got '{data_type}'")
+
     return url
 
 
@@ -187,12 +187,7 @@ def get_urls_by_xml_parse(
     network_month_dict = {}
     local_day_list = []
     network_day_list = []
-    if data_type in [
-        DataType.klines,
-        DataType.aggTrades,
-        DataType.trades,
-        DataType.fundingRate,
-    ]:
+    if data_type in timeframe_data_types_dict[timeframe]:
         months = pd.date_range(
             start.replace(day=1),
             end,
@@ -223,21 +218,24 @@ def get_urls_by_xml_parse(
             all_keys.sort()
             start = all_dict[all_keys[-1]] + pd.DateOffset(months=1)
 
-    days_url_list = [
-        gen_data_url(data_type, asset_type, Freq.daily, symbol, d, timeframe=timeframe)
-        for d in pd.date_range(start, end, freq="D").to_list()
-    ]
+    if data_type in timeframe_data_types_dict[timeframe]:
+        days_url_list = [
+            gen_data_url(
+                data_type, asset_type, Freq.daily, symbol, d, timeframe=timeframe
+            )
+            for d in pd.date_range(start, end, freq="D").to_list()
+        ]
 
-    if days_url_list:
-        days_url_list_remote = loop_get_url_list_remote(
-            "daily", asset_type, data_type, symbol, timeframe, proxies
-        )
+        if days_url_list:
+            days_url_list_remote = loop_get_url_list_remote(
+                "daily", asset_type, data_type, symbol, timeframe, proxies
+            )
 
-        for day_url in days_url_list:
-            if get_local_data_path(day_url, file_path).exists():
-                local_day_list.append(day_url)
-            elif day_url in days_url_list_remote:
-                network_day_list.append(day_url)
+            for day_url in days_url_list:
+                if get_local_data_path(day_url, file_path).exists():
+                    local_day_list.append(day_url)
+                elif day_url in days_url_list_remote:
+                    network_day_list.append(day_url)
 
     # https://data.binance.vision/data/spot/monthly/klines/BCCBTC/1d/BCCBTC-1d-2018-11.zip
     download_urls = list(network_month_dict.keys()) + network_day_list

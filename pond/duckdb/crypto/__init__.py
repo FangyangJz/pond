@@ -19,6 +19,7 @@ from binance.um_futures import UMFutures
 
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
 from pond.binance_history.type import TIMEFRAMES, AssetType, DataType
+from pond.duckdb.crypto.const import timeframe_data_types_dict
 
 
 class CryptoDB(DuckDB):
@@ -36,18 +37,26 @@ class CryptoDB(DuckDB):
         # trades data path
         self.path_crypto_trades = self.path_crypto / "trades"
         self.path_crypto_trades_origin = self.path_crypto_trades / "origin"
+        self.path_crypto_trades_spot = self.path_crypto_trades / "spot"
+        self.path_crypto_trades_um = self.path_crypto_trades / "um"
+        self.path_crypto_trades_cm = self.path_crypto_trades / "cm"
 
-        # agg trades data path
-        self.path_crypto_agg_trades = self.path_crypto / "agg_trades"
-        self.path_crypto_agg_trades_origin = self.path_crypto_agg_trades / "origin"
-        self.path_crypto_agg_trades_spot = self.path_crypto_agg_trades / "spot"
-        self.path_crypto_agg_trades_um = self.path_crypto_agg_trades / "um"
-        self.path_crypto_agg_trades_cm = self.path_crypto_agg_trades / "cm"
+        # aggTrades data path
+        self.path_crypto_aggTrades = self.path_crypto / "agg_trades"
+        self.path_crypto_aggTrades_origin = self.path_crypto_aggTrades / "origin"
+        self.path_crypto_aggTrades_spot = self.path_crypto_aggTrades / "spot"
+        self.path_crypto_aggTrades_um = self.path_crypto_aggTrades / "um"
+        self.path_crypto_aggTrades_cm = self.path_crypto_aggTrades / "cm"
 
         # metrics data path
         self.path_crypto_metrics = self.path_crypto / "metrics"
         self.path_crypto_metrics_um = self.path_crypto_metrics / "um"
         self.path_crypto_metrics_cm = self.path_crypto_metrics / "cm"
+
+        # fundingRate data path
+        self.path_crypto_fundingRate = self.path_crypto / "funding_rate"
+        self.path_crypto_fundingRate_um = self.path_crypto_fundingRate / "um"
+        self.path_crypto_fundingRate_cm = self.path_crypto_fundingRate / "cm"
 
         #  orderbook data path
         self.path_crypto_orderbook = self.path_crypto / "orderbook"
@@ -67,18 +76,27 @@ class CryptoDB(DuckDB):
             # trades path
             self.path_crypto_trades,
             self.path_crypto_trades_origin,
+            self.path_crypto_trades_spot,
+            self.path_crypto_trades_um,
+            self.path_crypto_trades_cm,
             # aggtrades path
-            self.path_crypto_agg_trades,
-            self.path_crypto_agg_trades_origin,
-            self.path_crypto_agg_trades_spot,
-            self.path_crypto_agg_trades_um,
-            self.path_crypto_agg_trades_cm,
+            self.path_crypto_aggTrades,
+            self.path_crypto_aggTrades_origin,
+            self.path_crypto_aggTrades_spot,
+            self.path_crypto_aggTrades_um,
+            self.path_crypto_aggTrades_cm,
             # metrics path
             self.path_crypto_metrics,
             self.path_crypto_metrics_cm,
             self.path_crypto_metrics_cm / "1d",
             self.path_crypto_metrics_um,
             self.path_crypto_metrics_um / "1d",
+            # fundingRate path
+            self.path_crypto_fundingRate,
+            self.path_crypto_fundingRate_cm,
+            self.path_crypto_fundingRate_cm / "1M",
+            self.path_crypto_fundingRate_um,
+            self.path_crypto_fundingRate_um / "1M",
             # orderbook path
             self.path_crypto_orderbook,
         ]
@@ -158,22 +176,60 @@ class CryptoDB(DuckDB):
             (AssetType.spot, DataType.klines): self.path_crypto_kline_spot,
             (AssetType.future_cm, DataType.klines): self.path_crypto_kline_cm,
             (AssetType.future_um, DataType.klines): self.path_crypto_kline_um,
+            # trades path map
+            (AssetType.spot, DataType.trades): self.path_crypto_trades_spot,
+            (AssetType.future_cm, DataType.trades): self.path_crypto_trades_cm,
+            (AssetType.future_um, DataType.trades): self.path_crypto_trades_um,
             # aggtrades path map
-            (AssetType.spot, DataType.aggTrades): self.path_crypto_agg_trades_spot,
-            (AssetType.future_cm, DataType.aggTrades): self.path_crypto_agg_trades_cm,
-            (AssetType.future_um, DataType.aggTrades): self.path_crypto_agg_trades_um,
+            (AssetType.spot, DataType.aggTrades): self.path_crypto_aggTrades_spot,
+            (AssetType.future_cm, DataType.aggTrades): self.path_crypto_aggTrades_cm,
+            (AssetType.future_um, DataType.aggTrades): self.path_crypto_aggTrades_um,
             # metrics path map
             (AssetType.future_um, DataType.metrics): self.path_crypto_metrics_um,
             (AssetType.future_cm, DataType.metrics): self.path_crypto_metrics_cm,
+            # fundingRate path map
+            (
+                AssetType.future_um,
+                DataType.fundingRate,
+            ): self.path_crypto_fundingRate_um,
+            (
+                AssetType.future_cm,
+                DataType.fundingRate,
+            ): self.path_crypto_fundingRate_cm,
         }[(asset_type, data_type)]  # type: ignore
 
     @staticmethod
     def get_csv_schema(data_type: DataType) -> dict[str, pl.DataType]:
-        from pond.duckdb.crypto.const import kline_schema, metric_schema
+        from pond.duckdb.crypto.const import (
+            klines_schema,
+            metrics_schema,
+            fundingRate_schema,
+        )
 
-        return {DataType.klines: kline_schema, DataType.metrics: metric_schema}[
-            data_type
-        ]
+        return {
+            DataType.klines: klines_schema,
+            DataType.metrics: metrics_schema,
+            DataType.trades: {
+                "id": pl.Int64,
+                "price": pl.Float64,
+                "qty": pl.Float64,
+                "quoteQty": pl.Float64,
+                "time": pl.Int64,
+                "isBuyerMaker": pl.Boolean,
+                "isBestMatch": pl.Boolean,
+            },
+            DataType.aggTrades: {
+                "a": pl.Int64,
+                "p": pl.Float64,
+                "q": pl.Float64,
+                "f": pl.Int64,
+                "l": pl.Int64,
+                "T": pl.Int64,
+                "m": pl.Boolean,
+                "M": pl.Boolean,
+            },
+            DataType.fundingRate: fundingRate_schema,
+        }[data_type]
 
     @staticmethod
     def filter_quote_volume_0(df: pl.DataFrame, symbol: str, timeframe: TIMEFRAMES):
@@ -276,6 +332,7 @@ class CryptoDB(DuckDB):
     ):
         assert isinstance(asset_type, AssetType)
         assert isinstance(data_type, DataType)
+        assert data_type in timeframe_data_types_dict[timeframe]
 
         base_path = self.get_base_path(asset_type, data_type)
         exist_files = [f.stem for f in (base_path / timeframe).glob("*.parquet")]
@@ -477,7 +534,7 @@ class CryptoDB(DuckDB):
                 )
 
     def update_crypto_agg_trades(self):
-        agg_trades_list = [f.stem for f in self.path_crypto_agg_trades.iterdir()]
+        agg_trades_list = [f.stem for f in self.path_crypto_aggTrades.iterdir()]
         names = [
             "agg_trade_id",
             "price",
@@ -487,7 +544,7 @@ class CryptoDB(DuckDB):
             "transact_time",
             "is_buyer_maker",
         ]
-        for f in (pbar := tqdm(self.path_crypto_agg_trades_origin.glob("*.csv"))):
+        for f in (pbar := tqdm(self.path_crypto_aggTrades_origin.glob("*.csv"))):
             pbar.set_postfix_str(str(f))
             if f.stem not in agg_trades_list:
                 (
@@ -496,7 +553,7 @@ class CryptoDB(DuckDB):
                         f"epoch_ms(transact_time) as transact_time, is_buyer_maker  "
                         f"from read_csv_auto('{str(f)}', names={names})"
                     ).write_parquet(
-                        str(self.path_crypto_agg_trades / f"{f.stem}.parquet"),
+                        str(self.path_crypto_aggTrades / f"{f.stem}.parquet"),
                         compression=self.compress,
                     )
                 )
@@ -516,9 +573,9 @@ if __name__ == "__main__":
         try:
             db.update_history_data_parallel(
                 start="2020-1-1",
-                end="2024-4-22",
+                end="2024-5-22",
                 asset_type=AssetType.future_um,
-                data_type=DataType.metrics,
+                data_type=DataType.fundingRate,
                 timeframe=interval,
                 # httpx_proxies={"https://": "https://127.0.0.1:7890"},
                 requests_proxies={
@@ -534,7 +591,7 @@ if __name__ == "__main__":
         return True
 
     # ...start downloading...
-    interval = "1d"
+    interval = "1M"
     complete = False
     retry = 0
     start_time = time.perf_counter()
