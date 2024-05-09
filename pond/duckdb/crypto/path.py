@@ -69,15 +69,15 @@ class CryptoPath:
             # metrics path
             self.metrics,
             self.metrics_cm,
-            self.metrics_cm / "1d",
+            self.metrics_cm / "5m",
             self.metrics_um,
-            self.metrics_um / "1d",
+            self.metrics_um / "5m",
             # fundingRate path
             self.fundingRate,
             self.fundingRate_cm,
-            self.fundingRate_cm / "1M",
+            self.fundingRate_cm / "8h",
             self.fundingRate_um,
-            self.fundingRate_um / "1M",
+            self.fundingRate_um / "8h",
             # orderbook path
             self.orderbook,
         ]

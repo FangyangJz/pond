@@ -187,7 +187,7 @@ def get_urls_by_xml_parse(
     network_month_dict = {}
     local_day_list = []
     network_day_list = []
-    if data_type in timeframe_data_types_dict[timeframe]:
+    if data_type in timeframe_data_types_dict["1M"]:
         months = pd.date_range(
             start.replace(day=1),
             end,
@@ -214,11 +214,12 @@ def get_urls_by_xml_parse(
 
             all_dict = local_month_dict | network_month_dict
 
-            all_keys = list(all_dict.keys())
-            all_keys.sort()
-            start = all_dict[all_keys[-1]] + pd.DateOffset(months=1)
+            if all_dict:
+                all_keys = list(all_dict.keys())
+                all_keys.sort()
+                start = all_dict[all_keys[-1]] + pd.DateOffset(months=1)
 
-    if data_type in timeframe_data_types_dict[timeframe]:
+    if data_type in timeframe_data_types_dict["1d"]:
         days_url_list = [
             gen_data_url(
                 data_type, asset_type, Freq.daily, symbol, d, timeframe=timeframe

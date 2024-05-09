@@ -283,7 +283,12 @@ class CryptoDB(DuckDB):
                     f"{symbol} load df is empty, and skip save to parquet file"
                 )
             else:
-                df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
+                if data_type == DataType.klines:
+                    df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
+                elif data_type == DataType.metrics:
+                    df.write_parquet(base_path / "5m" / f"{symbol}.parquet")
+                elif data_type == DataType.fundingRate:
+                    df.write_parquet(base_path / "8h" / f"{symbol}.parquet")
 
             pbar.set_description_str(
                 f"[Worker_{worker_id}] Total {total_len}", refresh=False
@@ -487,7 +492,7 @@ if __name__ == "__main__":
                 start="2020-1-1",
                 end="2024-5-22",
                 asset_type=AssetType.future_um,
-                data_type=DataType.klines,
+                data_type=DataType.metrics,
                 timeframe=interval,
                 # httpx_proxies={"https://": "https://127.0.0.1:7890"},
                 requests_proxies={
@@ -505,7 +510,7 @@ if __name__ == "__main__":
         return True
 
     # ...start downloading...
-    interval = "5m"
+    interval = "1d"
     complete = False
     retry = 0
     start_time = time.perf_counter()
