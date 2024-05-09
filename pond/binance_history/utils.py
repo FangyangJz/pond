@@ -218,10 +218,12 @@ def get_urls_by_xml_parse(
                     network_month_dict[month_url] = m
 
             all_dict = local_month_dict | network_month_dict
-
-            all_keys = list(all_dict.keys())
-            all_keys.sort()
-            start = all_dict[all_keys[-1]] + pd.DateOffset(months=1)
+            if all_dict:
+                all_keys = list(all_dict.keys())
+                all_keys.sort()
+                start = all_dict[all_keys[-1]] + pd.DateOffset(months=1)
+            else:
+                start = months[-1]
 
     days_url_list = [
         gen_data_url(data_type, asset_type, Freq.daily, symbol, d, timeframe=timeframe)
