@@ -193,5 +193,5 @@ if __name__ == "__main__":
         conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
     )
     helper = FuturesHelper(crypto_db, manager)
-    ret = helper.sync_futures_kline("1h")
+    ret = helper.sync_futures_kline("1h", workers=1)
     print(f"sync ret {ret}")

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 import datetime as dtm
 from clickhouse_driver import Client
 from deprecated import deprecated
+from typing import Union
 
 
 class Task:
@@ -79,21 +80,26 @@ class ClickHouseManager:
 
     def native_read_table(
         self,
-        table: TsTable,
+        table: Union[str, TsTable],
         start_date: datetime,
         end_date: datetime,
         filters=None,
         params=None,
         rename=False,
+        datetime_col="datetime",
     ) -> pd.DataFrame:
-        sql = f"select * from {table.__tablename__}"
+        if isinstance(table, str):
+            table_name = table
+        else:
+            table_name = table.__tablename__
+        sql = f"select * from {table_name}"
         query_params = {}
         if start_date is None:
             start_date = self.data_start
-        sql += " where datetime >= %(start)s "
+        sql += f" where {datetime_col} >= %(start)s "
         query_params["start"] = start_date
         if end_date is not None:
-            sql += " AND datetime <= %(end)s "
+            sql += f" AND {datetime_col} <= %(end)s "
             query_params["end"] = end_date
         if filters is not None:
             if not isinstance(filters, list):
@@ -104,7 +110,7 @@ class ClickHouseManager:
             query_params.update(params)
         with Client.from_url(self.native_uri) as client:
             df = client.query_dataframe(query=sql, params=query_params)
-        if rename:
+        if rename and not isinstance(table, str):
             df = df.rename(columns=table().get_colcom_names())
         return df
 
@@ -133,34 +139,57 @@ class ClickHouseManager:
                 df = df.rename(table().get_colcom_names())
         return df
 
-    def save_to_db(self, table: TsTable, df: pd.DataFrame, last_record_filters):
+    def save_to_db(
+        self,
+        table: Union[str, TsTable],
+        df: pd.DataFrame,
+        last_record_filters,
+        datetime_col="datetime",
+    ):
         # format data
-        df = table().format_dataframe(df)
-        lastet_record_time = self.get_latest_record_time(table, last_record_filters)
+        if isinstance(table, str):
+            table_name = table
+            lastet_record_time = self.native_get_latest_record_time(
+                table, last_record_filters, datetime_col
+            )
+        else:
+            table_name = table.__tablename__
+            df = table().format_dataframe(df)
+            df.drop_duplicates(subset=["datetime", "code"], inplace=True)
+            lastet_record_time = self.get_latest_record_time(table, last_record_filters)
+
+        origin_len = len(df)
         if lastet_record_time is not None:
             tz = None
             try:
-                tz = getattr(df.dtypes["datetime"], "tz")
-                if lastet_record_time.tzinfo is None:
-                    lastet_record_time = lastet_record_time.replace(
-                        tzinfo=dtm.timezone.utc
-                    ).astimezone(tz)
-                else:
-                    lastet_record_time = lastet_record_time.astimezone(tz)
+                tz = getattr(df.dtypes[datetime_col], "tz")
             except Exception:
-                lastet_record_time = lastet_record_time.astimezone(tz).replace(
-                    tzinfo=None
-                )
-            df["datetime"] = df["datetime"].dt.floor(freq="1s")
-            df = df[df["datetime"] > lastet_record_time]
+                pass
+            if tz is not None and lastet_record_time.tzinfo is not None:
+                lastet_record_time = lastet_record_time.astimezone(tz)
+            elif tz is not None and lastet_record_time.tzinfo is None:
+                lastet_record_time = lastet_record_time.replace(
+                    tzinfo=dtm.timezone.utc
+                ).astimezone(tz)
+            elif tz is None and lastet_record_time.tzinfo is not None:
+                lastet_record_time = lastet_record_time.astimezone(
+                    dtm.timezone.utc
+                ).replace(tzinfo=None)
+
+            df[datetime_col] = df[datetime_col].dt.floor(freq="1s")
+            df = df[df[datetime_col] > lastet_record_time]
             # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
-        df.drop_duplicates(subset=["datetime", "code"], inplace=True)
-        query = f"INSERT INTO {table.__tablename__} (*) VALUES"
+        if len(df) == 0:
+            print(
+                f"dataframe is empty after filter by latest record, original len {origin_len}"
+            )
+            return
+        query = f"INSERT INTO {table_name} (*) VALUES"
         with Client.from_url(self.native_uri) as client:
             rows = client.insert_dataframe(
                 query=query, dataframe=df, settings=dict(use_numpy=True)
             )
-            print(f"total {len(df)} saved {rows} into table {table.__tablename__}")
+            print(f"total {len(df)} saved {rows} into table {table_name}")
 
     def get_syncing_tasks(self, date) -> List[Task]:
         tasks: List[Task] = []
@@ -253,6 +282,45 @@ class ClickHouseManager:
         else:
             begin = self.data_start
         return begin
+
+    def native_get_latest_record_time(self, table, filters, datetime_col="datetime"):
+        if filters is None:
+            filters = []
+        elif isinstance(filters, str):
+            filters = [filters]
+        filters.append(f"ORDER BY {datetime_col} DESC LIMIT 1")
+        try:
+            df = self.native_read_table(
+                table, None, None, filters, datetime_col=datetime_col
+            )
+            if len(df) > 0:
+                return df[datetime_col][0]
+        except Exception:
+            pass
+        return self.data_start
+
+    def create_table(self, table_name, order_by_cols: list, df: pl.DataFrame):
+        columns_ddl = ""
+        for i in range(len(df.columns)):
+            col = df.columns[i]
+            dtype = df.dtypes[i]
+            if str(dtype).lower().startswith("datetime"):
+                columns_ddl += f"{col} Datetime,"
+            elif str(dtype).lower().startswith("str"):
+                columns_ddl += f"{col} String,"
+            elif str(dtype).lower().startswith("int"):
+                columns_ddl += f"{col} Int,"
+            elif str(dtype).lower().startswith("float"):
+                columns_ddl += f"{col} Float64,"
+            else:
+                raise (f"unsupport dtype for {col} {dtype}")
+        # remove last comma.
+        columns_ddl = columns_ddl[:-1]
+        orderby = ",".join(order_by_cols)
+
+        ddl = f"CREATE TABLE IF NOT EXISTS {table_name} ( {columns_ddl} ) ENGINE = ReplacingMergeTree ORDER BY ({orderby})"
+        with Client.from_url(self.native_uri) as client:
+            client.execute(ddl)
 
 
 if __name__ == "__main__":
