@@ -19,78 +19,15 @@ from binance.um_futures import UMFutures
 
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
 from pond.binance_history.type import TIMEFRAMES, AssetType, DataType
+from pond.duckdb.crypto.const import timeframe_data_types_dict
+from pond.duckdb.crypto.path import CryptoPath
 
 
 class CryptoDB(DuckDB):
     def __init__(self, db_path: Path, df_type: DataFrameStrType = df_types.polars):
-        self.path_crypto = db_path / "crypto"
-        self.path_crypto_data = self.path_crypto / "data"
-        self.path_crypto_info = self.path_crypto / "info"
-
-        # kline data path
-        self.path_crypto_kline = self.path_crypto / "kline"
-        self.path_crypto_kline_spot = self.path_crypto_kline / "spot"
-        self.path_crypto_kline_um = self.path_crypto_kline / "um"
-        self.path_crypto_kline_cm = self.path_crypto_kline / "cm"
-
-        # trades data path
-        self.path_crypto_trades = self.path_crypto / "trades"
-        self.path_crypto_trades_origin = self.path_crypto_trades / "origin"
-
-        # agg trades data path
-        self.path_crypto_agg_trades = self.path_crypto / "agg_trades"
-        self.path_crypto_agg_trades_origin = self.path_crypto_agg_trades / "origin"
-        self.path_crypto_agg_trades_spot = self.path_crypto_agg_trades / "spot"
-        self.path_crypto_agg_trades_um = self.path_crypto_agg_trades / "um"
-        self.path_crypto_agg_trades_cm = self.path_crypto_agg_trades / "cm"
-
-        # metrics data path
-        self.path_crypto_metrics = self.path_crypto / "metrics"
-        self.path_crypto_metrics_um = self.path_crypto_metrics / "um"
-        self.path_crypto_metrics_cm = self.path_crypto_metrics / "cm"
-
-        #  orderbook data path
-        self.path_crypto_orderbook = self.path_crypto / "orderbook"
-
-        self.path_crypto_list = [
-            self.path_crypto,
-            self.path_crypto_data,
-            self.path_crypto_info,
-            # kline path
-            self.path_crypto_kline,
-            self.path_crypto_kline_spot,
-            *self.get_common_interval_path_list(self.path_crypto_kline_spot),
-            self.path_crypto_kline_um,
-            *self.get_common_interval_path_list(self.path_crypto_kline_um),
-            self.path_crypto_kline_cm,
-            *self.get_common_interval_path_list(self.path_crypto_kline_cm),
-            # trades path
-            self.path_crypto_trades,
-            self.path_crypto_trades_origin,
-            # aggtrades path
-            self.path_crypto_agg_trades,
-            self.path_crypto_agg_trades_origin,
-            self.path_crypto_agg_trades_spot,
-            self.path_crypto_agg_trades_um,
-            self.path_crypto_agg_trades_cm,
-            # metrics path
-            self.path_crypto_metrics,
-            self.path_crypto_metrics_cm,
-            self.path_crypto_metrics_cm / "1d",
-            self.path_crypto_metrics_um,
-            self.path_crypto_metrics_um / "1d",
-            # orderbook path
-            self.path_crypto_orderbook,
-        ]
-
+        self.crypto_path = CryptoPath(crypto_path=db_path / "crypto")
+        self.init_db_path = self.crypto_path.init_db_path
         super().__init__(db_path, df_type)
-
-    @staticmethod
-    def get_common_interval_path_list(base_path: Path):
-        return [base_path / freq for freq in ["1m", "1h", "1d"]]
-
-    def init_db_path(self):
-        [f.mkdir() for f in self.path_crypto_list if not f.exists()]
 
     def get_local_future_perpetual_symbol_list(
         self, asset_type: AssetType
@@ -106,9 +43,9 @@ class CryptoDB(DuckDB):
     def get_future_info(self, asset_type: AssetType, from_local=True) -> pd.DataFrame:
         if self.is_future_type(asset_type):
             a1, a2 = asset_type.value.split("/")
-            file = self.path_crypto_info / f"{a2.upper()}{a1.capitalize()}.csv"
+            file = self.crypto_path.info / f"{a2.upper()}{a1.capitalize()}.csv"
         else:
-            file = self.path_crypto_info / f"{asset_type.value.capitalize()}.csv"
+            file = self.crypto_path.info / f"{asset_type.value.capitalize()}.csv"
 
         if from_local:
             if file.exists():
@@ -126,7 +63,7 @@ class CryptoDB(DuckDB):
         """
         from pond.duckdb.crypto.future import get_future_info_df
 
-        file = self.path_crypto_info / "info.csv"
+        file = self.crypto_path.info / "info.csv"
         logger.info(f"Update {file} from network...")
 
         for c in [
@@ -136,7 +73,7 @@ class CryptoDB(DuckDB):
         ]:
             info_df = get_future_info_df(c)
             info_df.to_csv(
-                self.path_crypto_info / f"{c.__class__.__name__}.csv", index_label=False
+                self.crypto_path.info / f"{c.__class__.__name__}.csv", index_label=False
             )
 
     def get_client(
@@ -152,28 +89,38 @@ class CryptoDB(DuckDB):
             case _:
                 raise ValueError(f"{asset_type} is a wrong {AssetType}")
 
-    def get_base_path(self, asset_type: AssetType, data_type: DataType) -> Path:
-        return {
-            # kline path map
-            (AssetType.spot, DataType.klines): self.path_crypto_kline_spot,
-            (AssetType.future_cm, DataType.klines): self.path_crypto_kline_cm,
-            (AssetType.future_um, DataType.klines): self.path_crypto_kline_um,
-            # aggtrades path map
-            (AssetType.spot, DataType.aggTrades): self.path_crypto_agg_trades_spot,
-            (AssetType.future_cm, DataType.aggTrades): self.path_crypto_agg_trades_cm,
-            (AssetType.future_um, DataType.aggTrades): self.path_crypto_agg_trades_um,
-            # metrics path map
-            (AssetType.future_um, DataType.metrics): self.path_crypto_metrics_um,
-            (AssetType.future_cm, DataType.metrics): self.path_crypto_metrics_cm,
-        }[(asset_type, data_type)]  # type: ignore
-
     @staticmethod
     def get_csv_schema(data_type: DataType) -> dict[str, pl.DataType]:
-        from pond.duckdb.crypto.const import kline_schema, metric_schema
+        from pond.duckdb.crypto.const import (
+            klines_schema,
+            metrics_schema,
+            fundingRate_schema,
+        )
 
-        return {DataType.klines: kline_schema, DataType.metrics: metric_schema}[
-            data_type
-        ]
+        return {
+            DataType.klines: klines_schema,
+            DataType.metrics: metrics_schema,
+            DataType.trades: {
+                "id": pl.Int64,
+                "price": pl.Float64,
+                "qty": pl.Float64,
+                "quoteQty": pl.Float64,
+                "time": pl.Int64,
+                "isBuyerMaker": pl.Boolean,
+                "isBestMatch": pl.Boolean,
+            },
+            DataType.aggTrades: {
+                "a": pl.Int64,
+                "p": pl.Float64,
+                "q": pl.Float64,
+                "f": pl.Int64,
+                "l": pl.Int64,
+                "T": pl.Int64,
+                "m": pl.Boolean,
+                "M": pl.Boolean,
+            },
+            DataType.fundingRate: fundingRate_schema,
+        }[data_type]
 
     @staticmethod
     def filter_quote_volume_0(df: pl.DataFrame, symbol: str, timeframe: TIMEFRAMES):
@@ -198,6 +145,7 @@ class CryptoDB(DuckDB):
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
+        if_skip_usdc: bool = True,
         ignore_cache=False,
         workers=None,
     ):
@@ -235,6 +183,7 @@ class CryptoDB(DuckDB):
             #     httpx_proxies,
             #     requests_proxies,
             #     skip_symbols,
+            #     if_skip_usdc,
             #     ignore_cache,
             #     i,
             # )
@@ -251,6 +200,7 @@ class CryptoDB(DuckDB):
                     httpx_proxies,
                     requests_proxies,
                     skip_symbols,
+                    if_skip_usdc,
                     ignore_cache,
                     i,
                 ),
@@ -271,13 +221,15 @@ class CryptoDB(DuckDB):
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
+        if_skip_usdc: bool = True,
         ignore_cache=False,
         worker_id: int = 0,
     ):
         assert isinstance(asset_type, AssetType)
         assert isinstance(data_type, DataType)
+        assert data_type in timeframe_data_types_dict[timeframe]
 
-        base_path = self.get_base_path(asset_type, data_type)
+        base_path = self.crypto_path.get_base_path(asset_type, data_type)
         exist_files = [f.stem for f in (base_path / timeframe).glob("*.parquet")]
 
         input_start = parser.parse(start).replace(tzinfo=tz.tzutc())
@@ -310,7 +262,12 @@ class CryptoDB(DuckDB):
                 continue
 
             if symbol in skip_symbols:
+                logger.warning(f"{symbol} in skip_symbols, skip download.")
                 continue
+            if if_skip_usdc and symbol.endswith("USDC"):
+                logger.warning(f"{symbol} is USDC, skip download.")
+                continue
+
             df = self.load_history_data(
                 symbol,
                 _start,
@@ -326,7 +283,12 @@ class CryptoDB(DuckDB):
                     f"{symbol} load df is empty, and skip save to parquet file"
                 )
             else:
-                df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
+                if data_type == DataType.klines:
+                    df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
+                elif data_type == DataType.metrics:
+                    df.write_parquet(base_path / "5m" / f"{symbol}.parquet")
+                elif data_type == DataType.fundingRate:
+                    df.write_parquet(base_path / "8h" / f"{symbol}.parquet")
 
             pbar.set_description_str(
                 f"[Worker_{worker_id}] Total {total_len}", refresh=False
@@ -359,12 +321,12 @@ class CryptoDB(DuckDB):
             start=start,
             end=end,
             timeframe=timeframe,
-            file_path=self.path_crypto,
+            file_path=self.crypto_path.crypto,
             proxies=requests_proxies,
         )
 
         start_async_download_files(
-            download_urls, self.path_crypto, proxies=httpx_proxies
+            download_urls, self.crypto_path.crypto, proxies=httpx_proxies
         )
         csv_schema = self.get_csv_schema(data_type)
 
@@ -372,7 +334,7 @@ class CryptoDB(DuckDB):
         for url in load_urls:
             df = load_data_from_disk(
                 url,
-                self.path_crypto,
+                self.crypto_path.crypto,
                 dtypes=csv_schema,
             )
             if df is not None:
@@ -381,11 +343,17 @@ class CryptoDB(DuckDB):
         if df_list:
             df = pl.concat(df_list)
             if data_type == DataType.klines:
-                df = self.transform_klines_dataframe(
+                df = self.transform_klines(
                     df, symbol, asset_type, timeframe, requests_proxies
                 )
+            elif data_type == DataType.trades:
+                pass
+            elif data_type == DataType.aggTrades:
+                pass
             elif data_type == DataType.metrics:
-                df = self.transform_metrics_dataframe(df)
+                df = self.transform_metrics(df)
+            elif data_type == DataType.fundingRate:
+                df = self.transform_fundingRate(df, symbol)
         else:
             df = (
                 pl.DataFrame({}, schema=csv_schema)
@@ -395,12 +363,18 @@ class CryptoDB(DuckDB):
 
         return df
 
-    def transform_metrics_dataframe(self, df: pl.DataFrame):
+    def transform_fundingRate(self, df: pl.DataFrame, symbol: str):
+        return df.with_columns(
+            (pl.col("calc_time") * 1e3).cast(pl.Datetime),
+            jj_code=pl.lit(symbol),
+        )
+
+    def transform_metrics(self, df: pl.DataFrame):
         return df.with_columns(
             pl.col("create_time").str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S")
         ).rename({"symbol": "jj_code"})
 
-    def transform_klines_dataframe(
+    def transform_klines(
         self,
         df: pl.DataFrame,
         symbol: str,
@@ -460,10 +434,10 @@ class CryptoDB(DuckDB):
         return df
 
     def update_crypto_trades(self):
-        trades_list = [f.stem for f in self.path_crypto_trades.iterdir()]
+        trades_list = [f.stem for f in self.crypto_path.trades.iterdir()]
         names = ["id", "price", "qty", "quote_qty", "time", "is_buyer_maker"]
 
-        for f in (pbar := tqdm(self.path_crypto_trades_origin.glob("*.csv"))):
+        for f in (pbar := tqdm(self.crypto_path.trades_origin.glob("*.csv"))):
             pbar.set_postfix_str(str(f))
             if f.stem not in trades_list:
                 (
@@ -471,13 +445,13 @@ class CryptoDB(DuckDB):
                         f"SELECT id, price, qty, quote_qty, epoch_ms(time) as time, is_buyer_maker  "
                         f"from read_csv_auto('{str(f)}', names={names}) order by id"
                     ).write_parquet(
-                        str(self.path_crypto_trades / f"{f.stem}.parquet"),
+                        str(self.crypto_path.trades / f"{f.stem}.parquet"),
                         compression=self.compress,
                     )
                 )
 
     def update_crypto_agg_trades(self):
-        agg_trades_list = [f.stem for f in self.path_crypto_agg_trades.iterdir()]
+        agg_trades_list = [f.stem for f in self.crypto_path.aggTrades.iterdir()]
         names = [
             "agg_trade_id",
             "price",
@@ -487,7 +461,7 @@ class CryptoDB(DuckDB):
             "transact_time",
             "is_buyer_maker",
         ]
-        for f in (pbar := tqdm(self.path_crypto_agg_trades_origin.glob("*.csv"))):
+        for f in (pbar := tqdm(self.crypto_path.aggTrades_origin.glob("*.csv"))):
             pbar.set_postfix_str(str(f))
             if f.stem not in agg_trades_list:
                 (
@@ -496,7 +470,7 @@ class CryptoDB(DuckDB):
                         f"epoch_ms(transact_time) as transact_time, is_buyer_maker  "
                         f"from read_csv_auto('{str(f)}', names={names})"
                     ).write_parquet(
-                        str(self.path_crypto_agg_trades / f"{f.stem}.parquet"),
+                        str(self.crypto_path.aggTrades / f"{f.stem}.parquet"),
                         compression=self.compress,
                     )
                 )
@@ -516,7 +490,7 @@ if __name__ == "__main__":
         try:
             db.update_history_data_parallel(
                 start="2020-1-1",
-                end="2024-4-22",
+                end="2024-5-22",
                 asset_type=AssetType.future_um,
                 data_type=DataType.metrics,
                 timeframe=interval,
@@ -525,7 +499,9 @@ if __name__ == "__main__":
                     "http": "127.0.0.1:7890",
                     "https": "127.0.0.1:7890",
                 },
-                ignore_cache=True,
+                skip_symbols=["ETHBTC"],
+                if_skip_usdc=True,
+                ignore_cache=False,
                 workers=os.cpu_count() - 2,
             )
         except BaseException as e:
