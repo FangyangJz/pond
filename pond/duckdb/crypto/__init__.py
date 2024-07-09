@@ -156,7 +156,7 @@ class CryptoDB(DuckDB):
         if workers is None:
             workers = int(os.cpu_count() / 2)
 
-        df = self.get_future_info(asset_type)
+        df = self.get_future_info(asset_type, from_local=False).sort_values(by="symbol")
         if self.is_future_type(asset_type):
             df = df[df["contractType"] == "PERPETUAL"][
                 [
@@ -282,7 +282,7 @@ class CryptoDB(DuckDB):
                 do_filter_quote_volume_0,
                 httpx_proxies,
                 requests_proxies,
-            )
+            ).filter(pl.col("open_time") < _end.replace(tzinfo=None))
             if len(df) == 0:
                 logger.warning(
                     f"{symbol} load df is empty, and skip save to parquet file"
