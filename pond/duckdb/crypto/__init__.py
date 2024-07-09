@@ -167,6 +167,8 @@ class CryptoDB(DuckDB):
                     "update_datetime",
                 ]
             ]
+            manual_df = pd.read_csv(Path(__file__).parent / "UMFutures_manual.csv")
+            df = pd.concat([df, manual_df])
         else:
             df = df[["symbol"]]
 
@@ -489,9 +491,19 @@ class CryptoDB(DuckDB):
                     )
                 )
 
+    def compare_um_future_info_with_vision(self):
+        local_path = Path(r"E:\DuckDB\crypto\data\futures\um\monthly\klines")
+        local_symbols = [i.stem for i in local_path.iterdir()]
+        info_symbols = self.get_future_info(AssetType.future_um, from_local=False)[
+            "symbol"
+        ].to_list()
+        diff_set = set(local_symbols) - set(info_symbols)
+        print(diff_set)
+
 
 if __name__ == "__main__":
     db = CryptoDB(Path(r"E:\DuckDB"))
+    # db.compare_um_future_info_with_vision()
 
     # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
 
@@ -504,7 +516,7 @@ if __name__ == "__main__":
         try:
             db.update_history_data_parallel(
                 start="2020-1-1",
-                end="2024-7-8",
+                end="2024-7-9",
                 asset_type=AssetType.future_um,
                 data_type=DataType.klines,
                 timeframe=interval,
