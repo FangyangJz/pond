@@ -145,6 +145,7 @@ class CryptoDB(DuckDB):
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
+        do_filter_quote_volume_0: bool = False,
         if_skip_usdc: bool = True,
         ignore_cache=False,
         workers=None,
@@ -183,6 +184,7 @@ class CryptoDB(DuckDB):
             #     httpx_proxies,
             #     requests_proxies,
             #     skip_symbols,
+            #     do_filter_quote_volume_0,
             #     if_skip_usdc,
             #     ignore_cache,
             #     i,
@@ -200,6 +202,7 @@ class CryptoDB(DuckDB):
                     httpx_proxies,
                     requests_proxies,
                     skip_symbols,
+                    do_filter_quote_volume_0,
                     if_skip_usdc,
                     ignore_cache,
                     i,
@@ -221,6 +224,7 @@ class CryptoDB(DuckDB):
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
+        do_filter_quote_volume_0: bool = False,
         if_skip_usdc: bool = True,
         ignore_cache=False,
         worker_id: int = 0,
@@ -275,6 +279,7 @@ class CryptoDB(DuckDB):
                 asset_type,
                 data_type,
                 timeframe,
+                do_filter_quote_volume_0,
                 httpx_proxies,
                 requests_proxies,
             )
@@ -305,6 +310,7 @@ class CryptoDB(DuckDB):
         asset_type: AssetType = AssetType.future_um,
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
+        do_filter_quote_volume_0: bool = False,
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
     ) -> pl.DataFrame:
@@ -344,7 +350,12 @@ class CryptoDB(DuckDB):
             df = pl.concat(df_list)
             if data_type == DataType.klines:
                 df = self.transform_klines(
-                    df, symbol, asset_type, timeframe, requests_proxies
+                    df,
+                    symbol,
+                    asset_type,
+                    timeframe,
+                    requests_proxies,
+                    do_filter_quote_volume_0,
                 )
             elif data_type == DataType.trades:
                 pass
@@ -381,10 +392,13 @@ class CryptoDB(DuckDB):
         asset_type: AssetType,
         timeframe: TIMEFRAMES,
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
+        do_filter_quote_volume_0: bool = False,
     ):
         from pond.duckdb.crypto.future import get_supply_df
 
-        df = self.filter_quote_volume_0(df, symbol, timeframe)
+        if do_filter_quote_volume_0:
+            df = self.filter_quote_volume_0(df, symbol, timeframe)
+
         df = (
             df.sort("open_time").with_columns(
                 (pl.col("open_time").diff() - pl.col("open_time").diff().shift(-1))
@@ -490,9 +504,9 @@ if __name__ == "__main__":
         try:
             db.update_history_data_parallel(
                 start="2020-1-1",
-                end="2024-5-22",
+                end="2024-7-8",
                 asset_type=AssetType.future_um,
-                data_type=DataType.metrics,
+                data_type=DataType.klines,
                 timeframe=interval,
                 # httpx_proxies={"https://": "https://127.0.0.1:7890"},
                 requests_proxies={
@@ -500,8 +514,9 @@ if __name__ == "__main__":
                     "https": "127.0.0.1:7890",
                 },
                 skip_symbols=["ETHBTC"],
+                do_filter_quote_volume_0=False,
                 if_skip_usdc=True,
-                ignore_cache=False,
+                ignore_cache=True,
                 workers=os.cpu_count() - 2,
             )
         except BaseException as e:
@@ -510,7 +525,7 @@ if __name__ == "__main__":
         return True
 
     # ...start downloading...
-    interval = "1d"
+    interval = "5m"
     complete = False
     retry = 0
     start_time = time.perf_counter()
