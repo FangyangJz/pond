@@ -284,7 +284,14 @@ class CryptoDB(DuckDB):
                 do_filter_quote_volume_0,
                 httpx_proxies,
                 requests_proxies,
-            ).filter(pl.col("open_time") < _end.replace(tzinfo=None))
+            )
+            if data_type == DataType.klines:
+                df = df.filter(pl.col("open_time") < _end.replace(tzinfo=None))
+            elif data_type == DataType.fundingRate:
+                raise ValueError("fundingRate not support filter end time")
+            elif data_type == DataType.metrics:
+                df = df.filter(pl.col("create_time") < _end.replace(tzinfo=None))
+
             if len(df) == 0:
                 logger.warning(
                     f"{symbol} load df is empty, and skip save to parquet file"
@@ -384,7 +391,9 @@ class CryptoDB(DuckDB):
 
     def transform_metrics(self, df: pl.DataFrame):
         return df.with_columns(
-            pl.col("create_time").str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S")
+            pl.col("create_time")
+            .str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S")
+            .dt.truncate("5m")
         ).rename({"symbol": "jj_code"})
 
     def transform_klines(
@@ -503,6 +512,7 @@ class CryptoDB(DuckDB):
 
 if __name__ == "__main__":
     db = CryptoDB(Path(r"E:\DuckDB"))
+
     # db.compare_um_future_info_with_vision()
 
     # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
@@ -516,9 +526,9 @@ if __name__ == "__main__":
         try:
             db.update_history_data_parallel(
                 start="2020-1-1",
-                end="2024-7-9",
+                end="2024-7-12",
                 asset_type=AssetType.future_um,
-                data_type=DataType.klines,
+                data_type=DataType.metrics,
                 timeframe=interval,
                 # httpx_proxies={"https://": "https://127.0.0.1:7890"},
                 requests_proxies={
@@ -537,7 +547,7 @@ if __name__ == "__main__":
         return True
 
     # ...start downloading...
-    interval = "5m"
+    interval = "1d"
     complete = False
     retry = 0
     start_time = time.perf_counter()
