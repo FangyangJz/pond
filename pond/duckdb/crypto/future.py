@@ -51,7 +51,7 @@ def get_klines(
     end: int,
     res_list: list[pl.DataFrame],
 ):
-    deltaTime = end - start
+    deltaTime = (end - start) / 1000
     if interval == "1d":
         limit = int(deltaTime / 60 / 60 / 24) + 1
     elif interval == "1h":
@@ -61,6 +61,7 @@ def get_klines(
     else:
         raise ValueError(f"Invalid interval: {interval}")
 
+    logger.info(f"Requesting limit {limit} klines for {symbol} {interval}")
     dd = client.klines(
         symbol=symbol,
         interval=interval,
