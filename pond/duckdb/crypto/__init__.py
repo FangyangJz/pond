@@ -528,7 +528,7 @@ if __name__ == "__main__":
                 start="2020-1-1",
                 end="2024-7-12",
                 asset_type=AssetType.future_um,
-                data_type=DataType.metrics,
+                data_type=DataType.klines,
                 timeframe=interval,
                 # httpx_proxies={"https://": "https://127.0.0.1:7890"},
                 requests_proxies={
@@ -547,7 +547,7 @@ if __name__ == "__main__":
         return True
 
     # ...start downloading...
-    interval = "1d"
+    interval = "5m"
     complete = False
     retry = 0
     start_time = time.perf_counter()

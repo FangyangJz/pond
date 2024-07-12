@@ -51,12 +51,22 @@ def get_klines(
     end: int,
     res_list: list[pl.DataFrame],
 ):
+    deltaTime = end - start
+    if interval == "1d":
+        limit = int(deltaTime / 60 / 60 / 24) + 1
+    elif interval == "1h":
+        limit = int(deltaTime / 60 / 60) + 1
+    elif interval == "5m":
+        limit = int(deltaTime / 60 / 5) + 1
+    else:
+        raise ValueError(f"Invalid interval: {interval}")
+
     dd = client.klines(
         symbol=symbol,
         interval=interval,
         startTime=start,
         endTime=end,
-        limit=500 if interval not in ["1s", "1m"] else 1000,
+        limit=limit,
     )
     dd = pl.from_records(dd, schema=klines_schema)
     res_list.append(dd)
@@ -101,6 +111,25 @@ def get_supply_df(
 if __name__ == "__main__":
     import polars as pl
     from pond.duckdb.crypto.const import klines_schema
+
+    symbol = "IOTAUSDT"
+    client = UMFutures(proxies={"http": "127.0.0.1:7890", "https": "127.0.0.1:7890"})
+    dd = client.klines(
+        symbol=symbol,
+        interval="5m",
+        startTime=1645833300000,
+        endTime=1646092800000,
+        limit=1500,
+    )
+    dd = (
+        pl.from_records(dd, schema=klines_schema)
+        .with_columns(
+            (pl.col("open_time") * 1e3).cast(pl.Datetime),
+            (pl.col("close_time") * 1e3).cast(pl.Datetime),
+            jj_code=pl.lit(symbol),
+        )
+        .sort("open_time")
+    )
 
     symbol = "BTSUSDT"
     interval = "1d"
