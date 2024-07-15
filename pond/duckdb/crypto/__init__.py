@@ -244,6 +244,8 @@ class CryptoDB(DuckDB):
 
         for idx, row in (pbar := tqdm(asset_info_df.iterrows(), position=worker_id)):
             symbol = row["symbol"]
+            # if symbol != "CRVUSDT":
+            #     continue
 
             if self.is_future_type(asset_type):
                 delivery_date = parser.parse(row["deliveryDate"])
@@ -436,7 +438,8 @@ class CryptoDB(DuckDB):
                 symbol=symbol,
                 interval=timeframe,
             )
-            supply_df = self.filter_quote_volume_0(supply_df, symbol, timeframe)
+            if do_filter_quote_volume_0:
+                supply_df = self.filter_quote_volume_0(supply_df, symbol, timeframe)
             df = pl.concat([df.select(pl.exclude("open_time_diff")), supply_df])
         else:
             df = df.select(pl.exclude("open_time_diff"))
@@ -449,9 +452,10 @@ class CryptoDB(DuckDB):
                 jj_code=pl.lit(symbol),
             )
             .sort("open_time")
+            .fill_null(strategy="forward")
             .unique(maintain_order=True)
         )
-
+        # check_df = df.to_pandas()
         logger.success(
             f"[{symbol}] Dataframe shape: {df.shape}, {df['open_time'].min()} -> {df['close_time'].max()}."
         )
@@ -526,7 +530,7 @@ if __name__ == "__main__":
         try:
             db.update_history_data_parallel(
                 start="2020-1-1",
-                end="2024-7-12",
+                end="2024-7-15",
                 asset_type=AssetType.future_um,
                 data_type=DataType.klines,
                 timeframe=interval,
