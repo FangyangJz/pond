@@ -42,6 +42,35 @@ def get_future_symbol_list(client: CMFutures | UMFutures) -> list[str]:
     ]
 
 
+def mock_empty_klines(start: int, end: int, coef: int) -> pl.DataFrame:
+    return (
+        pl.DataFrame(
+            {
+                "open_time": pl.arange(start, end, coef * 1000, eager=True),
+                "volume": 0.0,
+                "quote_volume": 0.0,
+                "taker_buy_volume": 0.0,
+                "taker_buy_quote_volume": 0.0,
+                "ignore": 0.0,
+            },
+        )
+        .with_columns(
+            pl.lit(0, pl.Int64).alias("count"),
+            pl.lit(None, pl.Float64).alias("open"),
+            pl.lit(None, pl.Float64).alias("high"),
+            pl.lit(None, pl.Float64).alias("low"),
+            pl.lit(None, pl.Float64).alias("close"),
+            (pl.col("open_time") + coef * 1000 - 1).alias("close_time"),
+        )
+        .select(list(klines_schema.keys()))
+        # .with_columns(
+        #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
+        #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
+        # )
+        # .sort("open_time")
+    )
+
+
 @retry(wait=wait_fixed(3))
 def get_klines(
     client: CMFutures | UMFutures | Spot,
@@ -51,15 +80,82 @@ def get_klines(
     end: int,
     res_list: list[pl.DataFrame],
 ):
-    dd = client.klines(
-        symbol=symbol,
-        interval=interval,
-        startTime=start,
-        endTime=end,
-        limit=500 if interval not in ["1s", "1m"] else 1000,
-    )
-    dd = pl.from_records(dd, schema=klines_schema)
-    res_list.append(dd)
+    deltaTime = (end - start) / 1000
+    coef = 1
+    if interval == "1d":
+        coef = 60 * 60 * 24
+        limit = int(deltaTime / coef) + 1
+    elif interval == "1h":
+        coef = 60 * 60
+        limit = int(deltaTime / coef) + 1
+    elif interval == "5m":
+        coef = 60 * 5
+        limit = int(deltaTime / coef) + 1
+    else:
+        raise ValueError(f"Invalid interval: {interval}")
+
+    logger.info(f"Requesting limit {limit} klines for {symbol} {interval}")
+    if (symbol in ["ICPUSDT"]) and (limit > 1500):
+        dd = mock_empty_klines(start, end, coef)
+
+    elif limit > 1500:
+        logger.info(
+            f"Requesting limit {limit} > 1500 for {symbol} {interval}, loop limit fix 499."
+        )
+        fix_limit = 499
+        raise ValueError("manual breakpoint")
+        while True:
+            dd = (
+                pl.from_records(
+                    client.klines(
+                        symbol=symbol,
+                        interval=interval,
+                        # startTime=start,
+                        endTime=end,
+                        limit=fix_limit,
+                    ),
+                    schema=klines_schema,
+                )
+                # .with_columns(
+                #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
+                #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
+                #     jj_code=pl.lit(symbol),
+                # )
+                # .sort("open_time")
+            )
+            limit -= fix_limit
+            if limit < (1 - 499):
+                break
+            else:
+                res_list.append(dd)
+    else:
+        dd = client.klines(
+            symbol=symbol,
+            interval=interval,
+            startTime=start,
+            endTime=end,
+            limit=limit,
+        )
+        dd = (
+            pl.from_records(dd, schema=klines_schema)
+            # .with_columns(
+            #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
+            #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
+            #     jj_code=pl.lit(symbol),
+            # )
+            # .sort("open_time")
+        )
+        if dd.is_empty():
+            logger.warning(
+                f"No data returned for {symbol} {interval}, start:{start}, end:{end}, limit:{limit}. "
+                f"Use mock empty DataFrame replace."
+            )
+            dd = mock_empty_klines(start, end, coef)
+        else:
+            logger.success(
+                f"Retrieved {dd.shape[0]} klines for {symbol} {interval}, start:{start}, end:{end}, limit:{limit}"
+            )
+    res_list.append(dd[1:])
 
 
 def get_supply_df(
@@ -101,6 +197,25 @@ def get_supply_df(
 if __name__ == "__main__":
     import polars as pl
     from pond.duckdb.crypto.const import klines_schema
+
+    symbol = "IOTAUSDT"
+    client = UMFutures(proxies={"http": "127.0.0.1:7890", "https": "127.0.0.1:7890"})
+    dd = client.klines(
+        symbol=symbol,
+        interval="5m",
+        startTime=1645833300000,
+        endTime=1646092800000,
+        limit=1500,
+    )
+    dd = (
+        pl.from_records(dd, schema=klines_schema)
+        .with_columns(
+            (pl.col("open_time") * 1e3).cast(pl.Datetime),
+            (pl.col("close_time") * 1e3).cast(pl.Datetime),
+            jj_code=pl.lit(symbol),
+        )
+        .sort("open_time")
+    )
 
     symbol = "BTSUSDT"
     interval = "1d"

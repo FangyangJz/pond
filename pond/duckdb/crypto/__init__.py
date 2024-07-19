@@ -145,6 +145,7 @@ class CryptoDB(DuckDB):
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
+        do_filter_quote_volume_0: bool = False,
         if_skip_usdc: bool = True,
         ignore_cache=False,
         workers=None,
@@ -155,7 +156,7 @@ class CryptoDB(DuckDB):
         if workers is None:
             workers = int(os.cpu_count() / 2)
 
-        df = self.get_future_info(asset_type)
+        df = self.get_future_info(asset_type, from_local=False).sort_values(by="symbol")
         if self.is_future_type(asset_type):
             df = df[df["contractType"] == "PERPETUAL"][
                 [
@@ -166,6 +167,8 @@ class CryptoDB(DuckDB):
                     "update_datetime",
                 ]
             ]
+            manual_df = pd.read_csv(Path(__file__).parent / "UMFutures_manual.csv")
+            df = pd.concat([df, manual_df])
         else:
             df = df[["symbol"]]
 
@@ -183,6 +186,7 @@ class CryptoDB(DuckDB):
             #     httpx_proxies,
             #     requests_proxies,
             #     skip_symbols,
+            #     do_filter_quote_volume_0,
             #     if_skip_usdc,
             #     ignore_cache,
             #     i,
@@ -200,6 +204,7 @@ class CryptoDB(DuckDB):
                     httpx_proxies,
                     requests_proxies,
                     skip_symbols,
+                    do_filter_quote_volume_0,
                     if_skip_usdc,
                     ignore_cache,
                     i,
@@ -221,6 +226,7 @@ class CryptoDB(DuckDB):
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
+        do_filter_quote_volume_0: bool = False,
         if_skip_usdc: bool = True,
         ignore_cache=False,
         worker_id: int = 0,
@@ -238,6 +244,8 @@ class CryptoDB(DuckDB):
 
         for idx, row in (pbar := tqdm(asset_info_df.iterrows(), position=worker_id)):
             symbol = row["symbol"]
+            # if symbol != "CRVUSDT":
+            #     continue
 
             if self.is_future_type(asset_type):
                 delivery_date = parser.parse(row["deliveryDate"])
@@ -275,9 +283,17 @@ class CryptoDB(DuckDB):
                 asset_type,
                 data_type,
                 timeframe,
+                do_filter_quote_volume_0,
                 httpx_proxies,
                 requests_proxies,
             )
+            if data_type == DataType.klines:
+                df = df.filter(pl.col("open_time") < _end.replace(tzinfo=None))
+            elif data_type == DataType.fundingRate:
+                raise ValueError("fundingRate not support filter end time")
+            elif data_type == DataType.metrics:
+                df = df.filter(pl.col("create_time") < _end.replace(tzinfo=None))
+
             if len(df) == 0:
                 logger.warning(
                     f"{symbol} load df is empty, and skip save to parquet file"
@@ -305,6 +321,7 @@ class CryptoDB(DuckDB):
         asset_type: AssetType = AssetType.future_um,
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
+        do_filter_quote_volume_0: bool = False,
         httpx_proxies: ProxiesTypes = {},
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
     ) -> pl.DataFrame:
@@ -344,7 +361,12 @@ class CryptoDB(DuckDB):
             df = pl.concat(df_list)
             if data_type == DataType.klines:
                 df = self.transform_klines(
-                    df, symbol, asset_type, timeframe, requests_proxies
+                    df,
+                    symbol,
+                    asset_type,
+                    timeframe,
+                    requests_proxies,
+                    do_filter_quote_volume_0,
                 )
             elif data_type == DataType.trades:
                 pass
@@ -371,7 +393,9 @@ class CryptoDB(DuckDB):
 
     def transform_metrics(self, df: pl.DataFrame):
         return df.with_columns(
-            pl.col("create_time").str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S")
+            pl.col("create_time")
+            .str.strptime(pl.Datetime, "%Y-%m-%d %H:%M:%S")
+            .dt.truncate("5m")
         ).rename({"symbol": "jj_code"})
 
     def transform_klines(
@@ -381,10 +405,13 @@ class CryptoDB(DuckDB):
         asset_type: AssetType,
         timeframe: TIMEFRAMES,
         requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
+        do_filter_quote_volume_0: bool = False,
     ):
         from pond.duckdb.crypto.future import get_supply_df
 
-        df = self.filter_quote_volume_0(df, symbol, timeframe)
+        if do_filter_quote_volume_0:
+            df = self.filter_quote_volume_0(df, symbol, timeframe)
+
         df = (
             df.sort("open_time").with_columns(
                 (pl.col("open_time").diff() - pl.col("open_time").diff().shift(-1))
@@ -411,7 +438,8 @@ class CryptoDB(DuckDB):
                 symbol=symbol,
                 interval=timeframe,
             )
-            supply_df = self.filter_quote_volume_0(supply_df, symbol, timeframe)
+            if do_filter_quote_volume_0:
+                supply_df = self.filter_quote_volume_0(supply_df, symbol, timeframe)
             df = pl.concat([df.select(pl.exclude("open_time_diff")), supply_df])
         else:
             df = df.select(pl.exclude("open_time_diff"))
@@ -424,9 +452,10 @@ class CryptoDB(DuckDB):
                 jj_code=pl.lit(symbol),
             )
             .sort("open_time")
+            .fill_null(strategy="forward")
             .unique(maintain_order=True)
         )
-
+        # check_df = df.to_pandas()
         logger.success(
             f"[{symbol}] Dataframe shape: {df.shape}, {df['open_time'].min()} -> {df['close_time'].max()}."
         )
@@ -475,9 +504,20 @@ class CryptoDB(DuckDB):
                     )
                 )
 
+    def compare_um_future_info_with_vision(self):
+        local_path = Path(r"E:\DuckDB\crypto\data\futures\um\monthly\klines")
+        local_symbols = [i.stem for i in local_path.iterdir()]
+        info_symbols = self.get_future_info(AssetType.future_um, from_local=False)[
+            "symbol"
+        ].to_list()
+        diff_set = set(local_symbols) - set(info_symbols)
+        print(diff_set)
+
 
 if __name__ == "__main__":
     db = CryptoDB(Path(r"E:\DuckDB"))
+
+    # db.compare_um_future_info_with_vision()
 
     # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
 
@@ -490,9 +530,9 @@ if __name__ == "__main__":
         try:
             db.update_history_data_parallel(
                 start="2020-1-1",
-                end="2024-5-22",
+                end="2024-7-15",
                 asset_type=AssetType.future_um,
-                data_type=DataType.metrics,
+                data_type=DataType.klines,
                 timeframe=interval,
                 # httpx_proxies={"https://": "https://127.0.0.1:7890"},
                 requests_proxies={
@@ -500,8 +540,9 @@ if __name__ == "__main__":
                     "https": "127.0.0.1:7890",
                 },
                 skip_symbols=["ETHBTC"],
+                do_filter_quote_volume_0=False,
                 if_skip_usdc=True,
-                ignore_cache=False,
+                ignore_cache=True,
                 workers=os.cpu_count() - 2,
             )
         except BaseException as e:
@@ -510,7 +551,7 @@ if __name__ == "__main__":
         return True
 
     # ...start downloading...
-    interval = "1d"
+    interval = "5m"
     complete = False
     retry = 0
     start_time = time.perf_counter()
