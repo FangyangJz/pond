@@ -1,4 +1,8 @@
 from datetime import datetime
+
+import clickhouse_connect
+import clickhouse_connect.driver
+import clickhouse_connect.driver.client
 from pond.clickhouse.downoader import Downloader
 import akshare as ak
 from pond.clickhouse.holders import (
@@ -23,6 +27,7 @@ import datetime as dtm
 from clickhouse_driver import Client
 from deprecated import deprecated
 from typing import Union
+from urllib.parse import urlparse
 
 
 class Task:
@@ -36,14 +41,30 @@ class Task:
 
 
 class ClickHouseManager:
+    client: clickhouse_connect.driver.client.Client = None
+
     def __init__(self, db_uri, data_start: datetime = None, native_uri=None) -> None:
         self.engine = create_engine(db_uri)
         metadata.create_all(self.engine)
         self.data_start = data_start
         self.native_uri = native_uri
+        self.create_client(native_uri)
 
     def get_engin(self):
         return self.engine
+
+    def create_client(self, db_uri):
+        parts = urlparse(db_uri)
+        configs = {
+            "host": parts.hostname,
+            "user": parts.username,
+            "password": parts.password,
+            "session_id": "session_0",
+            "connect_timeout": 15,
+            "database": parts.path[1:],
+            "settings": {"distributed_ddl_task_timeout": 300},
+        }
+        self.client = clickhouse_connect.get_client(**configs)
 
     def sync(self, date=datetime.now()):
         print(f"click house manager syncing at {date.isoformat()}")
@@ -108,8 +129,10 @@ class ClickHouseManager:
                 sql += f" {filter} "
         if params is not None:
             query_params.update(params)
-        with Client.from_url(self.native_uri) as client:
-            df = client.query_dataframe(query=sql, params=query_params)
+        df = self.client.query_df(
+            query=sql,
+            parameters=query_params,
+        )
         if rename and not isinstance(table, str):
             df = df.rename(columns=table().get_colcom_names())
         return df
