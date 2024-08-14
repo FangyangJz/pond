@@ -75,11 +75,16 @@ class FuturesHelper:
         ]
         return stub_list
 
-    def sync_futures_kline(self, interval, workers=None) -> bool:
+    def sync_futures_kline(
+        self, interval, workers=None, end_time: datetime = None
+    ) -> bool:
         table = self.get_futures_table(interval)
         if table is None:
             return False
-        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        if end_time is not None:
+            signal = end_time
+        else:
+            signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
         if workers is None:
             workers = math.ceil(os.cpu_count() / 2)
         symbols = self.get_perpetual_symbols(signal)
@@ -128,7 +133,8 @@ class FuturesHelper:
         interval_seconds = timeframe2minutes(interval) * 60
         data_limit = 720  # 1 month, max 1000
         limit_seconds = data_limit * timeframe2minutes(interval) * 60
-        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        if signal is None:
+            signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
         for symbol in symbols:
             code = symbol["pair"]
             lastest_record = self.clickhouse.get_latest_record_time(
@@ -195,5 +201,7 @@ if __name__ == "__main__":
         conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
     )
     helper = FuturesHelper(crypto_db, manager)
-    ret = helper.sync_futures_kline("5m", workers=1)
+    ret = helper.sync_futures_kline(
+        "5m", workers=1, end_time=datetime.now().replace(hour=0).replace(minute=0)
+    )
     print(f"sync ret {ret}")
