@@ -99,7 +99,7 @@ class ClickHouseManager:
                 final_df["时间"] = date
                 self.save_to_db(task.table, final_df)
 
-    def native_read_table(
+    def __native_read_table(
         self,
         table: Union[str, TsTable],
         start_date: datetime,
@@ -117,7 +117,7 @@ class ClickHouseManager:
         query_params = {}
         if start_date is None:
             start_date = self.data_start
-        sql += f" where {datetime_col} >= %(start)s "
+        sql += f" where {datetime_col} > %(start)s "
         query_params["start"] = start_date
         if end_date is not None:
             sql += f" AND {datetime_col} <= %(end)s "
@@ -136,6 +136,39 @@ class ClickHouseManager:
         if rename and not isinstance(table, str):
             df = df.rename(columns=table().get_colcom_names())
         return df
+
+    def native_read_table(
+        self,
+        table: Union[str, TsTable],
+        start_date: datetime,
+        end_date: datetime,
+        filters=None,
+        params=None,
+        rename=False,
+        datetime_col="datetime",
+        trunk_days=None,
+    ) -> pd.DataFrame:
+        if trunk_days is None:
+            starts = [start_date]
+            ends = [end_date]
+        else:
+            dt_splits = int(
+                (end_date - start_date).total_seconds() / 3600 / 24 / trunk_days
+            )
+            dt_step = (end_date - start_date) // dt_splits
+            starts = [start_date + dt_step * i for i in range(0, dt_splits)]
+            ends = [start_date + dt_step * (i + 1) for i in range(0, dt_splits)]
+        dfs = []
+        for start, end in zip(starts, ends):
+            print(f"reading {table} from {start} to {end}")
+            df = self.__native_read_table(
+                table, start, end, filters, params, rename, datetime_col
+            )
+            if df is not None and len(df) > 0:
+                dfs.append(df)
+        if len(dfs) > 0:
+            return pd.concat(dfs)
+        return None
 
     @deprecated("this method works quite slowly, use native read table instead.")
     def read_table(
