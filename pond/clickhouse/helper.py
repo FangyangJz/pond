@@ -5,7 +5,7 @@ from typing import Optional
 import datetime as dtm
 from datetime import datetime
 from binance.um_futures import UMFutures
-from pond.clickhouse.kline import FuturesKline5m, FuturesKline1H
+from pond.clickhouse.kline import FuturesKline5m, FuturesKline1H, FuturesKline1d
 from threading import Thread
 import threading
 import pandas as pd
@@ -55,6 +55,8 @@ class FuturesHelper:
             return FuturesKline1H
         if interval == "5m":
             return FuturesKline5m
+        if interval == "1d":
+            return FuturesKline1d
         return None
 
     def gen_stub_kline_as_list(self, start: datetime, end: datetime):
@@ -202,6 +204,6 @@ if __name__ == "__main__":
     )
     helper = FuturesHelper(crypto_db, manager)
     ret = helper.sync_futures_kline(
-        "5m", workers=1, end_time=datetime.now().replace(hour=0).replace(minute=0)
+        "1d", workers=1, end_time=datetime.now().replace(hour=0).replace(minute=0)
     )
     print(f"sync ret {ret}")
