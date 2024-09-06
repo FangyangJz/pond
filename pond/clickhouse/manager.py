@@ -28,6 +28,7 @@ from clickhouse_driver import Client
 from deprecated import deprecated
 from typing import Union
 from urllib.parse import urlparse
+import math
 
 
 class Task:
@@ -152,7 +153,7 @@ class ClickHouseManager:
             starts = [start_date]
             ends = [end_date]
         else:
-            dt_splits = int(
+            dt_splits = math.ceil(
                 (end_date - start_date).total_seconds() / 3600 / 24 / trunk_days
             )
             dt_step = (end_date - start_date) // dt_splits
