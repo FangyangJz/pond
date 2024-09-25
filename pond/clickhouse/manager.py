@@ -156,6 +156,7 @@ class ClickHouseManager:
             dt_splits = math.ceil(
                 (end_date - start_date).total_seconds() / 3600 / 24 / trunk_days
             )
+            dt_splits = max(1, dt_splits)
             dt_step = (end_date - start_date) // dt_splits
             starts = [start_date + dt_step * i for i in range(0, dt_splits)]
             ends = [start_date + dt_step * (i + 1) for i in range(0, dt_splits)]
