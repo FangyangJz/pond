@@ -42,14 +42,11 @@ class Task:
 
 
 class ClickHouseManager:
-    client: clickhouse_connect.driver.client.Client = None
-
     def __init__(self, db_uri, data_start: datetime = None, native_uri=None) -> None:
         self.engine = create_engine(db_uri)
         metadata.create_all(self.engine)
         self.data_start = data_start
         self.native_uri = native_uri
-        self.create_client(native_uri)
 
     def get_engin(self):
         return self.engine
@@ -65,7 +62,7 @@ class ClickHouseManager:
             "database": parts.path[1:],
             "settings": {"distributed_ddl_task_timeout": 300},
         }
-        self.client = clickhouse_connect.get_client(**configs)
+        return clickhouse_connect.get_client(**configs)
 
     def sync(self, date=datetime.now()):
         print(f"click house manager syncing at {date.isoformat()}")
@@ -130,13 +127,14 @@ class ClickHouseManager:
                 sql += f" {filter} "
         if params is not None:
             query_params.update(params)
-        df = self.client.query_df(
-            query=sql,
-            parameters=query_params,
-        )
-        if rename and not isinstance(table, str):
-            df = df.rename(columns=table().get_colcom_names())
-        return df
+        with self.create_client(self.native_uri) as client:
+            df = client.query_df(
+                query=sql,
+                parameters=query_params,
+            )
+            if rename and not isinstance(table, str):
+                df = df.rename(columns=table().get_colcom_names())
+            return df
 
     def native_read_table(
         self,
