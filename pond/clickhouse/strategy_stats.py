@@ -5,7 +5,7 @@ from pond.clickhouse import TsTable
 
 class FuturePosition(TsTable):
     __tablename__ = "future_position"
-    open_date = Column(types.DateTime64, comment="open_date", primary_key=True)
+    datetime = Column(types.DateTime64, comment="open_date", primary_key=True)
     pair = Column(types.String, comment="pair")
     strategy = Column(types.String, comment="strategy")
     account = Column(types.String, comment="account")
@@ -22,9 +22,9 @@ class FuturePosition(TsTable):
 
     __table_args__ = (
         engines.ReplacingMergeTree(
-            partition_by=func.toYYYYMM(open_date),
-            order_by=(open_date, pair),
-            primary_key=(open_date, pair),
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, pair),
+            primary_key=(datetime, pair),
         ),
     )
 

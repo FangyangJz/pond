@@ -211,7 +211,8 @@ class ClickHouseManager:
         else:
             table_name = table.__tablename__
             df = table().format_dataframe(df)
-            df.drop_duplicates(subset=["datetime", "code"], inplace=True)
+            if "datetime" in df.columns and "code" in df.columns:
+                df.drop_duplicates(subset=["datetime", "code"], inplace=True)
             lastet_record_time = self.get_latest_record_time(table, last_record_filters)
 
         origin_len = len(df)

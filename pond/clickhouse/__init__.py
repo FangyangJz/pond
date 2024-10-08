@@ -14,7 +14,6 @@ class TsTable(Base):
     __abstract__ = True
 
     datetime = Column(types.DateTime64, comment="时间", primary_key=True)
-    code = Column(types.String, comment="代码")
 
     def format_dataframe(self, df: pd.DataFrame):
         all_cols = []
