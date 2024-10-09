@@ -19,6 +19,10 @@ class FuturePosition(TsTable):
     group: int = Column(types.Int32, comment="group")
     status: str = Column(types.String, comment="status")
     refreshed_date = Column(types.DateTime64, comment="refreshed_date")
+    refreshed_count = Column(types.Int64, comment="refreshed_count")
+    prediction_refreshed_date = Column(
+        types.DateTime64, comment="prediction_refreshed_date"
+    )
 
     __table_args__ = (
         engines.ReplacingMergeTree(
