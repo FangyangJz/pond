@@ -5,7 +5,7 @@ from pond.clickhouse import TsTable
 
 class FuturePosition(TsTable):
     __tablename__ = "future_position"
-    datetime = Column(types.DateTime64, comment="open_date", primary_key=True)
+    datetime = Column(types.DateTime64, comment="refreshed_date", primary_key=True)
     pair = Column(types.String, comment="pair")
     strategy = Column(types.String, comment="strategy")
     account = Column(types.String, comment="account")
@@ -18,7 +18,7 @@ class FuturePosition(TsTable):
     close_price: float = Column(types.Float64, comment="close_price")
     group: int = Column(types.Int32, comment="group")
     status: str = Column(types.String, comment="status")
-    refreshed_date = Column(types.DateTime64, comment="refreshed_date")
+    open_date = Column(types.DateTime64, comment="open_date")
     refreshed_count = Column(types.Int64, comment="refreshed_count")
     prediction_refreshed_date = Column(
         types.DateTime64, comment="prediction_refreshed_date"
