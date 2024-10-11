@@ -246,7 +246,9 @@ class ClickHouseManager:
             rows = client.insert_dataframe(
                 query=query, dataframe=df, settings=dict(use_numpy=True)
             )
-            print(f"total {len(df)} saved {rows} into table {table_name}")
+            print(
+                f"total {len(df)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
+            )
 
     def get_syncing_tasks(self, date) -> List[Task]:
         tasks: List[Task] = []
