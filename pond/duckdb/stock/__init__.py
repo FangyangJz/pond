@@ -59,7 +59,7 @@ class StockDB(DuckDB):
             self.path_stock_level2_orderbook,
             self.path_stock_level2_orderbook_rebuild,
             self.path_stock_snapshot_1m,
-            self.path_stock_industry
+            self.path_stock_industry,
         ]
 
         super().__init__(db_path, df_type)
@@ -288,7 +288,7 @@ class StockDB(DuckDB):
         )
         return self.transform_to_df(rel)
 
-    def update_kline_from_tdx(self, tdx_dir=None, period='1'):
+    def update_kline_from_tdx(self, tdx_dir=None, period="1"):
         from pond.akshare.stock.all_basic import get_all_stocks_df
         import os
         import math
@@ -314,42 +314,60 @@ class StockDB(DuckDB):
         for reader in readers:
             ray.get(reader.get.remote())
 
-
     def update_kline_1d_by_1m(self, force=True):
-        def agg_into_1d(parquet_file:Path) -> pl.DataFrame:
-            df = pl.scan_parquet(parquet_file).with_columns([
-                pl.col("date").alias("datetime"),
-                pl.col("date").dt.date().alias("date"),
-                pl.col("date").dt.time().alias("time"),
-            ]).sort("datetime").with_columns([
-                (pl.col("close") / pl.col("close").shift(1) -1).alias("chgpct")
-            ]).with_columns([
-                ((1 + pl.col("chgpct") * 10).log(2) * pl.col("amount")).alias("found"),#使用log函数模拟资金流入流出
-            ])
-            df_day = df.group_by("date").agg([
-                pl.col("open").first(),
-                pl.col("high").max(),
-                pl.col("low").min(),
-                pl.col("close").last(),
-                pl.col("datetime").first().alias("open_time"),
-                pl.col("datetime").last().alias("close_time"),
-                pl.col("volume").sum(),
-                pl.col("amount").sum(),
-                pl.col("found").sum(),
-            ]).sort("date").with_columns([
-                pl.lit(parquet_file.stem).alias("jj_code"),
-                pl.col("amount").alias("quote_volume"),
-            ])
+        def agg_into_1d(parquet_file: Path) -> pl.DataFrame:
+            df = (
+                pl.scan_parquet(parquet_file)
+                .with_columns(
+                    [
+                        pl.col("date").alias("datetime"),
+                        pl.col("date").dt.date().alias("date"),
+                        pl.col("date").dt.time().alias("time"),
+                    ]
+                )
+                .sort("datetime")
+                .with_columns(
+                    [(pl.col("close") / pl.col("close").shift(1) - 1).alias("chgpct")]
+                )
+                .with_columns(
+                    [
+                        ((1 + pl.col("chgpct") * 10).log(2) * pl.col("amount")).alias(
+                            "found"
+                        ),  # 使用log函数模拟资金流入流出
+                    ]
+                )
+            )
+            df_day = (
+                df.group_by("date")
+                .agg(
+                    [
+                        pl.col("open").first(),
+                        pl.col("high").max(),
+                        pl.col("low").min(),
+                        pl.col("close").last(),
+                        pl.col("datetime").first().alias("open_time"),
+                        pl.col("datetime").last().alias("close_time"),
+                        pl.col("volume").sum(),
+                        pl.col("amount").sum(),
+                        pl.col("found").sum(),
+                    ]
+                )
+                .sort("date")
+                .with_columns(
+                    [
+                        pl.lit(parquet_file.stem).alias("jj_code"),
+                        pl.col("amount").alias("quote_volume"),
+                    ]
+                )
+            )
             return df_day.collect().sort("close_time")
 
-        
-        for file in tqdm((self.path_stock_kline_tdx / '1').glob("*.parquet")):
+        for file in tqdm((self.path_stock_kline_tdx / "1").glob("*.parquet")):
             target = self.path_stock_kline_1d_generated / file.name
             if target.exists() and not force:
                 continue
             df = agg_into_1d(file)
             df.write_parquet(target, compression=self.compress.lower())
-
 
     def get_snapshot_1m(self) -> pl.LazyFrame:
         return pl.scan_parquet(self.path_stock_snapshot_1m / "*.parquet")
@@ -361,58 +379,79 @@ class StockDB(DuckDB):
             rf"SELECT * from read_parquet({[str(f) for f in self.path_stock_snapshot_1m.iterdir()]})"
         ).filter(
             f"(date >= TIMESTAMP '{start_date}') and (date < TIMESTAMP '{end_date}')"
-        ) 
-
+        )
 
     def update_snapshot_1m(self, force=True):
         """
         aggrate 1m kline into market snapshot
         """
+
         def agg_into_snapshots(parquet_file) -> pl.DataFrame:
-            df = pl.scan_parquet(parquet_file).with_columns([
-                pl.col("date").alias("datetime"),
-                pl.col("date").dt.date().alias("date"),
-                pl.col("date").dt.time().alias("time"),
-            ]).sort("datetime").with_columns([
-                (pl.col("close") / pl.col("close").shift(1) -1).alias("chgpct")
-            ]).with_columns([
-                ((1 + pl.col("chgpct") * 10).log(2) * pl.col("amount")).alias("found"),#使用log函数模拟资金流入流出
-            ])
-            df_day = df.group_by("date").agg([
-                pl.col("close").last().alias("dclose")
-            ]).sort("date").with_columns([
-                pl.col("dclose").shift(1).alias("dclose_lag1")
-            ])
+            df = (
+                pl.scan_parquet(parquet_file)
+                .with_columns(
+                    [
+                        pl.col("date").alias("datetime"),
+                        pl.col("date").dt.date().alias("date"),
+                        pl.col("date").dt.time().alias("time"),
+                    ]
+                )
+                .sort("datetime")
+                .with_columns(
+                    [(pl.col("close") / pl.col("close").shift(1) - 1).alias("chgpct")]
+                )
+                .with_columns(
+                    [
+                        ((1 + pl.col("chgpct") * 10).log(2) * pl.col("amount")).alias(
+                            "found"
+                        ),  # 使用log函数模拟资金流入流出
+                    ]
+                )
+            )
+            df_day = (
+                df.group_by("date")
+                .agg([pl.col("close").last().alias("dclose")])
+                .sort("date")
+                .with_columns([pl.col("dclose").shift(1).alias("dclose_lag1")])
+            )
             df_minutes = []
-            for time in pl.time_range(dtime(9,30), dtime(15,0), '1m', eager=True):
-                if time > dtime(11,30) and time < dtime(13,0):
+            for time in pl.time_range(dtime(9, 30), dtime(15, 0), "1m", eager=True):
+                if time > dtime(11, 30) and time < dtime(13, 0):
                     continue
-                df_minute = df.filter(pl.col("time") <= time).group_by("date").agg([
-                    pl.col("open").first(),
-                    pl.col("high").max(),
-                    pl.col("low").min(),
-                    pl.col("close").last(),
-                    pl.col("time").last(),
-                    pl.col("datetime").last(),
-                    pl.col("volume").sum(),
-                    pl.col("amount").sum(),
-                    pl.col("found").sum(),
-                    pl.col("chgpct").last().alias("chgpct_1m")
-                ]).with_columns([
-                    pl.lit(parquet_file.stem).alias("code")
-                ])
+                df_minute = (
+                    df.filter(pl.col("time") <= time)
+                    .group_by("date")
+                    .agg(
+                        [
+                            pl.col("open").first(),
+                            pl.col("high").max(),
+                            pl.col("low").min(),
+                            pl.col("close").last(),
+                            pl.col("time").last(),
+                            pl.col("datetime").last(),
+                            pl.col("volume").sum(),
+                            pl.col("amount").sum(),
+                            pl.col("found").sum(),
+                            pl.col("chgpct").last().alias("chgpct_1m"),
+                        ]
+                    )
+                    .with_columns([pl.lit(parquet_file.stem).alias("code")])
+                )
                 df_minutes.append(df_minute)
 
-            df : pl.LazyFrame = pl.concat(df_minutes)
-            df = df.join(df_day, on='date')
-            df = df.with_columns([
-                (pl.col("close") / pl.col("dclose_lag1") -1).alias("dchgpct"),
-                (pl.col("dclose") / pl.col("dclose_lag1") -1).alias("dchgpct_next0")
-            ])
+            df: pl.LazyFrame = pl.concat(df_minutes)
+            df = df.join(df_day, on="date")
+            df = df.with_columns(
+                [
+                    (pl.col("close") / pl.col("dclose_lag1") - 1).alias("dchgpct"),
+                    (pl.col("dclose") / pl.col("dclose_lag1") - 1).alias(
+                        "dchgpct_next0"
+                    ),
+                ]
+            )
             return df.collect().sort("datetime")
 
-        
-        for file in (self.path_stock_kline_tdx / '1').glob("*.parquet"):
+        for file in (self.path_stock_kline_tdx / "1").glob("*.parquet"):
             target = self.path_stock_snapshot_1m / file.name
             if target.exists() and not force:
                 continue
@@ -420,19 +459,15 @@ class StockDB(DuckDB):
             df.write_parquet(target, compression=self.compress.lower())
             print(f"writing {self.path_stock_snapshot_1m / file.name}")
 
-
     def update_indsutry_info(self):
         pindustry.update_industry_list(self.path_stock_industry)
         pindustry.update_industry_constituent(self.path_stock_industry)
 
-
     def read_industry_consituent(self) -> pl.LazyFrame:
         return pindustry.read_industry_consituent(self.path_stock_industry)
-    
 
     def update_indsutry_index(self):
-        pindustry.gen_industry_index(self.get_snapshot_1m(),  self.path_stock_industry)
-
+        pindustry.gen_industry_index(self.get_snapshot_1m(), self.path_stock_industry)
 
     def read_industry_index(self, industry=None) -> pl.LazyFrame:
         return pindustry.read_industry_index(self.path_stock_industry, industry)
@@ -444,12 +479,13 @@ if __name__ == "__main1__":
     db = StockDB(Path(r"E:\DuckDB"))
     db.init_db_path()
     db.update_indsutry_index()
-    #print(f"read indsutry {len(db.read_industry_consituent().collect())}")
-    #db.update_indsutry_info()
-    #print(f"read indsutry {len(db.read_industry_consituent().collect())}")
+    # print(f"read indsutry {len(db.read_industry_consituent().collect())}")
+    # db.update_indsutry_info()
+    # print(f"read indsutry {len(db.read_industry_consituent().collect())}")
 
 if __name__ == "__main__":
     import time
+
     db = StockDB(Path(r"E:\DuckDB"))
     db.init_db_path()
     # db = StockDB(Path(r'/home/fangyang/zhitai5000/DuckDB/'))
@@ -458,8 +494,8 @@ if __name__ == "__main__":
     # rel = db.get_kline_1d_qfq_rel()
     # df = db.get_kline_1d_qfq_df().to_pandas()
 
-    #db.update_stock_info()
-    #db.update_kline_1d_nfq()
+    # db.update_stock_info()
+    # db.update_kline_1d_nfq()
     # db.update_kline_1d_qfq()
 
     # db.update_level2_trade()
@@ -471,12 +507,12 @@ if __name__ == "__main__":
     #
     # r4 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'basic.parquet')}')")
     # r5 = db.con.sql(rf"SELECT * from read_parquet('{str(db.path_stock_info / 'calender.parquet')}')")
-    
-    db.update_kline_from_tdx(r"D:\windows\programs\TongDaXin", 'd')
 
-    #db.update_kline_1d_by_1m()
+    db.update_kline_from_tdx(r"D:\windows\programs\TongDaXin", "d")
+
+    # db.update_kline_1d_by_1m()
 
     start = time.perf_counter()
-    #df = db.get_kline_1m()
-    #print(f"fetched data {len(df)}, cost time {time.perf_counter() - start:.2f}")
+    # df = db.get_kline_1m()
+    # print(f"fetched data {len(df)}, cost time {time.perf_counter() - start:.2f}")
     print(1)

@@ -3,14 +3,13 @@ from clickhouse_sqlalchemy import types, engines
 from pond.clickhouse import TsTable
 
 
-class StockFactor(TsTable):
-    __tablename__ = "stock_factor"
+class StockPrediction(TsTable):
+    __tablename__ = "stock_prediction"
 
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
     code = Column(types.String, comment="jj_code")
-    interval = Column(types.String, comment="interval")
-    name = Column(types.String, comment="factor_name")
-    value = Column(types.String, comment="value")
+    model = Column(types.String, comment="model")
+    value = Column(types.Float64, comment="y_pred")
 
     __table_args__ = (
         engines.MergeTree(
@@ -21,14 +20,13 @@ class StockFactor(TsTable):
     )
 
 
-class CryptoFactor(TsTable):
-    __tablename__ = "crypto_factor"
+class CryptoPrediction(TsTable):
+    __tablename__ = "crypto_prediction"
 
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
     code = Column(types.String, comment="jj_code")
-    interval = Column(types.String, comment="interval")
-    name = Column(types.String, comment="factor_name")
-    value = Column(types.String, comment="value")
+    model = Column(types.String, comment="model")
+    value = Column(types.Float64, comment="y_pred")
 
     __table_args__ = (
         engines.MergeTree(
@@ -39,14 +37,20 @@ class CryptoFactor(TsTable):
     )
 
 
-class FuturesFactor(TsTable):
-    __tablename__ = "futures_factor"
+class FuturesPrediction(TsTable):
+    __tablename__ = "futures_prediction"
 
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
     code = Column(types.String, comment="jj_code")
-    interval = Column(types.String, comment="interval")
-    name = Column(types.String, comment="factor_name")
-    value = Column(types.String, comment="value")
+    model = Column(types.String, comment="model")
+    model_name = Column(types.String, comment="model_name")
+    train_start = Column(types.DateTime64, comment="train_start", primary_key=True)
+    train_end = Column(types.DateTime64, comment="train_end", primary_key=True)
+    rank_start = Column(types.DateTime64, comment="rank_start", primary_key=True)
+    rank_end = Column(types.DateTime64, comment="rank_end", primary_key=True)
+    rank_ls_rtn = Column(types.Float64, comment="rank_ls_rtn")
+    rank_sharpe = Column(types.Float64, comment="rank_sharpe")
+    value = Column(types.Float64, comment="y_pred")
 
     __table_args__ = (
         engines.MergeTree(

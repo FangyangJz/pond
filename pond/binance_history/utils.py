@@ -20,6 +20,7 @@ from pond.utils.crawler import get_mock_headers
 from pond.binance_history.vision import get_vision_data_url_list
 from pond.binance_history.exceptions import NetworkError
 from pond.binance_history.type import TIMEFRAMES, AssetType, DataType, Freq
+from pond.duckdb.crypto.const import timeframe_data_types_dict
 
 
 def gen_data_url(
@@ -42,13 +43,12 @@ def gen_data_url(
             f"https://data.binance.vision/data/{asset_type.value}/{freq.value}/{data_type.value}/{symbol}/{timeframe}"
             f"/{symbol}-{timeframe}-{date_str}.zip"
         )
-    elif data_type == DataType.aggTrades:
+    else:
         url = (
             f"https://data.binance.vision/data/{asset_type.value}/{freq.value}/{data_type.value}/{symbol}"
-            f"/{symbol}-{data_type}-{date_str}.zip"
+            f"/{symbol}-{data_type.value}-{date_str}.zip"
         )
-    else:
-        raise ValueError(f"data_type must be 'klines', but got '{data_type}'")
+
     return url
 
 
@@ -180,61 +180,64 @@ def get_urls_by_xml_parse(
     proxies: dict[str, str] = {},
 ) -> tuple[list[str], list[str]]:
     assert start <= end, "start cannot be greater than end"
+    all_dict = {}
 
-    months = pd.date_range(
-        start.replace(day=1),
-        end,
-        freq="MS",
-    ).to_list()
-
+    month_url_dict = {}
     local_month_dict = {}
     network_month_dict = {}
-    month_url_dict = {
-        gen_data_url(
-            data_type, asset_type, Freq.monthly, symbol, m, timeframe=timeframe
-        ): m
-        for m in months
-    }
-
-    all_dict = {}
-    if month_url_dict:
-        month_url_list_remote = loop_get_url_list_remote(
-            "monthly", asset_type, data_type, symbol, timeframe, proxies
-        )
-
-        for month_url, m in month_url_dict.items():
-            if get_local_data_path(month_url, file_path).exists():
-                local_month_dict[month_url] = m
-            elif month_url in month_url_list_remote:
-                network_month_dict[month_url] = m
-
-        all_dict = local_month_dict | network_month_dict
-
-    if not all_dict:
-        return [], []
-
-    all_keys = list(all_dict.keys())
-    all_keys.sort()
-
     local_day_list = []
     network_day_list = []
-    start = all_dict[all_keys[-1]] + pd.DateOffset(months=1)
-    # 4*31 表示 4个月没有月数据, 用4个月的日数据补充
-    days_url_list = [
-        gen_data_url(data_type, asset_type, Freq.daily, symbol, d, timeframe=timeframe)
-        for d in pd.date_range(start, end, freq="D").to_list()[: 4 * 31]
-    ]
+    if data_type in timeframe_data_types_dict["1M"]:
+        months = pd.date_range(
+            start.replace(day=1),
+            end,
+            freq="MS",
+        ).to_list()
 
-    if days_url_list:
-        days_url_list_remote = loop_get_url_list_remote(
-            "daily", asset_type, data_type, symbol, timeframe, proxies
-        )
+        month_url_dict = {
+            gen_data_url(
+                data_type, asset_type, Freq.monthly, symbol, m, timeframe=timeframe
+            ): m
+            for m in months
+        }
 
-        for day_url in days_url_list:
-            if get_local_data_path(day_url, file_path).exists():
-                local_day_list.append(day_url)
-            elif day_url in days_url_list_remote:
-                network_day_list.append(day_url)
+        if month_url_dict:
+            month_url_list_remote = loop_get_url_list_remote(
+                "monthly", asset_type, data_type, symbol, timeframe, proxies
+            )
+
+            for month_url, m in month_url_dict.items():
+                if get_local_data_path(month_url, file_path).exists():
+                    local_month_dict[month_url] = m
+                elif month_url in month_url_list_remote:
+                    network_month_dict[month_url] = m
+
+            all_dict = local_month_dict | network_month_dict
+            if all_dict:
+                all_keys = list(all_dict.keys())
+                all_keys.sort()
+                start = all_dict[all_keys[-1]] + pd.DateOffset(months=1)
+            else:
+                start = months[-1]
+
+    if data_type in timeframe_data_types_dict["1d"]:
+        days_url_list = [
+            gen_data_url(
+                data_type, asset_type, Freq.daily, symbol, d, timeframe=timeframe
+            )
+            for d in pd.date_range(start, end, freq="D").to_list()
+        ]
+
+        if days_url_list:
+            days_url_list_remote = loop_get_url_list_remote(
+                "daily", asset_type, data_type, symbol, timeframe, proxies
+            )
+
+            for day_url in days_url_list:
+                if get_local_data_path(day_url, file_path).exists():
+                    local_day_list.append(day_url)
+                elif day_url in days_url_list_remote:
+                    network_day_list.append(day_url)
 
     # https://data.binance.vision/data/spot/monthly/klines/BCCBTC/1d/BCCBTC-1d-2018-11.zip
     download_urls = list(network_month_dict.keys()) + network_day_list
@@ -250,9 +253,12 @@ def loop_get_url_list_remote(
     timeframe: TIMEFRAMES,
     proxies: dict[str, str],
 ) -> list[str]:
+    prefix = f"data/{asset_type.value}/{freq}/{data_type.value}/{symbol}/"
     params = {
         "delimiter": r"/",
-        "prefix": f"data/{asset_type.value}/{freq}/{data_type.value}/{symbol}/{timeframe}/",
+        "prefix": prefix + f"{timeframe}/"
+        if data_type in [DataType.klines]
+        else prefix,
     }
     is_truncated, day_url_list_remote = get_vision_data_url_list(params, proxies)
     while is_truncated:
@@ -292,7 +298,9 @@ def load_data_from_disk(
 
     if path.exists():
         try:
-            if (int(path.stem.split("-")[2]) < 2022) or ("spot" in path.parts):
+            if ("klines" in path.parts) and (
+                (int(path.stem.split("-")[2]) < 2022) or ("spot" in path.parts)
+            ):
                 df = (
                     pl.read_csv(
                         ZipFile(path).read(f"{path.stem}.csv"),
