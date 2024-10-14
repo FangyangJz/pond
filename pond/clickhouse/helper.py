@@ -31,7 +31,9 @@ class FuturesHelper:
     ) -> None:
         self.crypto_db = crypto_db
         self.clickhouse = clickhouse
-        self.exchange = UMFutures()
+        self.exchange = UMFutures(
+            proxies={"https": "127.0.0.1:7890", "http": "127.0.0.1:7890"}
+        )
         self.configs = kwargs
 
     def get_exchange_info(self, signal: datetime):
