@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import clickhouse_connect
 import clickhouse_connect.driver
@@ -29,6 +29,7 @@ from deprecated import deprecated
 from typing import Union
 from urllib.parse import urlparse
 import math
+
 
 class Task:
     def __init__(self, table: TsTable, func, arg_groups) -> None:
@@ -200,7 +201,6 @@ class ClickHouseManager:
         df: pd.DataFrame,
         last_record_filters,
         datetime_col="datetime",
-        trunk_days=None,
     ):
         # format data
         if isinstance(table, str):
@@ -242,30 +242,12 @@ class ClickHouseManager:
             )
             return
         query = f"INSERT INTO {table_name} (*) VALUES"
-
-        datetime_series = df[datetime_col].drop_duplicates().sort_values()
-        start_date = datetime_series.iloc[0] - timedelta(seconds=1)
-        end_date = datetime_series.iloc[-1]
-        if trunk_days is None:
-            starts = [start_date]
-            ends = [end_date]
-        else:
-            dt_splits = math.ceil(
-                (end_date - start_date).total_seconds() / 3600 / 24 / trunk_days
+        with Client.from_url(self.native_uri) as client:
+            rows = client.insert_dataframe(
+                query=query, dataframe=df, settings=dict(use_numpy=True)
             )
-            dt_splits = max(1, dt_splits)
-            dt_step = (end_date - start_date) // dt_splits
-            starts = [start_date + dt_step * i for i in range(0, dt_splits)]
-            ends = [start_date + dt_step * (i + 1) for i in range(0, dt_splits)]
-        for start, end in zip(starts, ends):
-            print(f"writing {table_name} from {start} to {end}")
-            df_writing = df[(df[datetime_col] > start) & (df[datetime_col] <= end)].copy()
-            with Client.from_url(self.native_uri) as client:
-                rows = client.insert_dataframe(
-                    query=query, dataframe=df_writing, settings=dict(use_numpy=True)
-                )
-                print(
-                f"total {len(df_writing)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
+            print(
+                f"total {len(df)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
             )
 
     def get_syncing_tasks(self, date) -> List[Task]:
