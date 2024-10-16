@@ -259,13 +259,13 @@ class ClickHouseManager:
             ends = [start_date + dt_step * (i + 1) for i in range(0, dt_splits)]
         for start, end in zip(starts, ends):
             print(f"writing {table_name} from {start} to {end}")
-            df_writing = df[(df[datetime_col] > start) & (df[datetime_col] <= end)]
+            df_writing = df[(df[datetime_col] > start) & (df[datetime_col] <= end)].copy()
             with Client.from_url(self.native_uri) as client:
                 rows = client.insert_dataframe(
                     query=query, dataframe=df_writing, settings=dict(use_numpy=True)
                 )
                 print(
-                f"total {len(df)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
+                f"total {len(df_writing)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
             )
 
     def get_syncing_tasks(self, date) -> List[Task]:
