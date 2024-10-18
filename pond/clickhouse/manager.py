@@ -201,7 +201,7 @@ class ClickHouseManager:
         df: pd.DataFrame,
         last_record_filters,
         datetime_col="datetime",
-    ):
+    ) -> int:
         # format data
         if isinstance(table, str):
             table_name = table
@@ -240,7 +240,7 @@ class ClickHouseManager:
             print(
                 f"dataframe is empty after filter by latest record, original len {origin_len}"
             )
-            return
+            return 0
         query = f"INSERT INTO {table_name} (*) VALUES"
         with Client.from_url(self.native_uri) as client:
             rows = client.insert_dataframe(
@@ -249,6 +249,7 @@ class ClickHouseManager:
             print(
                 f"total {len(df)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
             )
+            return rows
 
     def get_syncing_tasks(self, date) -> List[Task]:
         tasks: List[Task] = []
