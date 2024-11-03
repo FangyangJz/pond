@@ -40,6 +40,7 @@ class FuturesHelper:
         key = str(signal.date())
         if key in self.dict_exchange_info.keys():
             return self.dict_exchange_info[key]
+        self.dict_exchange_info.clear()
         dict_exchange_info = self.exchange.exchange_info()
         self.dict_exchange_info = {key: dict_exchange_info}
         return self.dict_exchange_info[key]
