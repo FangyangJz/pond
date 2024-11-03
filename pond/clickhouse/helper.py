@@ -202,7 +202,7 @@ class FuturesHelper:
                 )
                 continue
 
-            startTime = datetime2utctimestamp_milli(signal) - limit_seconds * 1000
+            startTime = datetime2utctimestamp_milli(lastest_record)
             klines_list = self.data_proxy.um_future_klines(
                 code,
                 "PERPETUAL",
