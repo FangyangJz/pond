@@ -20,28 +20,63 @@ from pond.utils.times import (
 )
 
 
+class DataProxy:
+    def um_future_exchange_info(self) -> dict:
+        pass
+
+    def um_future_klines(
+        self, symbol, contract_type, interval, startTime, limit
+    ) -> list:
+        pass
+
+
+class DirectDataProxy(DataProxy):
+    exchange: UMFutures = None
+
+    def __init__(self) -> None:
+        self.exchange = UMFutures(
+            proxies={"https": "127.0.0.1:7890", "http": "127.0.0.1:7890"}
+        )
+
+    def um_future_exchange_info(self) -> dict:
+        return self.exchange.exchange_info()
+
+    def um_future_klines(
+        self, symbol, contract_type, interval, startTime, limit
+    ) -> list:
+        return self.exchange.continuous_klines(
+            symbol,
+            contract_type,
+            interval,
+            startTime=startTime,
+            limit=1000,
+        )
+
+
 class FuturesHelper:
     crypto_db: CryptoDB = None
     clickhouse: ClickHouseManager = None
     dict_exchange_info = {}
     exchange: UMFutures = None
+    data_proxy: DataProxy = None
 
     def __init__(
         self, crypto_db: CryptoDB, clickhouse: ClickHouseManager, **kwargs
     ) -> None:
         self.crypto_db = crypto_db
         self.clickhouse = clickhouse
-        self.exchange = UMFutures(
-            proxies={"https": "127.0.0.1:7890", "http": "127.0.0.1:7890"}
-        )
         self.configs = kwargs
+        self.data_proxy = DirectDataProxy()
+
+    def set_data_prox(self, data_proxy: DataProxy):
+        self.data_proxy = data_proxy
 
     def get_exchange_info(self, signal: datetime):
         key = str(signal.date())
         if key in self.dict_exchange_info.keys():
             return self.dict_exchange_info[key]
         self.dict_exchange_info.clear()
-        dict_exchange_info = self.exchange.exchange_info()
+        dict_exchange_info = self.data_proxy.um_future_exchange_info()
         self.dict_exchange_info = {key: dict_exchange_info}
         return self.dict_exchange_info[key]
 
@@ -168,7 +203,7 @@ class FuturesHelper:
                 continue
 
             startTime = datetime2utctimestamp_milli(signal) - limit_seconds * 1000
-            klines_list = self.exchange.continuous_klines(
+            klines_list = self.data_proxy.um_future_klines(
                 code,
                 "PERPETUAL",
                 interval,
