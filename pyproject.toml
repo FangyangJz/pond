@@ -37,6 +37,7 @@ pre-commit = "*"
 ruff = "^0.3.2"
 xmltodict = "^0.13.0"
 deprecated = "*"
+ray= "*"
 
 [build-system]
 requires = ["poetry-core"]
