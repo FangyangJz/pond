@@ -48,11 +48,12 @@ class FutureWallet(TsTable):
     __tablename__ = "future_wallet"
 
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    machine = Column(types.String, comment="machine")
     strategy = Column(types.String, comment="strategy")
     account = Column(types.String, comment="account")
     total = Column(types.Float64, comment="total")
     free = Column(types.Float64, comment="free")
-    used = Column(types.Float64, comment="used")
+    value = Column(types.Float64, comment="value")
 
     __table_args__ = (
         engines.ReplacingMergeTree(
