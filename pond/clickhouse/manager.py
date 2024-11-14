@@ -1,5 +1,5 @@
+import os
 from datetime import datetime
-
 import clickhouse_connect
 import clickhouse_connect.driver
 import clickhouse_connect.driver.client
@@ -32,12 +32,12 @@ import math
 
 
 class Task:
-    def __init__(self, table: TsTable, func, arg_groups) -> None:
+    def __init__(self, table: TsTable, func, arg_groups, distributed=False) -> None:
         self.table = table
         self.func = func
         self.arg_groups = arg_groups
         self.downloaders = []
-        self.distributed = True
+        self.distributed = distributed
         self.dfs = []
 
 
@@ -64,13 +64,14 @@ class ClickHouseManager:
         }
         return clickhouse_connect.get_client(**configs)
 
-    def sync(self, date=datetime.now()):
-        print(f"click house manager syncing at {date.isoformat()}")
-        tasks = self.get_syncing_tasks(date)
+    def sync(self, tasks: list[Task] = [], end: datetime = None):
+        print(
+            f"click house manager syncing at {end.isoformat()}, task size {len(tasks)}"
+        )
         max_dowloader_size = int(os.cpu_count() / len(tasks)) + 1
         for task in tasks:
             latest_record_time = self.get_latest_record_time(task.table)
-            if latest_record_time >= date:
+            if latest_record_time >= end:
                 continue
             for i in range(len(task.arg_groups)):
                 kwargs = task.arg_groups[i]
@@ -94,7 +95,6 @@ class ClickHouseManager:
                     dfs.append(df)
             if len(dfs) > 0:
                 final_df = pd.concat(dfs)
-                final_df["时间"] = date
                 self.save_to_db(task.table, final_df)
 
     def __native_read_table(
@@ -251,7 +251,7 @@ class ClickHouseManager:
             )
             return rows
 
-    def get_syncing_tasks(self, date) -> List[Task]:
+    def get_syncing_tasks(self, date: datetime) -> List[Task]:
         tasks: List[Task] = []
         args = {"date": datestr(date)}
 
