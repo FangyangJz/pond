@@ -66,6 +66,32 @@ class StockKline5m(TsTable):
     )
 
 
+class StockKline15m(TsTable):
+    """
+    日K线，后复权
+    """
+
+    __tablename__ = "stock_kline_15m"
+
+    datetime = Column(types.DateTime64, comment="日期", primary_key=True)
+    code = Column(types.String, comment="代码")
+    open = Column(types.Float64, comment="开盘")
+    high = Column(types.Float64, comment="最高")
+    low = Column(types.Float64, comment="最低")
+    close = Column(types.Float64, comment="收盘")
+    volume = Column(types.Float64, comment="成交量")
+    amount = Column(types.Float64, comment="成交额")
+    turn = Column(types.Float64, comment="换手率")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
 class StockKlineHFQ15M(TsTable):
     """
     日K线，后复权

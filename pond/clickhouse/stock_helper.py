@@ -4,7 +4,7 @@ from pond.clickhouse.manager import ClickHouseManager
 from typing import Optional
 import datetime as dtm
 from datetime import datetime
-from pond.clickhouse.kline import StockKline5m
+from pond.clickhouse.kline import StockKline5m, StockKline15m
 from threading import Thread
 import threading
 import pandas as pd
@@ -53,7 +53,7 @@ class TdxDataProxy(DataProxy):
         end: datetime = None,
         limit: int = 1000,
     ):
-        if period in ["5", "5m"]:
+        if period in ["5", "5m", "15", "15m"]:
             suffix = 5
         elif period in ["1", "1m"]:
             suffix = 1
@@ -63,11 +63,30 @@ class TdxDataProxy(DataProxy):
         else:
             df = self.reader.minute(symbol=symbol, suffix=suffix)
         if df is not None:
-            df = df.reset_index()
             if start is not None:
-                df = df[df["date"] >= start]
+                df = df[start:]
             if end is not None:
-                df = df[df["date"] <= end]
+                df = df[:end]
+            if period == "15m":
+                df = self.agg_kline_to15(df)
+            df = df.reset_index()
+        return df
+
+    def agg_kline_to15(self, df: pd.DataFrame):
+        df = (
+            df.resample(rule="15min", closed="right", label="right")
+            .agg(
+                {
+                    "open": "first",
+                    "high": "max",
+                    "low": "min",
+                    "close": "last",
+                    "volume": "sum",
+                    "amount": "sum",
+                }
+            )
+            .dropna()
+        )
         return df
 
 
@@ -89,6 +108,8 @@ class StockHelper:
     def get_table(self, interval) -> Optional[StockKline5m]:
         if interval == "5m":
             return StockKline5m
+        elif interval == "15m":
+            return StockKline15m
         return None
 
     def gen_stub_kline_as_list(self, start: datetime, end: datetime):
@@ -210,7 +231,7 @@ if __name__ == "__main__":
     )
     helper = StockHelper(manager, tdx_path=tdx_path)
     ret = helper.sync_kline(
-        interval="5m",
+        interval="15m",
         adjust="",
         workers=10,
         end_time=datetime.now().replace(hour=0).replace(minute=0),
