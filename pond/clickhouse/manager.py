@@ -57,7 +57,6 @@ class ClickHouseManager:
             "host": parts.hostname,
             "user": parts.username,
             "password": parts.password,
-            "session_id": "session_0",
             "connect_timeout": 15,
             "database": parts.path[1:],
             "settings": {"distributed_ddl_task_timeout": 300},
