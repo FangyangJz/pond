@@ -59,14 +59,20 @@ class FuturesHelper:
     dict_exchange_info = {}
     exchange: UMFutures = None
     data_proxy: DataProxy = None
+    fix_kline_with_cryptodb: bool = None
 
     def __init__(
-        self, crypto_db: CryptoDB, clickhouse: ClickHouseManager, **kwargs
+        self,
+        crypto_db: CryptoDB,
+        clickhouse: ClickHouseManager,
+        fix_kline_with_cryptodb=True,
+        **kwargs,
     ) -> None:
         self.crypto_db = crypto_db
         self.clickhouse = clickhouse
         self.configs = kwargs
         self.data_proxy = DirectDataProxy()
+        self.fix_kline_with_cryptodb = fix_kline_with_cryptodb
 
     def set_data_prox(self, data_proxy: DataProxy):
         self.data_proxy = data_proxy
@@ -183,7 +189,7 @@ class FuturesHelper:
             data_duration_seconds = (signal - lastest_record).total_seconds()
 
             # load history data and save into db
-            if data_duration_seconds > limit_seconds:
+            if data_duration_seconds > limit_seconds and self.fix_kline_with_cryptodb:
                 local_klines_df = self.crypto_db.load_history_data(
                     code, lastest_record, signal, timeframe=interval, **self.configs
                 )
