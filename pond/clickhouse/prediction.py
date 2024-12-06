@@ -51,6 +51,9 @@ class FuturesPrediction(TsTable):
     rank_ls_rtn = Column(types.Float64, comment="rank_ls_rtn")
     rank_sharpe = Column(types.Float64, comment="rank_sharpe")
     value = Column(types.Float64, comment="y_pred")
+    value_group = Column(types.Float64, comment="y_pred_group")
+    value_raw_mean = Column(types.Float64, comment="y_pred_raw_mean")
+    value_raw_str = Column(types.String, comment="y_pred_raw_str")
 
     __table_args__ = (
         engines.MergeTree(
