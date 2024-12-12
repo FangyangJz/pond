@@ -91,7 +91,7 @@ class FuturesHelper:
         return [
             symbol
             for symbol in exchange_info_dict["symbols"]
-            if symbol["contractType"] == "PERPETUAL"
+            if symbol["contractType"] == "PERPETUAL" and symbol["pair"].endswith("USDT")
         ]
 
     def get_futures_table(self, interval) -> Optional[FuturesKline1H]:
