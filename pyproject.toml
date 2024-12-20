@@ -12,7 +12,7 @@ priority = "primary"
 
 [tool.poetry]
 name = "pond"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["fangyang_gpu <fangyang.jing@hotmail.com>"]
 readme = "README.md"
