@@ -103,7 +103,7 @@ def get_klines(
             f"Requesting limit {limit} > 1500 for {symbol} {interval}, loop limit fix 499."
         )
         fix_limit = 499
-        raise ValueError("manual breakpoint")
+        # raise ValueError("manual breakpoint")
         while True:
             dd = (
                 pl.from_records(

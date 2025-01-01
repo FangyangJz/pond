@@ -156,7 +156,7 @@ class CryptoDB(DuckDB):
         if workers is None:
             workers = int(os.cpu_count() / 2)
 
-        df = self.get_future_info(asset_type, from_local=False).sort_values(by="symbol")
+        df = self.get_future_info(asset_type, from_local=False)
         if self.is_future_type(asset_type):
             df = df[df["contractType"] == "PERPETUAL"][
                 [
@@ -172,6 +172,10 @@ class CryptoDB(DuckDB):
         else:
             df = df[["symbol"]]
 
+        df = df.sort_values(by="symbol")
+        assert len(df) == len(
+            set(df["symbol"].to_list())
+        ), "symbol have duplicated data"
         task_size = math.ceil(len(df) / workers)
         threads = []
         for i in range(workers):
@@ -530,7 +534,7 @@ if __name__ == "__main__":
         try:
             db.update_history_data_parallel(
                 start="2020-1-1",
-                end="2024-7-15",
+                end="2024-7-22",
                 asset_type=AssetType.future_um,
                 data_type=DataType.klines,
                 timeframe=interval,

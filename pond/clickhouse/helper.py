@@ -5,7 +5,7 @@ from typing import Optional
 import datetime as dtm
 from datetime import datetime
 from binance.um_futures import UMFutures
-from pond.clickhouse.kline import FuturesKline1H
+from pond.clickhouse.kline import FuturesKline5m, FuturesKline1H, FuturesKline1d
 from threading import Thread
 import threading
 import pandas as pd
@@ -20,25 +20,69 @@ from pond.utils.times import (
 )
 
 
+class DataProxy:
+    def um_future_exchange_info(self) -> dict:
+        pass
+
+    def um_future_klines(
+        self, symbol, contract_type, interval, startTime, limit
+    ) -> list:
+        pass
+
+
+class DirectDataProxy(DataProxy):
+    exchange: UMFutures = None
+
+    def __init__(self) -> None:
+        self.exchange = UMFutures(
+            proxies={"https": "127.0.0.1:7890", "http": "127.0.0.1:7890"}
+        )
+
+    def um_future_exchange_info(self) -> dict:
+        return self.exchange.exchange_info()
+
+    def um_future_klines(
+        self, symbol, contract_type, interval, startTime, limit
+    ) -> list:
+        return self.exchange.continuous_klines(
+            symbol,
+            contract_type,
+            interval,
+            startTime=startTime,
+            limit=1000,
+        )
+
+
 class FuturesHelper:
     crypto_db: CryptoDB = None
     clickhouse: ClickHouseManager = None
     dict_exchange_info = {}
     exchange: UMFutures = None
+    data_proxy: DataProxy = None
+    fix_kline_with_cryptodb: bool = None
 
     def __init__(
-        self, crypto_db: CryptoDB, clickhouse: ClickHouseManager, **kwargs
+        self,
+        crypto_db: CryptoDB,
+        clickhouse: ClickHouseManager,
+        fix_kline_with_cryptodb=True,
+        **kwargs,
     ) -> None:
         self.crypto_db = crypto_db
         self.clickhouse = clickhouse
-        self.exchange = UMFutures()
         self.configs = kwargs
+        self.data_proxy = DirectDataProxy()
+        self.fix_kline_with_cryptodb = fix_kline_with_cryptodb
+
+    def set_data_prox(self, data_proxy: DataProxy):
+        self.data_proxy = data_proxy
 
     def get_exchange_info(self, signal: datetime):
         key = str(signal.date())
         if key in self.dict_exchange_info.keys():
             return self.dict_exchange_info[key]
-        dict_exchange_info = self.exchange.exchange_info()
+        self.dict_exchange_info.clear()
+        dict_exchange_info = self.data_proxy.um_future_exchange_info()
         self.dict_exchange_info = {key: dict_exchange_info}
         return self.dict_exchange_info[key]
 
@@ -47,12 +91,16 @@ class FuturesHelper:
         return [
             symbol
             for symbol in exchange_info_dict["symbols"]
-            if symbol["contractType"] == "PERPETUAL"
+            if symbol["contractType"] == "PERPETUAL" and symbol["pair"].endswith("USDT")
         ]
 
     def get_futures_table(self, interval) -> Optional[FuturesKline1H]:
         if interval == "1h":
             return FuturesKline1H
+        if interval == "5m":
+            return FuturesKline5m
+        if interval == "1d":
+            return FuturesKline1d
         return None
 
     def gen_stub_kline_as_list(self, start: datetime, end: datetime):
@@ -73,11 +121,16 @@ class FuturesHelper:
         ]
         return stub_list
 
-    def sync_futures_kline(self, interval, workers=None) -> bool:
+    def sync_futures_kline(
+        self, interval, workers=None, end_time: datetime = None
+    ) -> bool:
         table = self.get_futures_table(interval)
         if table is None:
             return False
-        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        if end_time is not None:
+            signal = end_time
+        else:
+            signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
         if workers is None:
             workers = math.ceil(os.cpu_count() / 2)
         symbols = self.get_perpetual_symbols(signal)
@@ -126,7 +179,8 @@ class FuturesHelper:
         interval_seconds = timeframe2minutes(interval) * 60
         data_limit = 720  # 1 month, max 1000
         limit_seconds = data_limit * timeframe2minutes(interval) * 60
-        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        if signal is None:
+            signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
         for symbol in symbols:
             code = symbol["pair"]
             lastest_record = self.clickhouse.get_latest_record_time(
@@ -135,7 +189,7 @@ class FuturesHelper:
             data_duration_seconds = (signal - lastest_record).total_seconds()
 
             # load history data and save into db
-            if data_duration_seconds > limit_seconds:
+            if data_duration_seconds > limit_seconds and self.fix_kline_with_cryptodb:
                 local_klines_df = self.crypto_db.load_history_data(
                     code, lastest_record, signal, timeframe=interval, **self.configs
                 )
@@ -154,8 +208,8 @@ class FuturesHelper:
                 )
                 continue
 
-            startTime = datetime2utctimestamp_milli(signal) - limit_seconds * 1000
-            klines_list = self.exchange.continuous_klines(
+            startTime = datetime2utctimestamp_milli(lastest_record)
+            klines_list = self.data_proxy.um_future_klines(
                 code,
                 "PERPETUAL",
                 interval,
@@ -193,5 +247,7 @@ if __name__ == "__main__":
         conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
     )
     helper = FuturesHelper(crypto_db, manager)
-    ret = helper.sync_futures_kline("1h", workers=1)
+    ret = helper.sync_futures_kline(
+        "1d", workers=1, end_time=datetime.now().replace(hour=0).replace(minute=0)
+    )
     print(f"sync ret {ret}")

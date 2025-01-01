@@ -1,5 +1,5 @@
+import os
 from datetime import datetime
-
 import clickhouse_connect
 import clickhouse_connect.driver
 import clickhouse_connect.driver.client
@@ -28,27 +28,25 @@ from clickhouse_driver import Client
 from deprecated import deprecated
 from typing import Union
 from urllib.parse import urlparse
+import math
 
 
 class Task:
-    def __init__(self, table: TsTable, func, arg_groups) -> None:
+    def __init__(self, table: TsTable, func, arg_groups, distributed=False) -> None:
         self.table = table
         self.func = func
         self.arg_groups = arg_groups
         self.downloaders = []
-        self.distributed = True
+        self.distributed = distributed
         self.dfs = []
 
 
 class ClickHouseManager:
-    client: clickhouse_connect.driver.client.Client = None
-
     def __init__(self, db_uri, data_start: datetime = None, native_uri=None) -> None:
         self.engine = create_engine(db_uri)
         metadata.create_all(self.engine)
         self.data_start = data_start
         self.native_uri = native_uri
-        self.create_client(native_uri)
 
     def get_engin(self):
         return self.engine
@@ -59,20 +57,20 @@ class ClickHouseManager:
             "host": parts.hostname,
             "user": parts.username,
             "password": parts.password,
-            "session_id": "session_0",
             "connect_timeout": 15,
             "database": parts.path[1:],
             "settings": {"distributed_ddl_task_timeout": 300},
         }
-        self.client = clickhouse_connect.get_client(**configs)
+        return clickhouse_connect.get_client(**configs)
 
-    def sync(self, date=datetime.now()):
-        print(f"click house manager syncing at {date.isoformat()}")
-        tasks = self.get_syncing_tasks(date)
+    def sync(self, tasks: list[Task] = [], end: datetime = None):
+        print(
+            f"click house manager syncing at {end.isoformat()}, task size {len(tasks)}"
+        )
         max_dowloader_size = int(os.cpu_count() / len(tasks)) + 1
         for task in tasks:
             latest_record_time = self.get_latest_record_time(task.table)
-            if latest_record_time >= date:
+            if latest_record_time >= end:
                 continue
             for i in range(len(task.arg_groups)):
                 kwargs = task.arg_groups[i]
@@ -96,10 +94,9 @@ class ClickHouseManager:
                     dfs.append(df)
             if len(dfs) > 0:
                 final_df = pd.concat(dfs)
-                final_df["时间"] = date
                 self.save_to_db(task.table, final_df)
 
-    def native_read_table(
+    def __native_read_table(
         self,
         table: Union[str, TsTable],
         start_date: datetime,
@@ -117,7 +114,7 @@ class ClickHouseManager:
         query_params = {}
         if start_date is None:
             start_date = self.data_start
-        sql += f" where {datetime_col} >= %(start)s "
+        sql += f" where {datetime_col} > %(start)s "
         query_params["start"] = start_date
         if end_date is not None:
             sql += f" AND {datetime_col} <= %(end)s "
@@ -129,13 +126,48 @@ class ClickHouseManager:
                 sql += f" {filter} "
         if params is not None:
             query_params.update(params)
-        df = self.client.query_df(
-            query=sql,
-            parameters=query_params,
-        )
-        if rename and not isinstance(table, str):
-            df = df.rename(columns=table().get_colcom_names())
-        return df
+        with self.create_client(self.native_uri) as client:
+            df = client.query_df(
+                query=sql,
+                parameters=query_params,
+            )
+            if rename and not isinstance(table, str):
+                df = df.rename(columns=table().get_colcom_names())
+            return df
+
+    def native_read_table(
+        self,
+        table: Union[str, TsTable],
+        start_date: datetime,
+        end_date: datetime,
+        filters=None,
+        params=None,
+        rename=False,
+        datetime_col="datetime",
+        trunk_days=None,
+    ) -> pd.DataFrame:
+        if trunk_days is None:
+            starts = [start_date]
+            ends = [end_date]
+        else:
+            dt_splits = math.ceil(
+                (end_date - start_date).total_seconds() / 3600 / 24 / trunk_days
+            )
+            dt_splits = max(1, dt_splits)
+            dt_step = (end_date - start_date) // dt_splits
+            starts = [start_date + dt_step * i for i in range(0, dt_splits)]
+            ends = [start_date + dt_step * (i + 1) for i in range(0, dt_splits)]
+        dfs = []
+        for start, end in zip(starts, ends):
+            print(f"reading {table} from {start} to {end}")
+            df = self.__native_read_table(
+                table, start, end, filters, params, rename, datetime_col
+            )
+            if df is not None and len(df) > 0:
+                dfs.append(df)
+        if len(dfs) > 0:
+            return pd.concat(dfs)
+        return None
 
     @deprecated("this method works quite slowly, use native read table instead.")
     def read_table(
@@ -168,7 +200,7 @@ class ClickHouseManager:
         df: pd.DataFrame,
         last_record_filters,
         datetime_col="datetime",
-    ):
+    ) -> int:
         # format data
         if isinstance(table, str):
             table_name = table
@@ -178,7 +210,8 @@ class ClickHouseManager:
         else:
             table_name = table.__tablename__
             df = table().format_dataframe(df)
-            df.drop_duplicates(subset=["datetime", "code"], inplace=True)
+            if "datetime" in df.columns and "code" in df.columns:
+                df.drop_duplicates(subset=["datetime", "code"], inplace=True)
             lastet_record_time = self.get_latest_record_time(table, last_record_filters)
 
         origin_len = len(df)
@@ -206,15 +239,18 @@ class ClickHouseManager:
             print(
                 f"dataframe is empty after filter by latest record, original len {origin_len}"
             )
-            return
+            return 0
         query = f"INSERT INTO {table_name} (*) VALUES"
         with Client.from_url(self.native_uri) as client:
             rows = client.insert_dataframe(
                 query=query, dataframe=df, settings=dict(use_numpy=True)
             )
-            print(f"total {len(df)} saved {rows} into table {table_name}")
+            print(
+                f"total {len(df)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
+            )
+            return rows
 
-    def get_syncing_tasks(self, date) -> List[Task]:
+    def get_syncing_tasks(self, date: datetime) -> List[Task]:
         tasks: List[Task] = []
         args = {"date": datestr(date)}
 

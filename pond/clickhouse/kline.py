@@ -40,6 +40,84 @@ class KlineDailyHFQ(TsTable):
     )
 
 
+class StockKline5m(TsTable):
+    """
+    5m K线，不复权
+    """
+
+    __tablename__ = "stock_kline_5m"
+
+    datetime = Column(types.DateTime64, comment="日期", primary_key=True)
+    code = Column(types.String, comment="代码")
+    open = Column(types.Float64, comment="开盘")
+    high = Column(types.Float64, comment="最高")
+    low = Column(types.Float64, comment="最低")
+    close = Column(types.Float64, comment="收盘")
+    volume = Column(types.Float64, comment="成交量")
+    amount = Column(types.Float64, comment="成交额")
+    turn = Column(types.Float64, comment="换手率")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
+class StockKline15m(TsTable):
+    """
+    日K线，后复权
+    """
+
+    __tablename__ = "stock_kline_15m"
+
+    datetime = Column(types.DateTime64, comment="日期", primary_key=True)
+    code = Column(types.String, comment="代码")
+    open = Column(types.Float64, comment="开盘")
+    high = Column(types.Float64, comment="最高")
+    low = Column(types.Float64, comment="最低")
+    close = Column(types.Float64, comment="收盘")
+    volume = Column(types.Float64, comment="成交量")
+    amount = Column(types.Float64, comment="成交额")
+    turn = Column(types.Float64, comment="换手率")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
+class StockKlineHFQ15M(TsTable):
+    """
+    日K线，后复权
+    """
+
+    __tablename__ = "stock_kline_hfq_15m"
+
+    datetime = Column(types.DateTime64, comment="日期", primary_key=True)
+    code = Column(types.String, comment="代码")
+    open = Column(types.Float64, comment="开盘")
+    high = Column(types.Float64, comment="最高")
+    low = Column(types.Float64, comment="最低")
+    close = Column(types.Float64, comment="收盘")
+    volume = Column(types.Float64, comment="成交量")
+    amount = Column(types.Float64, comment="成交额")
+    turn = Column(types.Float64, comment="换手率")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
 class KlineDailyNFQ(TsTable):
     """
     日K线，后复权
@@ -84,6 +162,56 @@ class FuturesKline1H(TsTable):
 
     __table_args__ = (
         engines.MergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
+class FuturesKline5m(TsTable):
+    __tablename__ = "kline_futures_5m"
+
+    code = Column(types.String, comment="jj_code")
+    open_time = Column(types.DateTime64, comment="open_time", primary_key=True)
+    open = Column(types.Float64, comment="open")
+    high = Column(types.Float64, comment="high")
+    low = Column(types.Float64, comment="low")
+    close = Column(types.Float64, comment="close")
+    volume = Column(types.Float64, comment="volume")
+    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    quote_volume = Column(types.Float64, comment="quote_volume")
+    count = Column(types.Float64, comment="count")
+    taker_buy_volume = Column(types.Float64, comment="taker_buy_volume")
+    taker_buy_quote_volume = Column(types.Float64, comment="taker_buy_quote_volume")
+
+    __table_args__ = (
+        engines.MergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
+class FuturesKline1d(TsTable):
+    __tablename__ = "kline_futures_1d"
+
+    code = Column(types.String, comment="jj_code")
+    open_time = Column(types.DateTime64, comment="open_time", primary_key=True)
+    open = Column(types.Float64, comment="open")
+    high = Column(types.Float64, comment="high")
+    low = Column(types.Float64, comment="low")
+    close = Column(types.Float64, comment="close")
+    volume = Column(types.Float64, comment="volume")
+    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    quote_volume = Column(types.Float64, comment="quote_volume")
+    count = Column(types.Float64, comment="count")
+    taker_buy_volume = Column(types.Float64, comment="taker_buy_volume")
+    taker_buy_quote_volume = Column(types.Float64, comment="taker_buy_quote_volume")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),

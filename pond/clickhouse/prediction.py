@@ -43,7 +43,17 @@ class FuturesPrediction(TsTable):
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
     code = Column(types.String, comment="jj_code")
     model = Column(types.String, comment="model")
+    model_name = Column(types.String, comment="model_name")
+    train_start = Column(types.DateTime64, comment="train_start", primary_key=True)
+    train_end = Column(types.DateTime64, comment="train_end", primary_key=True)
+    rank_start = Column(types.DateTime64, comment="rank_start", primary_key=True)
+    rank_end = Column(types.DateTime64, comment="rank_end", primary_key=True)
+    rank_ls_rtn = Column(types.Float64, comment="rank_ls_rtn")
+    rank_sharpe = Column(types.Float64, comment="rank_sharpe")
     value = Column(types.Float64, comment="y_pred")
+    value_group = Column(types.Float64, comment="y_pred_group")
+    value_raw_mean = Column(types.Float64, comment="y_pred_raw_mean")
+    value_raw_str = Column(types.String, comment="y_pred_raw_str")
 
     __table_args__ = (
         engines.MergeTree(

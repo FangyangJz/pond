@@ -12,7 +12,7 @@ priority = "primary"
 
 [tool.poetry]
 name = "pond"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["fangyang_gpu <fangyang.jing@hotmail.com>"]
 readme = "README.md"
@@ -34,9 +34,10 @@ clickhouse_connect = "*"
 binance-connector = "^3.5.1"
 binance-futures-connector = "^4.0.0"
 pre-commit = "*"
-ruff = "^0.3.2"
+ruff = "*"
 xmltodict = "^0.13.0"
 deprecated = "*"
+ray= "*"
 
 [build-system]
 requires = ["poetry-core"]
