@@ -231,7 +231,7 @@ if __name__ == "__main__":
     )
     helper = StockHelper(manager, tdx_path=tdx_path)
     ret = helper.sync_kline(
-        interval="15m",
+        interval="5m",
         adjust="",
         workers=10,
         end_time=datetime.now().replace(hour=0).replace(minute=0),
