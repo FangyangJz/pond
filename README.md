@@ -12,8 +12,9 @@ pond
 
 If you plan to develop pond yourself, or want to be on the cutting edge, you can use an editable install:
 ```bash
-git clone https://github.com/FangyangJz/pond.git
-pip install -e .
+$ git clone https://github.com/FangyangJz/pond.git
+$ cd pond
+$ uv sync
 ```
 >Note: `Pycharm` and `vscode` use `Black` as code formatter.
 
@@ -74,12 +75,6 @@ df3 = db.get_kline_1d_qfq_df()
 ```
 
 ### 3. CryptoDB
-
-Dependency install:
-```commandline
-pip install binance-futures-connector
-```
-
 Usage examples:
 ```python
 import polars as pl
