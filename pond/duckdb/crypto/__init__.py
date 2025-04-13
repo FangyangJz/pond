@@ -24,9 +24,15 @@ from pond.duckdb.crypto.path import CryptoPath
 
 
 class CryptoDB(DuckDB):
-    def __init__(self, db_path: Path, df_type: DataFrameStrType = df_types.polars):
+    def __init__(
+        self,
+        db_path: Path,
+        requests_proxies: dict[str, str] = {},
+        df_type: DataFrameStrType = df_types.polars,
+    ):
         self.crypto_path = CryptoPath(crypto_path=db_path / "crypto")
         self.init_db_path = self.crypto_path.init_db_path
+        self.requests_proxies = requests_proxies
         super().__init__(db_path, df_type)
 
     def get_local_future_perpetual_symbol_list(
@@ -55,7 +61,7 @@ class CryptoDB(DuckDB):
 
         return pd.read_csv(file)
 
-    def update_future_info(self, proxies: dict[str, str] = {"https": "127.0.0.1:7890"}):
+    def update_future_info(self):
         """
         字段说明: https://binance-docs.github.io/apidocs/futures/cn/#0f3f2d5ee7
 
@@ -67,9 +73,9 @@ class CryptoDB(DuckDB):
         logger.info(f"Update {file} from network...")
 
         for c in [
-            CMFutures(proxies=proxies),
-            UMFutures(proxies=proxies),
-            Spot(proxies=proxies),
+            CMFutures(proxies=self.requests_proxies),
+            UMFutures(proxies=self.requests_proxies),
+            Spot(proxies=self.requests_proxies),
         ]:
             info_df = get_future_info_df(c)
             info_df.to_csv(
@@ -109,15 +115,24 @@ class CryptoDB(DuckDB):
                 "isBuyerMaker": pl.Boolean,
                 "isBestMatch": pl.Boolean,
             },
+            # DataType.aggTrades: {
+            #     "a": pl.Int64,
+            #     "p": pl.Float64,
+            #     "q": pl.Float64,
+            #     "f": pl.Int64,
+            #     "l": pl.Int64,
+            #     "T": pl.Int64,
+            #     "m": pl.Boolean,
+            #     "M": pl.Boolean,
+            # },
             DataType.aggTrades: {
-                "a": pl.Int64,
-                "p": pl.Float64,
-                "q": pl.Float64,
-                "f": pl.Int64,
-                "l": pl.Int64,
-                "T": pl.Int64,
-                "m": pl.Boolean,
-                "M": pl.Boolean,
+                "agg_trade_id": pl.Int64,
+                "price": pl.Float64,
+                "quantity": pl.Float64,
+                "first_trade_id": pl.Int64,
+                "last_trade_id": pl.Int64,
+                "transact_time": pl.Int64,
+                "is_buyer_maker": pl.Boolean,
             },
             DataType.fundingRate: fundingRate_schema,
         }[data_type]
@@ -143,7 +158,6 @@ class CryptoDB(DuckDB):
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
         httpx_proxies: ProxiesTypes = {},
-        requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
         do_filter_quote_volume_0: bool = False,
         if_skip_usdc: bool = True,
@@ -173,9 +187,9 @@ class CryptoDB(DuckDB):
             df = df[["symbol"]]
 
         df = df.sort_values(by="symbol")
-        assert len(df) == len(
-            set(df["symbol"].to_list())
-        ), "symbol have duplicated data"
+        assert len(df) == len(set(df["symbol"].to_list())), (
+            "symbol have duplicated data"
+        )
         task_size = math.ceil(len(df) / workers)
         threads = []
         for i in range(workers):
@@ -188,7 +202,7 @@ class CryptoDB(DuckDB):
             #     data_type,
             #     timeframe,
             #     httpx_proxies,
-            #     requests_proxies,
+            #     self.requests_proxies,
             #     skip_symbols,
             #     do_filter_quote_volume_0,
             #     if_skip_usdc,
@@ -206,7 +220,6 @@ class CryptoDB(DuckDB):
                     data_type,
                     timeframe,
                     httpx_proxies,
-                    requests_proxies,
                     skip_symbols,
                     do_filter_quote_volume_0,
                     if_skip_usdc,
@@ -228,7 +241,6 @@ class CryptoDB(DuckDB):
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
         httpx_proxies: ProxiesTypes = {},
-        requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         skip_symbols: list[str] = [],
         do_filter_quote_volume_0: bool = False,
         if_skip_usdc: bool = True,
@@ -289,7 +301,6 @@ class CryptoDB(DuckDB):
                 timeframe,
                 do_filter_quote_volume_0,
                 httpx_proxies,
-                requests_proxies,
             )
             if data_type == DataType.klines:
                 df = df.filter(pl.col("open_time") < _end.replace(tzinfo=None))
@@ -327,7 +338,6 @@ class CryptoDB(DuckDB):
         timeframe: TIMEFRAMES = "1m",
         do_filter_quote_volume_0: bool = False,
         httpx_proxies: ProxiesTypes = {},
-        requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
     ) -> pl.DataFrame:
         from pond.binance_history.utils import (
             get_urls_by_xml_parse,
@@ -343,7 +353,7 @@ class CryptoDB(DuckDB):
             end=end,
             timeframe=timeframe,
             file_path=self.crypto_path.crypto,
-            proxies=requests_proxies,
+            proxies=self.requests_proxies,
         )
 
         start_async_download_files(
@@ -369,7 +379,7 @@ class CryptoDB(DuckDB):
                     symbol,
                     asset_type,
                     timeframe,
-                    requests_proxies,
+                    self.requests_proxies,
                     do_filter_quote_volume_0,
                 )
             elif data_type == DataType.trades:
@@ -408,7 +418,6 @@ class CryptoDB(DuckDB):
         symbol: str,
         asset_type: AssetType,
         timeframe: TIMEFRAMES,
-        requests_proxies: dict[str, str] = {"https": "127.0.0.1:7890"},
         do_filter_quote_volume_0: bool = False,
     ):
         from pond.duckdb.crypto.future import get_supply_df
@@ -427,17 +436,19 @@ class CryptoDB(DuckDB):
             # .to_pandas()
         )
 
-        lack_df = df.filter(pl.col("open_time_diff") != 0).select(
-            ["open_time", "close_time"]
-        )
+        lack_df = df.filter(pl.col("open_time_diff") != 0).select([
+            "open_time",
+            "close_time",
+        ])
         if len(lack_df) > 0:
             if len(lack_df) % 2 != 0:
-                lack_df = pl.concat(
-                    [lack_df, df.select(["open_time", "close_time"])[-1]]
-                )
+                lack_df = pl.concat([
+                    lack_df,
+                    df.select(["open_time", "close_time"])[-1],
+                ])
 
             supply_df = get_supply_df(
-                client=self.get_client(asset_type, requests_proxies),
+                client=self.get_client(asset_type, self.requests_proxies),
                 lack_df=lack_df,
                 symbol=symbol,
                 interval=timeframe,
@@ -519,7 +530,13 @@ class CryptoDB(DuckDB):
 
 
 if __name__ == "__main__":
-    db = CryptoDB(Path(r"E:\DuckDB"))
+    db = CryptoDB(
+        Path(r"E:\DuckDB"),
+        requests_proxies={
+            "http": "127.0.0.1:7890",
+            "https": "127.0.0.1:7890",
+        },
+    )
 
     # db.compare_um_future_info_with_vision()
 
@@ -534,15 +551,11 @@ if __name__ == "__main__":
         try:
             db.update_history_data_parallel(
                 start="2020-1-1",
-                end="2024-7-22",
+                end="2025-7-22",
                 asset_type=AssetType.future_um,
-                data_type=DataType.klines,
+                data_type=DataType.aggTrades,
                 timeframe=interval,
                 # httpx_proxies={"https://": "https://127.0.0.1:7890"},
-                requests_proxies={
-                    "http": "127.0.0.1:7890",
-                    "https": "127.0.0.1:7890",
-                },
                 skip_symbols=["ETHBTC"],
                 do_filter_quote_volume_0=False,
                 if_skip_usdc=True,
@@ -555,7 +568,7 @@ if __name__ == "__main__":
         return True
 
     # ...start downloading...
-    interval = "5m"
+    interval = "1d"
     complete = False
     retry = 0
     start_time = time.perf_counter()
