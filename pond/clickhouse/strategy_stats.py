@@ -23,6 +23,17 @@ class FuturePosition(TsTable):
     prediction_refreshed_date = Column(
         types.DateTime64, comment="prediction_refreshed_date"
     )
+    latest_high: float = Column(types.Float64, comment="latest_high")
+    latest_low: float = Column(types.Float64, comment="latest_low")
+    latest_close: float = Column(types.Float64, comment="latest_close")
+    trade_id: int = Column(types.Int64, comment="trade_id")
+    trade_side: str = Column(types.String, comment="trade_side")
+    trade_stake_amount: float = Column(types.Float64, comment="trade_stake_amount")
+    trade_leverage: float = Column(types.Float64, comment="trade_leverage")
+    trade_value: float = Column(types.Float64, comment="trade_value")
+    unbalance_time = Column(types.DateTime64, comment="unbalance_time")
+    unbalance_state: str = Column(types.String, comment="unbalance_state")
+    warn_state: str = Column(types.String, comment="warn_state")
 
     __table_args__ = (
         engines.ReplacingMergeTree(
@@ -37,11 +48,12 @@ class FutureWallet(TsTable):
     __tablename__ = "future_wallet"
 
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    machine = Column(types.String, comment="machine")
     strategy = Column(types.String, comment="strategy")
     account = Column(types.String, comment="account")
     total = Column(types.Float64, comment="total")
     free = Column(types.Float64, comment="free")
-    used = Column(types.Float64, comment="used")
+    value = Column(types.Float64, comment="value")
 
     __table_args__ = (
         engines.ReplacingMergeTree(
