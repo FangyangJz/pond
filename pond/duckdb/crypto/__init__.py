@@ -362,14 +362,15 @@ class CryptoDB(DuckDB):
         csv_schema = self.get_csv_schema(data_type)
 
         df_list = []
-        for url in load_urls:
-            df = load_data_from_disk(
-                url,
-                self.crypto_path.crypto,
-                dtypes=csv_schema,
-            )
-            if df is not None:
-                df_list.append(df)
+        if data_type == DataType.klines:
+            for url in load_urls:
+                df = load_data_from_disk(
+                    url,
+                    self.crypto_path.crypto,
+                    dtypes=csv_schema,
+                )
+                if df is not None:
+                    df_list.append(df)
 
         if df_list:
             df = pl.concat(df_list)
