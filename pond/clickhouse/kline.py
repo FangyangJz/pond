@@ -169,6 +169,31 @@ class FuturesKline1H(TsTable):
     )
 
 
+class FuturesKline15m(TsTable):
+    __tablename__ = "kline_futures_15m"
+
+    code = Column(types.String, comment="jj_code")
+    open_time = Column(types.DateTime64, comment="open_time", primary_key=True)
+    open = Column(types.Float64, comment="open")
+    high = Column(types.Float64, comment="high")
+    low = Column(types.Float64, comment="low")
+    close = Column(types.Float64, comment="close")
+    volume = Column(types.Float64, comment="volume")
+    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    quote_volume = Column(types.Float64, comment="quote_volume")
+    count = Column(types.Float64, comment="count")
+    taker_buy_volume = Column(types.Float64, comment="taker_buy_volume")
+    taker_buy_quote_volume = Column(types.Float64, comment="taker_buy_quote_volume")
+
+    __table_args__ = (
+        engines.MergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
 class FuturesKline5m(TsTable):
     __tablename__ = "kline_futures_5m"
 
