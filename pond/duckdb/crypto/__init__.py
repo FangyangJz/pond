@@ -184,7 +184,19 @@ class CryptoDB(DuckDB):
             manual_df = pd.read_csv(Path(__file__).parent / "UMFutures_manual.csv")
             df = pd.concat([df, manual_df])
         else:
-            df = df[["symbol"]]
+            # TODO spot 目前也走这里, 主要还是以合约标的为主
+            df = self.get_future_info(AssetType.future_um, from_local=False)
+            df = df[df["contractType"] == "PERPETUAL"][
+                [
+                    "symbol",
+                    "contractType",
+                    "deliveryDate",
+                    "onboardDate",
+                    "update_datetime",
+                ]
+            ]
+            manual_df = pd.read_csv(Path(__file__).parent / "UMFutures_manual.csv")
+            df = pd.concat([df, manual_df])
 
         df = df.sort_values(by="symbol")
         assert len(df) == len(set(df["symbol"].to_list())), (
@@ -380,7 +392,6 @@ class CryptoDB(DuckDB):
                     symbol,
                     asset_type,
                     timeframe,
-                    self.requests_proxies,
                     do_filter_quote_volume_0,
                 )
             elif data_type == DataType.trades:
@@ -425,6 +436,19 @@ class CryptoDB(DuckDB):
 
         if do_filter_quote_volume_0:
             df = self.filter_quote_volume_0(df, symbol, timeframe)
+
+        # spot 数据这里有timestamp不一致的问题, 这里处理
+        # 新增代码：处理 open_time 和 close_time 时间戳
+        df = df.with_columns(
+            pl.when(pl.col("open_time").cast(str).str.len_bytes() > 13)
+            .then(pl.col("open_time").cast(str).str.slice(0, 13).cast(pl.Int64))
+            .otherwise(pl.col("open_time"))
+            .alias("open_time"),
+            pl.when(pl.col("close_time").cast(str).str.len_bytes() > 13)
+            .then(pl.col("close_time").cast(str).str.slice(0, 13).cast(pl.Int64))
+            .otherwise(pl.col("close_time"))
+            .alias("close_time"),
+        )
 
         df = (
             df.sort("open_time").with_columns(
@@ -553,11 +577,11 @@ if __name__ == "__main__":
             db.update_history_data_parallel(
                 start="2020-1-1",
                 end="2025-7-22",
-                asset_type=AssetType.future_um,
-                data_type=DataType.aggTrades,
+                asset_type=AssetType.spot,
+                data_type=DataType.klines,
                 timeframe=interval,
                 # httpx_proxies={"https://": "https://127.0.0.1:7890"},
-                skip_symbols=["ETHBTC"],
+                skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT"],
                 do_filter_quote_volume_0=False,
                 if_skip_usdc=True,
                 ignore_cache=True,
@@ -569,7 +593,7 @@ if __name__ == "__main__":
         return True
 
     # ...start downloading...
-    interval = "1d"
+    interval = "1h"
     complete = False
     retry = 0
     start_time = time.perf_counter()
