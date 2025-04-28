@@ -572,6 +572,20 @@ if __name__ == "__main__":
     # df = db.get_future_info(asset_type=AssetType.future_um)
     # ll = db.get_local_future_perpetual_symbol_list(asset_type=AssetType.future_um)
 
+    db.update_history_data_parallel(
+        start="2020-1-1",
+        end="2025-7-22",
+        asset_type=AssetType.spot,
+        data_type=DataType.klines,
+        timeframe='1h',
+        # httpx_proxies={"https://": "https://127.0.0.1:7890"},
+        skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT"],
+        do_filter_quote_volume_0=False,
+        if_skip_usdc=True,
+        ignore_cache=False,
+        workers=os.cpu_count() - 2,
+    )
+
     def try_update_data(interval) -> bool:
         try:
             db.update_history_data_parallel(
@@ -584,7 +598,7 @@ if __name__ == "__main__":
                 skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT"],
                 do_filter_quote_volume_0=False,
                 if_skip_usdc=True,
-                ignore_cache=True,
+                ignore_cache=False,
                 workers=os.cpu_count() - 2,
             )
         except BaseException as e:
@@ -593,20 +607,20 @@ if __name__ == "__main__":
         return True
 
     # ...start downloading...
-    interval = "1h"
-    complete = False
-    retry = 0
-    start_time = time.perf_counter()
-    while not complete:
-        complete = try_update_data(interval)
-        retry += 1
-        if retry < 1:
-            continue
-        else:
-            break
-    print(
-        f"complete: {complete}, retried: {retry}, time cost: {time.perf_counter() - start_time:.2f}s"
-    )
+    # interval = "1h"
+    # complete = False
+    # retry = 0
+    # start_time = time.perf_counter()
+    # while not complete:
+    #     complete = try_update_data(interval)
+    #     retry += 1
+    #     if retry < 1:
+    #         continue
+    #     else:
+    #         break
+    # print(
+    #     f"complete: {complete}, retried: {retry}, time cost: {time.perf_counter() - start_time:.2f}s"
+    # )
 
     # db.update_crypto_trades()
 

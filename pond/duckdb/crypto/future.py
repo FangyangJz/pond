@@ -137,7 +137,7 @@ def get_klines(
             limit=limit,
         )
         dd = (
-            pl.from_records(dd, schema=klines_schema)
+            pl.from_records(dd, schema=klines_schema, strict=False)
             # .with_columns(
             #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
             #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
