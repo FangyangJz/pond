@@ -4,7 +4,7 @@ from pond.clickhouse.manager import ClickHouseManager
 from typing import Optional
 import datetime as dtm
 from datetime import datetime
-from pond.clickhouse.kline import StockKline5m, StockKline15m
+from pond.clickhouse.kline import StockKline5m, StockKline15m, BaoStockKline5m
 from threading import Thread
 import threading
 import pandas as pd
@@ -16,9 +16,13 @@ from pond.utils.times import (
 )
 from mootdx.reader import Reader
 import akshare as ak
+import baostock as bs
 
 
 class DataProxy:
+    def get_table(self, interval, adjust):
+        pass
+
     def get_symobls(self) -> list[str]:
         pass
 
@@ -39,6 +43,14 @@ class TdxDataProxy(DataProxy):
 
     def __init__(self, tdx_path: str) -> None:
         self.reader = Reader.factory(market="std", tdxdir=tdx_path)
+
+    def get_table(self, interval, adjust) -> Optional[StockKline5m]:
+        if adjust in ["nfq", "", "3"]:
+            if interval == "5m":
+                return StockKline5m
+            elif interval == "15m":
+                return StockKline15m
+        return None
 
     def get_symobls(self) -> list[str]:
         stocks_df = ak.stock_info_a_code_name()
@@ -90,6 +102,84 @@ class TdxDataProxy(DataProxy):
         return df
 
 
+class BaostockDataProxy(DataProxy):
+    sync_stock_list_date: datetime = None
+    min_sync_interval_days = 1
+    min_start_date = None
+
+    def __init__(self, sync_stock_list_date) -> None:
+        super().__init__()
+        self.sync_stock_list_date = sync_stock_list_date
+        lg = bs.login()
+        logger.info("login respond error_code:" + lg.error_code)
+        logger.info("login respond  error_msg:" + lg.error_msg)
+
+    def get_table(self, interval, adjust) -> Optional[StockKline5m]:
+        if adjust in ["nfq", "", "3"]:
+            if interval in ["5", "5m"]:
+                return BaoStockKline5m
+        return None
+
+    def get_symobls(self) -> list[str]:
+        rs = bs.query_all_stock(day=self.sync_stock_list_date.strftime("%Y-%m-%d"))
+        print("query_all_stock respond error_code:" + rs.error_code)
+        print("query_all_stock respond  error_msg:" + rs.error_msg)
+        data_list = []
+        while (rs.error_code == "0") & rs.next():
+            data_list.append(rs.get_row_data())
+        stocks_df = pd.DataFrame(data_list, columns=rs.fields)
+        return stocks_df["code"].to_list()
+
+    def get_klines(
+        self,
+        symbol: str,
+        period: str,
+        adjust: str,
+        start: datetime,
+        end: datetime,
+        limit: int = 1000,
+    ) -> pd.DataFrame:
+        if period.endswith("m"):
+            period = period[:-1]
+        if end is None:
+            end = start + timedelta(days=90)
+        if end > datetime.now():
+            end = datetime.now()
+        if end - start < timedelta(days=self.min_sync_interval_days):
+            logger.debug(
+                f"get_klines {symbol} from {start} to {end} data len {0}, skip"
+            )
+            return None
+        if self.min_start_date is not None and start < self.min_start_date:
+            logger.debug(
+                f"get_klines {symbol} from {start} to {end} data len {0}, skip"
+            )
+            return None
+        start_date = start.strftime("%Y-%m-%d")
+        end_date = end.strftime("%Y-%m-%d")
+        rs = bs.query_history_k_data_plus(
+            symbol,
+            "date,time,code,open,high,low,close,volume,amount,adjustflag",
+            start_date=start_date,
+            end_date=end_date,
+            frequency=period,
+            adjustflag=adjust,
+        )
+        data_list = []
+        while (rs.error_code == "0") & rs.next():
+            data_list.append(rs.get_row_data())
+        result = pd.DataFrame(data_list, columns=rs.fields)
+        logger.debug(
+            f"query_history_k_data_plus {symbol} from {start_date} to {end_date} data len {len(result)} respond error_code: {rs.error_code}, msg {rs.error_msg}"
+        )
+        if len(result) == 0:
+            return result
+        result["datetime"] = result.apply(
+            lambda row: datetime.strptime(row["time"][:-4], "%Y%m%d%H%M%S"), axis=1
+        )
+        return result.drop(columns=["date", "time", "adjustflag"], axis=1)
+
+
 class StockHelper:
     clickhouse: ClickHouseManager = None
     data_proxy: DataProxy = None
@@ -104,13 +194,6 @@ class StockHelper:
 
     def set_data_proxy(self, data_proxy: DataProxy):
         self.data_proxy = data_proxy
-
-    def get_table(self, interval) -> Optional[StockKline5m]:
-        if interval == "5m":
-            return StockKline5m
-        elif interval == "15m":
-            return StockKline15m
-        return None
 
     def gen_stub_kline_as_list(self, start: datetime, end: datetime):
         open_time_mill = datetime2utctimestamp_milli(start)
@@ -133,7 +216,7 @@ class StockHelper:
     def sync_kline(
         self, interval, adjust, workers=None, end_time: datetime = None
     ) -> bool:
-        table = self.get_table(interval)
+        table = self.data_proxy.get_table(interval, adjust)
         if table is None:
             return False
         if end_time is not None:
@@ -226,14 +309,23 @@ if __name__ == "__main__":
     password = os.environ.get("CLICKHOUSE_PWD")
     conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
     native_conn_str = f"clickhouse+native://default:{password}@localhost:9000/quant?tcp_keepalive=true"
+    sync_start = datetime(2020, 1, 1)
     manager = ClickHouseManager(
-        conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
+        conn_str, data_start=sync_start, native_uri=native_conn_str
     )
-    helper = StockHelper(manager, tdx_path=tdx_path)
-    ret = helper.sync_kline(
-        interval="5m",
-        adjust="",
-        workers=10,
-        end_time=datetime.now().replace(hour=0).replace(minute=0),
-    )
-    print(f"sync ret {ret}")
+    while sync_start < datetime.now().replace(hour=0).replace(minute=0) or True:
+        sync_start = manager.get_latest_record_time(BaoStockKline5m)
+        print(f"sync at {sync_start} start")
+        helper = StockHelper(manager, tdx_path=tdx_path)
+        data_proxy = BaostockDataProxy(sync_stock_list_date=sync_start)
+        data_proxy.min_sync_interval_days = 3
+        data_proxy.min_start_date = datetime(2023, 1, 1)
+        helper.set_data_proxy(data_proxy)
+        ret = helper.sync_kline(
+            interval="5m",
+            adjust="3",
+            workers=1,
+            end_time=datetime.now().replace(hour=0).replace(minute=0),
+        )
+        sync_start = sync_start + timedelta(days=1)
+        print(f"sync at {sync_start} end")

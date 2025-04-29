@@ -66,6 +66,31 @@ class StockKline5m(TsTable):
     )
 
 
+class BaoStockKline5m(TsTable):
+    """
+    5m K线，不复权
+    """
+
+    __tablename__ = "baostock_kline_5m"
+
+    datetime = Column(types.DateTime64, comment="datetime", primary_key=True)
+    code = Column(types.String, comment="code")
+    open = Column(types.Float64, comment="open")
+    high = Column(types.Float64, comment="high")
+    low = Column(types.Float64, comment="low")
+    close = Column(types.Float64, comment="close")
+    volume = Column(types.Float64, comment="volume")
+    amount = Column(types.Float64, comment="amount")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
 class StockKline15m(TsTable):
     """
     日K线，后复权
