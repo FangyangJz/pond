@@ -139,6 +139,8 @@ class BaostockDataProxy(DataProxy):
         end: datetime,
         limit: int = 1000,
     ) -> pd.DataFrame:
+        # baostock always return data include start day but already existed.
+        start += timedelta(days=1)
         if period.endswith("m"):
             period = period[:-1]
         if end is None:
