@@ -17,6 +17,7 @@ from pond.utils.times import (
 from mootdx.reader import Reader
 import akshare as ak
 import baostock as bs
+import time
 
 
 class DataProxy:
@@ -275,6 +276,7 @@ class StockHelper:
         if signal is None:
             signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
         for symbol in symbols:
+            time.sleep(0.1)
             lastest_record = self.clickhouse.get_latest_record_time(
                 table, table.code == symbol
             )
