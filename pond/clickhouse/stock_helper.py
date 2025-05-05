@@ -129,6 +129,7 @@ class BaostockDataProxy(DataProxy):
         while (rs.error_code == "0") & rs.next():
             data_list.append(rs.get_row_data())
         stocks_df = pd.DataFrame(data_list, columns=rs.fields)
+        stocks_df = stocks_df[~stocks_df["code_name"].str.endswith("指数")]
         return stocks_df["code"].to_list()
 
     def get_klines(
@@ -186,6 +187,8 @@ class BaostockDataProxy(DataProxy):
 class StockHelper:
     clickhouse: ClickHouseManager = None
     data_proxy: DataProxy = None
+    fix_data = False
+    sync_data_start: datetime = None
 
     def __init__(
         self, clickhouse: ClickHouseManager, tdx_path: str = None, **kwargs
@@ -216,6 +219,19 @@ class StockHelper:
         ]
         return stub_list
 
+    def get_synced_codes(
+        self, table, code_col="code", time_col="datetime", sync_time: datetime = None
+    ):
+        if sync_time is None:
+            sync_time = self.clickhouse.get_latest_record_time(table)
+        latest_records_df = self.clickhouse.native_read_table(
+            table,
+            start_date=sync_time - timedelta(seconds=1),
+            end_date=sync_time,
+        )
+        latest_synced_codes = latest_records_df[code_col].unique()
+        return latest_synced_codes
+
     def sync_kline(
         self, interval, adjust, workers=None, end_time: datetime = None
     ) -> bool:
@@ -229,6 +245,14 @@ class StockHelper:
         if workers is None:
             workers = math.ceil(os.cpu_count() / 2)
         symbols = self.data_proxy.get_symobls()
+        if self.fix_data:
+            latest_synced_codes = self.get_synced_codes(table)
+            symbols = [s for s in symbols if s not in latest_synced_codes]
+        if self.sync_data_start is not None:
+            available_codes = self.get_synced_codes(
+                table, sync_time=self.sync_data_start
+            )
+            symbols = [s for s in symbols if s in available_codes]
         task_counts = math.ceil(len(symbols) / workers)
         res_dict = {}
         threads: list[Thread] = []
@@ -317,13 +341,15 @@ if __name__ == "__main__":
     manager = ClickHouseManager(
         conn_str, data_start=sync_start, native_uri=native_conn_str
     )
+    helper = StockHelper(manager, tdx_path=tdx_path)
+    helper.fix_data = True
+    helper.sync_data_start = datetime(2024, 10, 31, 15)
     while sync_start < datetime.now().replace(hour=0).replace(minute=0) or True:
         sync_start = manager.get_latest_record_time(BaoStockKline5m)
         print(f"sync at {sync_start} start")
-        helper = StockHelper(manager, tdx_path=tdx_path)
         data_proxy = BaostockDataProxy(sync_stock_list_date=sync_start)
-        data_proxy.min_sync_interval_days = 3
-        data_proxy.min_start_date = datetime(2023, 1, 1)
+        data_proxy.min_sync_interval_days = 5
+        data_proxy.min_start_date = helper.sync_data_start
         helper.set_data_proxy(data_proxy)
         ret = helper.sync_kline(
             interval="5m",
