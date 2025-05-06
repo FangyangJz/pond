@@ -15,6 +15,7 @@ dependencies = [
     "polars>=1.27.1",
     "pyarrow>=19.0.1",
     "python-binance>=1.0.28",
+    "ray>=2.45.0",
     "requests>=2.32.3",
     "xmltodict>=0.14.2",
 ]
