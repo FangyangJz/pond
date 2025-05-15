@@ -2,7 +2,6 @@ import os
 import math
 from pond.clickhouse.manager import ClickHouseManager
 from typing import Optional
-import datetime as dtm
 from datetime import datetime
 from pond.clickhouse.kline import StockKline5m, StockKline15m, BaoStockKline5m
 from threading import Thread
@@ -233,7 +232,12 @@ class StockHelper:
         return latest_synced_codes
 
     def sync_kline(
-        self, interval, adjust, workers=None, end_time: datetime = None
+        self,
+        interval,
+        adjust,
+        workers=None,
+        end_time: datetime = None,
+        time_col="datetime",
     ) -> bool:
         table = self.data_proxy.get_table(interval, adjust)
         if table is None:
@@ -241,7 +245,7 @@ class StockHelper:
         if end_time is not None:
             signal = end_time
         else:
-            signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+            signal = datetime.now().replace(hour=15, minute=0, second=0, microsecond=0)
         if workers is None:
             workers = math.ceil(os.cpu_count() / 2)
         symbols = self.data_proxy.get_symobls()
@@ -281,13 +285,17 @@ class StockHelper:
             rename=True,
         )
         if len(latest_kline_df) == 0:
+            logger.warning(
+                f"stock helper sync kline for {signal} into {table} failed, latest kline df is empty."
+            )
             return False
         lastest_count = (
-            latest_kline_df.group_by("close_time")
-            .count()
-            .sort("close_time")[-1, "count"]
+            latest_kline_df.group_by(time_col).count().sort(time_col)[-1, "count"]
         )
         if lastest_count / request_count < 0.98:
+            logger.warning(
+                f"stock helper sync kline for {signal} into {table} failed, lastest count {lastest_count} request count {request_count}"
+            )
             return False
         return True
 
@@ -298,7 +306,7 @@ class StockHelper:
         res_dict[tid] = False
         interval_seconds = timeframe2minutes(interval) * 60
         if signal is None:
-            signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+            signal = datetime.now().replace(hour=15, minute=0, second=0, microsecond=0)
         for symbol in symbols:
             time.sleep(0.1)
             lastest_record = self.clickhouse.get_latest_record_time(
