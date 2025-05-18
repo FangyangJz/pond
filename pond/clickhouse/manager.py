@@ -1,10 +1,19 @@
 import os
-from datetime import datetime
-import clickhouse_connect
-import clickhouse_connect.driver
-import clickhouse_connect.driver.client
-from pond.clickhouse.downoader import Downloader
+import math
+import datetime as dtm
+
+import ray
+import pandas as pd
+import polars as pl
 import akshare as ak
+import clickhouse_connect
+from clickhouse_driver import Client
+from urllib.parse import urlparse
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, desc
+from deprecated import deprecated
+
+from pond.clickhouse.downoader import Downloader
 from pond.clickhouse.holders import (
     FreeHoldingDetail,
     FreeHoldingStatistic,
@@ -13,22 +22,10 @@ from pond.clickhouse.holders import (
     HoldingStatistic,
     StockRestrictedReleaseDetail,
 )
-import ray
 from pond.utils.times import datestr
-import pandas as pd
 from pond.clickhouse import metadata, TsTable
-from typing import List
 from pond.akshare.stock import get_all_stocks_df
 from pond.clickhouse.kline import KlineDailyNFQ, stock_zh_a_hist
-from sqlalchemy import create_engine, desc
-import polars as pl
-from sqlalchemy.orm import Session
-import datetime as dtm
-from clickhouse_driver import Client
-from deprecated import deprecated
-from typing import Union
-from urllib.parse import urlparse
-import math
 
 
 class Task:
@@ -42,7 +39,9 @@ class Task:
 
 
 class ClickHouseManager:
-    def __init__(self, db_uri, data_start: datetime = None, native_uri=None) -> None:
+    def __init__(
+        self, db_uri, data_start: dtm.datetime = None, native_uri=None
+    ) -> None:
         self.engine = create_engine(db_uri)
         metadata.create_all(self.engine)
         self.data_start = data_start
@@ -63,7 +62,7 @@ class ClickHouseManager:
         }
         return clickhouse_connect.get_client(**configs)
 
-    def sync(self, tasks: list[Task] = [], end: datetime = None):
+    def sync(self, tasks: list[Task] = [], end: dtm.datetime = None):
         print(
             f"click house manager syncing at {end.isoformat()}, task size {len(tasks)}"
         )
@@ -98,9 +97,9 @@ class ClickHouseManager:
 
     def __native_read_table(
         self,
-        table: Union[str, TsTable],
-        start_date: datetime,
-        end_date: datetime,
+        table: str | TsTable,
+        start_date: dtm.datetime,
+        end_date: dtm.datetime,
         filters=None,
         params=None,
         rename=False,
@@ -142,9 +141,9 @@ class ClickHouseManager:
 
     def native_read_table(
         self,
-        table: Union[str, TsTable],
-        start_date: datetime,
-        end_date: datetime,
+        table: str | TsTable,
+        start_date: dtm.datetime,
+        end_date: dtm.datetime,
         filters=None,
         params=None,
         rename=False,
@@ -179,8 +178,8 @@ class ClickHouseManager:
     def read_table(
         self,
         table: TsTable,
-        start_date: datetime,
-        end_date: datetime,
+        start_date: dtm.datetime,
+        end_date: dtm.datetime,
         filters=None,
         rename=False,
     ) -> pl.DataFrame:
@@ -202,7 +201,7 @@ class ClickHouseManager:
 
     def save_to_db(
         self,
-        table: Union[str, TsTable],
+        table: str | TsTable,
         df: pd.DataFrame,
         last_record_filters,
         datetime_col="datetime",
@@ -256,8 +255,8 @@ class ClickHouseManager:
             )
             return rows
 
-    def get_syncing_tasks(self, date: datetime) -> List[Task]:
-        tasks: List[Task] = []
+    def get_syncing_tasks(self, date: dtm.datetime) -> list[Task]:
+        tasks: list[Task] = []
         args = {"date": datestr(date)}
 
         # kline daily hfq
@@ -395,9 +394,9 @@ if __name__ == "__main__":
     conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
     native_conn_str = f"clickhouse+native://default:{password}@localhost:9000/quant?tcp_keepalive=true"
     manager = ClickHouseManager(
-        conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
+        conn_str, data_start=dtm.datetime(2020, 1, 1), native_uri=native_conn_str
     )
-    begin = datetime(2021, 1, 1)
+    begin = dtm.datetime(2021, 1, 1)
     manager.sync()
 
     # end = datetime.now()

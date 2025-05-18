@@ -12,8 +12,9 @@ pond
 
 If you plan to develop pond yourself, or want to be on the cutting edge, you can use an editable install:
 ```bash
-git clone https://github.com/FangyangJz/pond.git
-pip install -e .
+$ git clone https://github.com/FangyangJz/pond.git
+$ cd pond
+$ uv sync
 ```
 >Note: `Pycharm` and `vscode` use `Black` as code formatter.
 
@@ -74,12 +75,6 @@ df3 = db.get_kline_1d_qfq_df()
 ```
 
 ### 3. CryptoDB
-
-Dependency install:
-```commandline
-pip install binance-futures-connector
-```
-
 Usage examples:
 ```python
 import polars as pl
@@ -114,12 +109,5 @@ db.update_crypto_agg_trades()
 
 If you are still hesitant about which computing framework to choose. Please refer this link [Database-like ops benchmark](https://duckdblabs.github.io/db-benchmark/)
 
-## About Install cuDF
-
-In my `python3.9` case, use Nvidia `rapids` products `[cuDF, cuML, cuxfilter]` in windows WSL2 or Linux.
-
-Modify offical installation below:
-```bash
-(Your_conda_env)$ conda install --solver=libmamba -c rapidsai -c conda-forge -c nvidia cudf=23.10 cuml=23.10 cuxfilter=23.10 python=3.9 cuda-version=12.0
-```
-> Note: create -> install
+## Note
+Dependencies must be `binance-connector==3.11.0`, if not binance-spot will raise import error.

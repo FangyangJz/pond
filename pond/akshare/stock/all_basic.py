@@ -3,12 +3,14 @@
 # @Author   : Fangyang
 # @Software : PyCharm
 
-from functools import cache
-from pond.akshare.stock.migrate_func import stock_zh_a_spot_em
+from functools import lru_cache
+
+import akshare as ak
+
 from pond.utils.code2code import trans_to_juejin_code
+from pond.akshare.stock.migrate_func import stock_zh_a_spot_em
 
-
-@cache
+@lru_cache()
 def get_all_stocks_df():
     """
     tushare 的 stock_basic 包含 行业, 地域, 上市日期字段, 能区分退市股票,
@@ -18,6 +20,7 @@ def get_all_stocks_df():
     :return:
     """
     df = stock_zh_a_spot_em()
+    # df2 = ak.stock_zh_a_spot_em()
 
     if "序号" in df.columns:
         df.drop("序号", inplace=True, axis=1)

@@ -1,44 +1,30 @@
-[[tool.poetry.source]]
-name = "tsinghua"
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-priority = "default"
-
-
-[[tool.poetry.source]]
-name = "aliyun"
-url = "http://mirrors.aliyun.com/pypi/simple"
-priority = "primary"
-
-
-[tool.poetry]
+[project]
 name = "pond"
-version = "0.1.1"
-description = ""
-authors = ["fangyang_gpu <fangyang.jing@hotmail.com>"]
+version = "0.1.0"
+description = "Add your description here"
 readme = "README.md"
-
-
-[tool.poetry.dependencies]
-python = "^3.11"
-akshare = "*"
-mootdx = "*"
-requests = "*"
-duckdb = "*"
-loguru = "*"
-black = "*"
-polars = "*"
-pyarrow = "*"
-sqlalchemy = "^2.0.25"
-clickhouse-sqlalchemy = "^0.3.0"
-clickhouse_connect = "*"
-binance-connector = "^3.5.1"
-binance-futures-connector = "^4.0.0"
-pre-commit = "*"
-ruff = "*"
-xmltodict = "^0.13.0"
-deprecated = "*"
-ray= "*"
+requires-python = ">=3.12"
+dependencies = [
+    "akshare>=1.16.77",
+    "binance-connector==3.11.0",
+    "binance-futures-connector>=4.1.0",
+    "clickhouse-connect>=0.8.17",
+    "clickhouse-sqlalchemy>=0.3.2",
+    "deprecated>=1.2.18",
+    "duckdb>=1.2.2",
+    "loguru>=0.7.3",
+    "mootdx>=0.11.7",
+    "polars>=1.27.1",
+    "pyarrow>=19.0.1",
+    "python-binance>=1.0.28",
+    "ray>=2.45.0",
+    "requests>=2.32.3",
+    "xmltodict>=0.14.2",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pond"]

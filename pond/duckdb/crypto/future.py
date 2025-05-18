@@ -14,11 +14,11 @@ from binance.cm_futures import CMFutures
 from binance.um_futures import UMFutures
 from pond.duckdb.crypto.const import klines_schema
 from pond.binance_history.type import TIMEFRAMES
-from tenacity import retry, wait_fixed
+from tenacity import retry, stop_after_delay, wait_fixed
 from concurrent.futures import ThreadPoolExecutor
 
 
-@retry(wait=wait_fixed(3))
+@retry(wait=wait_fixed(3), stop=stop_after_delay(10))
 def get_future_info_df(client: CMFutures | UMFutures | Spot) -> pd.DataFrame:
     info = client.exchange_info()
     df = pd.DataFrame.from_records(info["symbols"])
@@ -137,7 +137,7 @@ def get_klines(
             limit=limit,
         )
         dd = (
-            pl.from_records(dd, schema=klines_schema)
+            pl.from_records(dd, schema=klines_schema, strict=False)
             # .with_columns(
             #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
             #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
