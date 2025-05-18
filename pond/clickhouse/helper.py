@@ -5,7 +5,12 @@ from typing import Optional
 import datetime as dtm
 from datetime import datetime
 from binance.um_futures import UMFutures
-from pond.clickhouse.kline import FuturesKline5m, FuturesKline1H, FuturesKline1d
+from pond.clickhouse.kline import (
+    FuturesKline5m,
+    FuturesKline1H,
+    FuturesKline1d,
+    FuturesKline15m,
+)
 from threading import Thread
 import threading
 import pandas as pd
@@ -101,6 +106,8 @@ class FuturesHelper:
             return FuturesKline5m
         if interval == "1d":
             return FuturesKline1d
+        if interval == "15m":
+            return FuturesKline15m
         return None
 
     def gen_stub_kline_as_list(self, start: datetime, end: datetime):

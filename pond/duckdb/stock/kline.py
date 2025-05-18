@@ -124,7 +124,7 @@ def read_tdx_exported_kline(path: str, code: str, start: datetime, end: datetime
         code_name = infos[1]
         if infos[2].find("1分钟") >= 0:
             period = 1
-        elif infos[2].startswith("5分钟") >= 0:
+        elif infos[2].find("5分钟") >= 0:
             period = 5
         elif infos[2].find("日线") >= 0:
             period = "d"
@@ -161,25 +161,29 @@ def read_tdx_exported_kline(path: str, code: str, start: datetime, end: datetime
     return df
 
 
-def format_tdx_exported_kline(df) -> pl.DataFrame:
+def format_tdx_exported_kline(df: pl.DataFrame) -> pl.DataFrame:
     df = df.with_columns(
-        pl.col("date").str.strptime(pl.Datetime, format="%m-%d-%Y").cast(pl.Datetime)
-    )
-    df = df.with_columns(
-        [
-            (pl.col("time") / 100).floor().alias("hour"),
-            (pl.col("time") % 100).alias("minute"),
-        ]
-    )
-    df = df.with_columns(
-        [
-            (
-                pl.col("date")
-                + pl.duration(hours=pl.col("hour"), minutes=pl.col("minute"))
-            ).alias("datetime")
-        ]
-    ).sort("datetime")
-    return df.drop(["date", "time", "hour", "minute"])
+        datetime=pl.col("date")
+        .str.strptime(pl.Datetime, format="%m-%d-%Y")
+        .cast(pl.Datetime)
+    ).drop("date")
+    if "time" in df.columns:
+        df = df.with_columns(
+            [
+                (pl.col("time") / 100).floor().alias("hour"),
+                (pl.col("time") % 100).alias("minute"),
+            ]
+        )
+        df = df.with_columns(
+            [
+                (
+                    pl.col("datetime")
+                    + pl.duration(hours=pl.col("hour"), minutes=pl.col("minute"))
+                ).alias("datetime")
+            ]
+        ).sort("datetime")
+        df = df.drop(["time", "hour", "minute"])
+    return df
 
 
 if __name__ == "__main__1":

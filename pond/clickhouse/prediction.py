@@ -9,7 +9,11 @@ class StockPrediction(TsTable):
     datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
     code = Column(types.String, comment="jj_code")
     model = Column(types.String, comment="model")
+    model_name = Column(types.String, comment="model_name")
     value = Column(types.Float64, comment="y_pred")
+    value_group = Column(types.Float64, comment="y_pred_group")
+    value_raw_mean = Column(types.Float64, comment="y_pred_raw_mean")
+    value_raw_str = Column(types.String, comment="y_pred_raw_str")
 
     __table_args__ = (
         engines.MergeTree(

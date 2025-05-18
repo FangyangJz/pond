@@ -104,12 +104,17 @@ class ClickHouseManager:
         params=None,
         rename=False,
         datetime_col="datetime",
+        columns=[],
     ) -> pd.DataFrame:
         if isinstance(table, str):
             table_name = table
         else:
             table_name = table.__tablename__
-        sql = f"select * from {table_name}"
+        if len(columns) > 0:
+            columns = ",".join(columns)
+        else:
+            columns = "*"
+        sql = f"select {columns} from {table_name}"
         query_params = {}
         if start_date is None:
             start_date = self.data_start
@@ -144,6 +149,7 @@ class ClickHouseManager:
         rename=False,
         datetime_col="datetime",
         trunk_days=None,
+        columns=[],
     ) -> pd.DataFrame:
         if trunk_days is None:
             starts = [start_date]
@@ -160,7 +166,7 @@ class ClickHouseManager:
         for start, end in zip(starts, ends):
             print(f"reading {table} from {start} to {end}")
             df = self.__native_read_table(
-                table, start, end, filters, params, rename, datetime_col
+                table, start, end, filters, params, rename, datetime_col, columns
             )
             if df is not None and len(df) > 0:
                 dfs.append(df)

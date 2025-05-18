@@ -26,14 +26,6 @@ class FuturePosition(TsTable):
     latest_high: float = Column(types.Float64, comment="latest_high")
     latest_low: float = Column(types.Float64, comment="latest_low")
     latest_close: float = Column(types.Float64, comment="latest_close")
-    trade_id: int = Column(types.Int64, comment="trade_id")
-    trade_side: str = Column(types.String, comment="trade_side")
-    trade_stake_amount: float = Column(types.Float64, comment="trade_stake_amount")
-    trade_leverage: float = Column(types.Float64, comment="trade_leverage")
-    trade_value: float = Column(types.Float64, comment="trade_value")
-    unbalance_time = Column(types.DateTime64, comment="unbalance_time")
-    unbalance_state: str = Column(types.String, comment="unbalance_state")
-    warn_state: str = Column(types.String, comment="warn_state")
 
     __table_args__ = (
         engines.ReplacingMergeTree(
