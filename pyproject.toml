@@ -9,6 +9,7 @@ dependencies = [
     "binance-connector==3.11.0",
     "binance-futures-connector>=4.1.0",
     "clickhouse-connect>=0.8.17",
+    "clickhouse-sqlalchemy>=0.3.2",
     "duckdb>=1.2.2",
     "loguru>=0.7.3",
     "mootdx>=0.11.7",
