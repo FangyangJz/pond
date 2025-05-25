@@ -22,7 +22,7 @@ from pond.clickhouse.holders import (
     HoldingStatistic,
     StockRestrictedReleaseDetail,
 )
-from pond.utils.times import datestr
+from pond.utils.times import datestr, timeit_cls_method_wrapper
 from pond.clickhouse import metadata, TsTable
 from pond.akshare.stock import get_all_stocks_df
 from pond.clickhouse.kline import KlineDailyNFQ, stock_zh_a_hist
@@ -203,6 +203,7 @@ class ClickHouseManager:
                 df = df.rename(table().get_colcom_names())
         return df
 
+    @timeit_cls_method_wrapper
     def save_to_db(
         self,
         table: str | TsTable,

@@ -6,6 +6,7 @@ import baostock as bs
 from pond.clickhouse.data_proxy import DataProxy
 from pond.clickhouse.kline import BaoStockKline5m
 from pond.enums import Adjust, Interval
+from pond.utils.times import timeit_cls_method_wrapper
 
 
 class BaostockDataProxy(DataProxy):
@@ -70,6 +71,7 @@ class BaostockDataProxy(DataProxy):
                 common_fields + ", turn, pctChg, peTTM, pbMRQ, psTTM, pcfNcfTTM, isST"
             )
 
+    @timeit_cls_method_wrapper
     def get_klines(
         self,
         symbol: str,
