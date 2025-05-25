@@ -1,8 +1,5 @@
-# !/usr/bin/env python3
-# @Datetime : 2023/10/9 22:37
-# @Author   : Fangyang
-# @Software : PyCharm
-from functools import cache
+from functools import lru_cache
+
 import akshare as ak
 import pandas as pd
 
@@ -15,7 +12,7 @@ from pond.utils.code2code import (
 )
 
 
-@cache
+@lru_cache()
 def get_bond_basic_df(
     data_delist_status: str = "include",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
