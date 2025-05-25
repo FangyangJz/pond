@@ -212,7 +212,7 @@ if __name__ == "__main__":
         ret = helper.sync_kline(
             interval=Interval.MINUTE_5,
             adjust=Adjust.NFQ,
-            workers=0,
+            workers=1,
             end_time=datetime.now().replace(hour=0).replace(minute=0),
         )
         sync_start = sync_start + timedelta(days=1)
