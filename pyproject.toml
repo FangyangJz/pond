@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "akshare>=1.16.77",
+    "baostock>=0.8.9",
     "binance-connector==3.11.0",
     "binance-futures-connector>=4.1.0",
     "clickhouse-connect>=0.8.17",
