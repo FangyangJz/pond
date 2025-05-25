@@ -13,18 +13,15 @@ class BaostockDataProxy(DataProxy):
     min_sync_interval_days = 1
     min_start_date = None
 
-    def __init__(self, sync_stock_list_date) -> None:
+    def __init__(self, sync_stock_list_date: datetime) -> None:
         super().__init__()
         self.sync_stock_list_date = sync_stock_list_date
         lg = bs.login()
         logger.info("login respond error_code:" + lg.error_code)
         logger.info("login respond  error_msg:" + lg.error_msg)
 
-    def get_table(self, interval: Interval, adjust: Adjust) -> BaoStockKline5m | None:
-        if adjust in ["nfq", "", "3", "1"]:
-            if interval in ["5", "5m"]:
-                return BaoStockKline5m
-        return None
+    def get_table(self, interval: Interval, adjust: Adjust) -> BaoStockKline5m:
+        return {(Interval.MINUTE_5, Adjust.NFQ): BaoStockKline5m}[(interval, adjust)]
 
     def get_symobls(self) -> list[str]:
         rs = bs.query_all_stock(day=self.sync_stock_list_date.strftime("%Y-%m-%d"))
@@ -37,6 +34,42 @@ class BaostockDataProxy(DataProxy):
         stocks_df = stocks_df[~stocks_df["code_name"].str.endswith("指数")]
         return stocks_df["code"].to_list()
 
+    def get_frequency(self, interval: Interval) -> str:
+        if interval == Interval.MINUTE_5:
+            return "5"
+        elif interval == Interval.MINUTE_15:
+            return "15"
+        elif interval == Interval.MINUTE_30:
+            return "30"
+        elif interval == Interval.HOUR_1:
+            return "60"
+        elif interval == Interval.DAY_1:
+            return "d"
+        elif interval == Interval.WEEK_1:
+            return "w"
+        elif interval == Interval.MONTH_1:
+            return "m"
+        else:
+            raise ValueError(f"Unsupported interval: {interval}")
+
+    def get_fields(self, interval: Interval) -> str:
+        common_fields = (
+            "date, time, code, open, high, low, close, volume, amount, adjustflag"
+        )
+        if interval in [
+            Interval.MINUTE_5,
+            Interval.MINUTE_15,
+            Interval.MINUTE_30,
+            Interval.HOUR_1,
+        ]:
+            return common_fields
+        elif interval in [Interval.WEEK_1, Interval.MONTH_1]:
+            return common_fields + ", turn, pctChg"
+        elif interval == Interval.DAY_1:
+            return (
+                common_fields + ", turn, pctChg, peTTM, pbMRQ, psTTM, pcfNcfTTM, isST"
+            )
+
     def get_klines(
         self,
         symbol: str,
@@ -48,8 +81,6 @@ class BaostockDataProxy(DataProxy):
     ) -> pd.DataFrame:
         # baostock always return data include start day but already existed.
         start += timedelta(days=1)
-        if period.endswith("m"):
-            period = period[:-1]
         if end is None:
             end = start + timedelta(days=90)
         if end > datetime.now():
@@ -66,12 +97,13 @@ class BaostockDataProxy(DataProxy):
             return None
         start_date = start.strftime("%Y-%m-%d")
         end_date = end.strftime("%Y-%m-%d")
+
         rs = bs.query_history_k_data_plus(
             symbol,
-            "date,time,code,open,high,low,close,volume,amount,adjustflag",
+            fields=self.get_fields(period),
             start_date=start_date,
             end_date=end_date,
-            frequency=period,
+            frequency=self.get_frequency(period),
             adjustflag=adjust,
         )
         data_list = []

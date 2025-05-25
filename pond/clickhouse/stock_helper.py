@@ -54,7 +54,11 @@ class StockHelper:
         return stub_list
 
     def get_synced_codes(
-        self, table, code_col="code", time_col="datetime", sync_time: datetime = None
+        self,
+        table: TsTable,
+        code_col: str = "code",
+        time_col: str = "datetime",
+        sync_time: datetime | None = None,
     ):
         if sync_time is None:
             sync_time = self.clickhouse.get_latest_record_time(table)
@@ -190,14 +194,14 @@ if __name__ == "__main__":
     # password = os.environ.get("CLICKHOUSE_PWD")
     password = ""
     conn_str = f"clickhouse://default:{password}@localhost:18123/quant"
-    native_conn_str = f"clickhouse+native://default:{password}@localhost:18123/quant?tcp_keepalive=true"
+    native_conn_str = f"clickhouse+native://default:{password}@localhost:19000/quant?tcp_keepalive=true"
     sync_start = datetime(2020, 1, 2)
     manager = ClickHouseManager(
         conn_str, data_start=sync_start, native_uri=native_conn_str
     )
     helper = StockHelper(manager, tdx_path=tdx_path)
-    helper.fix_data = True
-    helper.sync_data_start = sync_start  # datetime(2024, 10, 31, 15)
+    helper.fix_data = False
+    helper.sync_data_start = None #sync_start  # datetime(2024, 10, 31, 15)
     while sync_start < datetime.now().replace(hour=0).replace(minute=0) or True:
         sync_start = manager.get_latest_record_time(BaoStockKline5m)
         print(f"sync at {sync_start} start")
@@ -206,9 +210,9 @@ if __name__ == "__main__":
         data_proxy.min_start_date = helper.sync_data_start
         helper.set_data_proxy(data_proxy)
         ret = helper.sync_kline(
-            interval="5m",
-            adjust="1",  # '1' 后复权, '2' 前复权, '3' 不复权
-            workers=1,
+            interval=Interval.MINUTE_5,
+            adjust=Adjust.NFQ,
+            workers=0,
             end_time=datetime.now().replace(hour=0).replace(minute=0),
         )
         sync_start = sync_start + timedelta(days=1)
