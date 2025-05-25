@@ -23,7 +23,10 @@ class TdxDataProxy(DataProxy):
         self.reader = Reader.factory(market="std", tdxdir=tdx_path)
 
     def get_table(
-        self, interval: Interval, adjust: Adjust, product: Product = Product.STOCK
+        self,
+        interval: Interval,
+        adjust: Adjust,
+        product: Product = Product.STOCK,
     ) -> TsTable | None:
         return {
             (Interval.MINUTE_5, Adjust.NFQ, Product.STOCK): StockKline5m,
