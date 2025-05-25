@@ -40,7 +40,10 @@ class Task:
 
 class ClickHouseManager:
     def __init__(
-        self, db_uri, data_start: dtm.datetime = None, native_uri=None
+        self,
+        db_uri: str,
+        data_start: dtm.datetime = None,
+        native_uri: str | None = None,
     ) -> None:
         self.engine = create_engine(db_uri)
         metadata.create_all(self.engine)
@@ -54,6 +57,7 @@ class ClickHouseManager:
         parts = urlparse(db_uri)
         configs = {
             "host": parts.hostname,
+            "port": parts.port if parts.port else 9000,
             "user": parts.username,
             "password": parts.password,
             "connect_timeout": 15,
@@ -264,15 +268,13 @@ class ClickHouseManager:
         begin = self.get_latest_record_time(KlineDailyNFQ)
         kline_nfq_daily_args = []
         for symbol in stock_basic["代码"]:
-            kline_nfq_daily_args.append(
-                {
-                    "symbol": symbol,
-                    "start_date": datestr(begin),
-                    "end_date": datestr(date),
-                    "period": "daily",
-                    "adjust": "",
-                }
-            )
+            kline_nfq_daily_args.append({
+                "symbol": symbol,
+                "start_date": datestr(begin),
+                "end_date": datestr(date),
+                "period": "daily",
+                "adjust": "",
+            })
         tasks.append(Task(KlineDailyNFQ, stock_zh_a_hist, kline_nfq_daily_args))
         return tasks
 
@@ -287,13 +289,11 @@ class ClickHouseManager:
         holding_detail_arg_groups = []
         for holder_type in holder_types:
             for changement in changements:
-                holding_detail_arg_groups.append(
-                    {
-                        "date": datestr(date),
-                        "indicator": holder_type,
-                        "symbol": changement,
-                    }
-                )
+                holding_detail_arg_groups.append({
+                    "date": datestr(date),
+                    "indicator": holder_type,
+                    "symbol": changement,
+                })
         tasks.append(
             Task(
                 HoldingDetail,
