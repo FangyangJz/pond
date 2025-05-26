@@ -7,6 +7,7 @@ import ray
 import pandas as pd
 import polars as pl
 import akshare as ak
+from loguru import logger
 import clickhouse_connect
 from clickhouse_driver import Client
 from urllib.parse import urlparse
@@ -51,7 +52,7 @@ class ClickHouseManager:
         self.data_start = data_start
         self.native_uri = native_uri
 
-    def get_engin(self):
+    def get_engine(self):
         return self.engine
 
     def create_client(self, db_uri: str):
@@ -68,8 +69,8 @@ class ClickHouseManager:
         return clickhouse_connect.get_client(**configs)
 
     def sync(self, tasks: list[Task] = [], end: dtm.datetime | None = None):
-        print(
-            f"click house manager syncing at {end.isoformat()}, task size {len(tasks)}"
+        logger.info(
+            f"clickhouse manager syncing at {end.isoformat()}, task size {len(tasks)}"
         )
         max_dowloader_size = int(os.cpu_count() / len(tasks)) + 1
         for task in tasks:
@@ -169,7 +170,7 @@ class ClickHouseManager:
             ends = [start_date + dt_step * (i + 1) for i in range(0, dt_splits)]
         dfs = []
         for start, end in zip(starts, ends):
-            print(f"reading {table} from {start} to {end}")
+            logger.info(f"reading {table} from {start} to {end}")
             df = self.__native_read_table(
                 table, start, end, filters, params, rename, datetime_col, columns
             )
@@ -247,7 +248,7 @@ class ClickHouseManager:
             df = df[df[datetime_col] > lastet_record_time]
             # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         if len(df) == 0:
-            print(
+            logger.info(
                 f"dataframe is empty after filter by latest record, original len {origin_len}"
             )
             return 0
@@ -256,7 +257,7 @@ class ClickHouseManager:
             rows = client.insert_dataframe(
                 query=query, dataframe=df, settings=dict(use_numpy=True)
             )
-            print(
+            logger.success(
                 f"total {len(df)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
             )
             return rows

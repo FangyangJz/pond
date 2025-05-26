@@ -6,7 +6,6 @@ import polars as pl
 from tqdm import tqdm
 
 from pond.clickhouse.data_proxy.tdx import TdxDataProxy
-from pond.clickhouse.kline import BondKline5m
 from pond.clickhouse.manager import ClickHouseManager
 from pond.enums import Interval, Product, Adjust
 from pond.tdx.reader.lc_min_bar_reader import TdxLCMinBarReader
@@ -19,6 +18,7 @@ product = Product.BOND
 tdx_path = r"E:\new_tdx"  # r"D:\windows\programs\TongDaXin"
 host = "192.168.0.103"
 password: str = os.environ.get("CLICKHOUSE_PWD", "")
+
 conn_str = f"clickhouse://default:{password}@{host}:18123/quant"
 native_conn_str = (
     f"clickhouse+native://default:{password}@{host}:19000/quant?tcp_keepalive=true"
