@@ -5,9 +5,15 @@ import akshare as ak
 from loguru import logger
 from mootdx.reader import Reader
 
+from pond.akshare.bond.all_basic import get_bond_basic_df
+from pond.clickhouse import TsTable
 from pond.clickhouse.data_proxy import DataProxy
-from pond.clickhouse.kline import StockKline15m, StockKline5m
-from pond.enums import Adjust, Interval
+from pond.clickhouse.kline import (
+    BondKline5m,
+    KlineDailyNFQ,
+    StockKline5m,
+)
+from pond.enums import Adjust, Interval, Product
 
 
 class TdxDataProxy(DataProxy):
@@ -17,18 +23,26 @@ class TdxDataProxy(DataProxy):
         self.reader = Reader.factory(market="std", tdxdir=tdx_path)
 
     def get_table(
-        self, interval: Interval, adjust: Adjust
-    ) -> StockKline5m | StockKline15m | None:
-        if adjust in ["nfq", "", "3"]:
-            if interval == "5m":
-                return StockKline5m
-            elif interval == "15m":
-                return StockKline15m
-        return None
+        self,
+        interval: Interval,
+        adjust: Adjust,
+        product: Product = Product.STOCK,
+    ) -> TsTable | None:
+        return {
+            (Interval.MINUTE_5, Adjust.NFQ, Product.STOCK): StockKline5m,
+            (Interval.DAY_1, Adjust.NFQ, Product.STOCK): KlineDailyNFQ,
+            (Interval.MINUTE_5, Adjust.NFQ, Product.BOND): BondKline5m,
+        }[(interval, adjust, product)]
 
-    def get_symobls(self) -> list[str]:
-        stocks_df = ak.stock_info_a_code_name()
-        return stocks_df["code"].to_list()
+    def get_symobls(self, product: Product = Product.STOCK) -> list[str]:
+        if product == Product.BOND:
+            # 1. 获取全部债券信息, 包含退市债券
+            bond_zh_cov_df = ak.bond_zh_cov()
+            symbols = bond_zh_cov_df["债券代码"].to_list()
+        elif product == Product.STOCK:
+            stocks_df = ak.stock_info_a_code_name()
+            symbols = stocks_df["code"].to_list()
+        return symbols
 
     def get_klines(
         self,
@@ -76,3 +90,11 @@ class TdxDataProxy(DataProxy):
             .dropna()
         )
         return df
+
+
+if __name__ == "__main__":
+    tdx_path = r"E:\new_tdx"
+    data_proxy = TdxDataProxy(tdx_path)
+    bond_klines_df = data_proxy.get_symobls(Product.BOND)
+    stock_klines_df = data_proxy.get_symobls(Product.STOCK)
+    pass

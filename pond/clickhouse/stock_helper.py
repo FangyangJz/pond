@@ -2,15 +2,16 @@ import os
 import math
 import time
 from datetime import datetime
+from datetime import timedelta
 import threading
+
+from loguru import logger
 
 from pond.clickhouse import TsTable
 from pond.clickhouse.data_proxy import DataProxy
 from pond.clickhouse.data_proxy.tdx import TdxDataProxy
 from pond.clickhouse.manager import ClickHouseManager
 from pond.clickhouse.kline import BaoStockKline5m
-from loguru import logger
-from datetime import timedelta
 from pond.enums import Interval, Adjust
 from pond.utils.times import (
     datetime2utctimestamp_milli,
@@ -21,7 +22,7 @@ from pond.utils.times import (
 class StockHelper:
     clickhouse: ClickHouseManager = None
     data_proxy: DataProxy = None
-    fix_data = False
+    fix_data: bool = False
     sync_data_start: datetime = None
 
     def __init__(
@@ -201,10 +202,10 @@ if __name__ == "__main__":
     )
     helper = StockHelper(manager, tdx_path=tdx_path)
     helper.fix_data = False
-    helper.sync_data_start = None #sync_start  # datetime(2024, 10, 31, 15)
+    helper.sync_data_start = None  # sync_start  # datetime(2024, 10, 31, 15)
     while sync_start < datetime.now().replace(hour=0).replace(minute=0) or True:
         sync_start = manager.get_latest_record_time(BaoStockKline5m)
-        print(f"sync at {sync_start} start")
+        logger.info(f"sync at {sync_start} start")
         data_proxy = BaostockDataProxy(sync_stock_list_date=sync_start)
         data_proxy.min_sync_interval_days = 5
         data_proxy.min_start_date = helper.sync_data_start
@@ -216,4 +217,4 @@ if __name__ == "__main__":
             end_time=datetime.now().replace(hour=0).replace(minute=0),
         )
         sync_start = sync_start + timedelta(days=1)
-        print(f"sync at {sync_start} end")
+        logger.info(f"sync at {sync_start} end")
