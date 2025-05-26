@@ -1,6 +1,7 @@
 import os
 import math
 import datetime as dtm
+from typing import Any
 
 import ray
 import pandas as pd
@@ -53,7 +54,7 @@ class ClickHouseManager:
     def get_engin(self):
         return self.engine
 
-    def create_client(self, db_uri):
+    def create_client(self, db_uri: str):
         parts = urlparse(db_uri)
         configs = {
             "host": parts.hostname,
@@ -66,7 +67,7 @@ class ClickHouseManager:
         }
         return clickhouse_connect.get_client(**configs)
 
-    def sync(self, tasks: list[Task] = [], end: dtm.datetime = None):
+    def sync(self, tasks: list[Task] = [], end: dtm.datetime | None = None):
         print(
             f"click house manager syncing at {end.isoformat()}, task size {len(tasks)}"
         )
@@ -104,11 +105,11 @@ class ClickHouseManager:
         table: str | TsTable,
         start_date: dtm.datetime,
         end_date: dtm.datetime,
-        filters=None,
-        params=None,
-        rename=False,
-        datetime_col="datetime",
-        columns=[],
+        filters: list[str] | None = None,
+        params: dict[str, Any] | None = None,
+        rename: bool = False,
+        datetime_col: str = "datetime",
+        columns: list[str] = [],
     ) -> pd.DataFrame:
         if isinstance(table, str):
             table_name = table
@@ -148,11 +149,11 @@ class ClickHouseManager:
         table: str | TsTable,
         start_date: dtm.datetime,
         end_date: dtm.datetime,
-        filters=None,
+        filters: list[str] | None = None,
         params=None,
-        rename=False,
-        datetime_col="datetime",
-        trunk_days=None,
+        rename: bool = False,
+        datetime_col: str = "datetime",
+        trunk_days: int = None,
         columns=[],
     ) -> pd.DataFrame:
         if trunk_days is None:
@@ -184,7 +185,7 @@ class ClickHouseManager:
         table: TsTable,
         start_date: dtm.datetime,
         end_date: dtm.datetime,
-        filters=None,
+        filters: list[str] | None = None,
         rename=False,
     ) -> pl.DataFrame:
         with Session(self.engine) as session:
@@ -208,7 +209,7 @@ class ClickHouseManager:
         self,
         table: str | TsTable,
         df: pd.DataFrame,
-        last_record_filters,
+        last_record_filters: list[str] | None,
         datetime_col="datetime",
     ) -> int:
         # format data
@@ -333,7 +334,9 @@ class ClickHouseManager:
         )
         return tasks
 
-    def get_latest_record_time(self, table: TsTable, filters=None):
+    def get_latest_record_time(
+        self, table: TsTable, filters: list[str] | None = None
+    ) -> dtm.datetime:
         with Session(self.engine) as session:
             query = session.query(table)
             if filters is not None:
@@ -348,7 +351,9 @@ class ClickHouseManager:
             begin = self.data_start
         return begin
 
-    def native_get_latest_record_time(self, table, filters, datetime_col="datetime"):
+    def native_get_latest_record_time(
+        self, table: TsTable, filters: str | list[str], datetime_col: str = "datetime"
+    ) -> dtm.datetime:
         if filters is None:
             filters = []
         elif isinstance(filters, str):
@@ -364,7 +369,7 @@ class ClickHouseManager:
             pass
         return self.data_start
 
-    def create_table(self, table_name, order_by_cols: list, df: pl.DataFrame):
+    def create_table(self, table_name: str, order_by_cols: list[str], df: pl.DataFrame):
         columns_ddl = ""
         for i in range(len(df.columns)):
             col = df.columns[i]

@@ -34,6 +34,6 @@ for code in tqdm(data_proxy.get_symobls(product=product)):
         continue
     df = df.with_columns(datetime=pl.col("close_time")).to_pandas()
     manager.save_to_db(
-        table=table, df=df, datetime_col="open_time", last_record_filters=None
+        table=table, df=df, datetime_col="open_time", last_record_filters=[table.code == code]
     )
     pass
