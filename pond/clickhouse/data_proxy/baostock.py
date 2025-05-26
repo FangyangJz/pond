@@ -5,7 +5,8 @@ import pandas as pd
 import baostock as bs
 from pond.clickhouse.data_proxy import DataProxy
 from pond.clickhouse.kline import BaoStockKline5m
-from pond.enums import Adjust, Interval
+from pond.enums import Adjust, Interval, Product
+from pond.utils.times import timeit_cls_method_wrapper
 
 
 class BaostockDataProxy(DataProxy):
@@ -20,8 +21,12 @@ class BaostockDataProxy(DataProxy):
         logger.info("login respond error_code:" + lg.error_code)
         logger.info("login respond  error_msg:" + lg.error_msg)
 
-    def get_table(self, interval: Interval, adjust: Adjust) -> BaoStockKline5m:
-        return {(Interval.MINUTE_5, Adjust.NFQ): BaoStockKline5m}[(interval, adjust)]
+    def get_table(
+        self, interval: Interval, adjust: Adjust, product: Product = Product.STOCK
+    ) -> BaoStockKline5m:
+        return {
+            (Interval.MINUTE_5, Adjust.NFQ, Product.STOCK): BaoStockKline5m,
+        }[(interval, adjust, product)]
 
     def get_symobls(self) -> list[str]:
         rs = bs.query_all_stock(day=self.sync_stock_list_date.strftime("%Y-%m-%d"))
@@ -70,6 +75,7 @@ class BaostockDataProxy(DataProxy):
                 common_fields + ", turn, pctChg, peTTM, pbMRQ, psTTM, pcfNcfTTM, isST"
             )
 
+    @timeit_cls_method_wrapper
     def get_klines(
         self,
         symbol: str,

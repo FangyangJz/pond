@@ -1,11 +1,13 @@
 import os
 import math
 import datetime as dtm
+from typing import Any
 
 import ray
 import pandas as pd
 import polars as pl
 import akshare as ak
+from loguru import logger
 import clickhouse_connect
 from clickhouse_driver import Client
 from urllib.parse import urlparse
@@ -22,7 +24,7 @@ from pond.clickhouse.holders import (
     HoldingStatistic,
     StockRestrictedReleaseDetail,
 )
-from pond.utils.times import datestr
+from pond.utils.times import datestr, timeit_cls_method_wrapper
 from pond.clickhouse import metadata, TsTable
 from pond.akshare.stock import get_all_stocks_df
 from pond.clickhouse.kline import KlineDailyNFQ, stock_zh_a_hist
@@ -50,10 +52,10 @@ class ClickHouseManager:
         self.data_start = data_start
         self.native_uri = native_uri
 
-    def get_engin(self):
+    def get_engine(self):
         return self.engine
 
-    def create_client(self, db_uri):
+    def create_client(self, db_uri: str):
         parts = urlparse(db_uri)
         configs = {
             "host": parts.hostname,
@@ -66,9 +68,9 @@ class ClickHouseManager:
         }
         return clickhouse_connect.get_client(**configs)
 
-    def sync(self, tasks: list[Task] = [], end: dtm.datetime = None):
-        print(
-            f"click house manager syncing at {end.isoformat()}, task size {len(tasks)}"
+    def sync(self, tasks: list[Task] = [], end: dtm.datetime | None = None):
+        logger.info(
+            f"clickhouse manager syncing at {end.isoformat()}, task size {len(tasks)}"
         )
         max_dowloader_size = int(os.cpu_count() / len(tasks)) + 1
         for task in tasks:
@@ -104,11 +106,11 @@ class ClickHouseManager:
         table: str | TsTable,
         start_date: dtm.datetime,
         end_date: dtm.datetime,
-        filters=None,
-        params=None,
-        rename=False,
-        datetime_col="datetime",
-        columns=[],
+        filters: list[str] | None = None,
+        params: dict[str, Any] | None = None,
+        rename: bool = False,
+        datetime_col: str = "datetime",
+        columns: list[str] = [],
     ) -> pd.DataFrame:
         if isinstance(table, str):
             table_name = table
@@ -134,10 +136,10 @@ class ClickHouseManager:
                 sql += f" {filter} "
         if params is not None:
             query_params.update(params)
-        with self.create_client(self.native_uri) as client:
-            df = client.query_df(
-                query=sql,
-                parameters=query_params,
+
+        with Client.from_url(self.native_uri) as client:
+            df = client.query_dataframe(
+                query=sql, params=query_params, settings=dict(use_numpy=True)
             )
             if rename and not isinstance(table, str):
                 df = df.rename(columns=table().get_colcom_names())
@@ -148,11 +150,11 @@ class ClickHouseManager:
         table: str | TsTable,
         start_date: dtm.datetime,
         end_date: dtm.datetime,
-        filters=None,
+        filters: list[str] | None = None,
         params=None,
-        rename=False,
-        datetime_col="datetime",
-        trunk_days=None,
+        rename: bool = False,
+        datetime_col: str = "datetime",
+        trunk_days: int = None,
         columns=[],
     ) -> pd.DataFrame:
         if trunk_days is None:
@@ -168,7 +170,7 @@ class ClickHouseManager:
             ends = [start_date + dt_step * (i + 1) for i in range(0, dt_splits)]
         dfs = []
         for start, end in zip(starts, ends):
-            print(f"reading {table} from {start} to {end}")
+            logger.info(f"reading {table} from {start} to {end}")
             df = self.__native_read_table(
                 table, start, end, filters, params, rename, datetime_col, columns
             )
@@ -184,7 +186,7 @@ class ClickHouseManager:
         table: TsTable,
         start_date: dtm.datetime,
         end_date: dtm.datetime,
-        filters=None,
+        filters: list[str] | None = None,
         rename=False,
     ) -> pl.DataFrame:
         with Session(self.engine) as session:
@@ -203,11 +205,12 @@ class ClickHouseManager:
                 df = df.rename(table().get_colcom_names())
         return df
 
+    @timeit_cls_method_wrapper
     def save_to_db(
         self,
         table: str | TsTable,
         df: pd.DataFrame,
-        last_record_filters,
+        last_record_filters: list[str] | None,
         datetime_col="datetime",
     ) -> int:
         # format data
@@ -245,7 +248,7 @@ class ClickHouseManager:
             df = df[df[datetime_col] > lastet_record_time]
             # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
         if len(df) == 0:
-            print(
+            logger.info(
                 f"dataframe is empty after filter by latest record, original len {origin_len}"
             )
             return 0
@@ -254,7 +257,7 @@ class ClickHouseManager:
             rows = client.insert_dataframe(
                 query=query, dataframe=df, settings=dict(use_numpy=True)
             )
-            print(
+            logger.success(
                 f"total {len(df)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
             )
             return rows
@@ -268,13 +271,15 @@ class ClickHouseManager:
         begin = self.get_latest_record_time(KlineDailyNFQ)
         kline_nfq_daily_args = []
         for symbol in stock_basic["代码"]:
-            kline_nfq_daily_args.append({
-                "symbol": symbol,
-                "start_date": datestr(begin),
-                "end_date": datestr(date),
-                "period": "daily",
-                "adjust": "",
-            })
+            kline_nfq_daily_args.append(
+                {
+                    "symbol": symbol,
+                    "start_date": datestr(begin),
+                    "end_date": datestr(date),
+                    "period": "daily",
+                    "adjust": "",
+                }
+            )
         tasks.append(Task(KlineDailyNFQ, stock_zh_a_hist, kline_nfq_daily_args))
         return tasks
 
@@ -289,11 +294,13 @@ class ClickHouseManager:
         holding_detail_arg_groups = []
         for holder_type in holder_types:
             for changement in changements:
-                holding_detail_arg_groups.append({
-                    "date": datestr(date),
-                    "indicator": holder_type,
-                    "symbol": changement,
-                })
+                holding_detail_arg_groups.append(
+                    {
+                        "date": datestr(date),
+                        "indicator": holder_type,
+                        "symbol": changement,
+                    }
+                )
         tasks.append(
             Task(
                 HoldingDetail,
@@ -332,7 +339,9 @@ class ClickHouseManager:
         )
         return tasks
 
-    def get_latest_record_time(self, table: TsTable, filters=None):
+    def get_latest_record_time(
+        self, table: TsTable, filters: list[str] | None = None
+    ) -> dtm.datetime:
         with Session(self.engine) as session:
             query = session.query(table)
             if filters is not None:
@@ -347,7 +356,9 @@ class ClickHouseManager:
             begin = self.data_start
         return begin
 
-    def native_get_latest_record_time(self, table, filters, datetime_col="datetime"):
+    def native_get_latest_record_time(
+        self, table: TsTable, filters: str | list[str], datetime_col: str = "datetime"
+    ) -> dtm.datetime:
         if filters is None:
             filters = []
         elif isinstance(filters, str):
@@ -363,7 +374,7 @@ class ClickHouseManager:
             pass
         return self.data_start
 
-    def create_table(self, table_name, order_by_cols: list, df: pl.DataFrame):
+    def create_table(self, table_name: str, order_by_cols: list[str], df: pl.DataFrame):
         columns_ddl = ""
         for i in range(len(df.columns)):
             col = df.columns[i]
