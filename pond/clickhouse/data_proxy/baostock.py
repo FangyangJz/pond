@@ -36,7 +36,9 @@ class BaostockDataProxy(DataProxy):
         while (rs.error_code == "0") & rs.next():
             data_list.append(rs.get_row_data())
         stocks_df = pd.DataFrame(data_list, columns=rs.fields)
-        stocks_df = stocks_df[~stocks_df["code_name"].str.endswith("指数")]
+        stocks_df = stocks_df[~stocks_df["code_name"].str.contains("指数")]
+        stocks_df = stocks_df[~stocks_df["code"].str.startswith("sh.00")]
+        stocks_df = stocks_df[~stocks_df["code"].str.startswith("sz.39")]
         return stocks_df["code"].to_list()
 
     def get_frequency(self, interval: Interval) -> str:
