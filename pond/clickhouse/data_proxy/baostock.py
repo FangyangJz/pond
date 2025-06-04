@@ -88,17 +88,17 @@ class BaostockDataProxy(DataProxy):
         # baostock always return data include start day but already existed.
         start += timedelta(days=1)
         if end is None:
-            end = start + timedelta(days=90)
+            end = start + timedelta(days=365)
         if end > datetime.now():
             end = datetime.now()
         if end - start < timedelta(days=self.min_sync_interval_days):
             logger.debug(
-                f"get_klines {symbol} from {start} to {end} data len {0}, skip"
+                f"get_klines {symbol} from {start} to {end} ignored by min sync interval days {self.min_sync_interval_days}"
             )
             return None
         if self.min_start_date is not None and start < self.min_start_date:
             logger.debug(
-                f"get_klines {symbol} from {start} to {end} data len {0}, skip"
+                f"get_klines {symbol} from {start} to {end} ignored by min_start_date {self.min_start_date}"
             )
             return None
         start_date = start.strftime("%Y-%m-%d")

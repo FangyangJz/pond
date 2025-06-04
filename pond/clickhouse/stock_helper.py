@@ -193,10 +193,12 @@ if __name__ == "__main__":
     from pond.clickhouse.data_proxy.baostock import BaostockDataProxy
 
     tdx_path = None  # r"D:\windows\programs\TongDaXin"
-    # password = os.environ.get("CLICKHOUSE_PWD")
     password = ""
-    conn_str = f"clickhouse://default:{password}@localhost:18123/quant"
-    native_conn_str = f"clickhouse+native://default:{password}@localhost:19000/quant?tcp_keepalive=true"
+    password = os.environ.get("CLICKHOUSE_PWD")
+    conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
+    native_conn_str = f"clickhouse+native://default:{password}@localhost:9000/quant?tcp_keepalive=true"
+    # 此处有天坑，原因是同步机制中增加了start-end限制，避免接口返回异常，如果部分标的再start附近没有数据，start就不会更新，再次查询还是同样的start-end,就下载不了数据。
+    # 没想到好的办法解决，在以这个时间为起始时间全部同步完之后，按每次增加1年再同步一遍。
     sync_start = datetime(2020, 1, 2)
     manager = ClickHouseManager(
         conn_str, data_start=sync_start, native_uri=native_conn_str
