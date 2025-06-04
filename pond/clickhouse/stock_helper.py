@@ -84,16 +84,13 @@ class StockHelper:
         if table is None:
             return False
 
-        signal = (
-            end_time
-            if end_time is not None
-            else datetime.now().replace(hour=15, minute=0, second=0, microsecond=0)
-        )
+        signal = end_time if end_time is not None else datetime.now()
+        signal = signal.replace(hour=15, minute=0, second=0, microsecond=0)
         workers = math.ceil(os.cpu_count() / 2) if workers <= 0 else workers
 
         symbols = self.data_proxy.get_symobls()
         if self.fix_data:
-            latest_synced_codes = self.get_synced_codes(table)
+            latest_synced_codes = self.get_synced_codes(table, sync_time=signal)
             symbols = [s for s in symbols if s not in latest_synced_codes]
         if self.sync_data_start is not None:
             available_codes = self.get_synced_codes(
@@ -157,7 +154,11 @@ class StockHelper:
         if signal is None:
             signal = datetime.now().replace(hour=15, minute=0, second=0, microsecond=0)
 
-        for symbol in symbols:
+        for i in range(0, len(symbols)):
+            logger.debug(
+                f"stock helper sync kline counting {i}/{len(symbols)} for {signal}"
+            )
+            symbol = symbols[i]
             time.sleep(0.1)
             lastest_record = self.clickhouse.get_latest_record_time(
                 table, table.code == symbol
