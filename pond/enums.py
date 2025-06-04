@@ -49,6 +49,15 @@ class Interval(StrEnum):
             # 粗略估算一个月为 30 天
             return timedelta(days=int(self.value[:-1]) * 30)
 
+    def toAKshare(self):
+        if self.value == "1d":
+            return "daily"
+        elif self.value == "1w":
+            return "weekly"
+        elif self.value == "1M":
+            return "monthly"
+        return self.value
+
 
 class Adjust(StrEnum):
     """
@@ -58,6 +67,15 @@ class Adjust(StrEnum):
     NFQ = "3"  # 不复权
     QFQ = "2"  # 前复权
     HFQ = "1"  # 后复权
+
+    def toAKshare(self):
+        if self.value == "3":
+            return ""
+        elif self.value == "2":
+            return "qfq"
+        elif self.value == "1":
+            return "hfq"
+        return self.value
 
 
 class Product(StrEnum):

@@ -12,7 +12,7 @@ from pond.clickhouse.data_proxy import DataProxy
 from pond.clickhouse.data_proxy.tdx import TdxDataProxy
 from pond.clickhouse.manager import ClickHouseManager
 from pond.clickhouse.kline import BaoStockKline5m
-from pond.enums import Interval, Adjust
+from pond.enums import Interval, Adjust, Product
 from pond.utils.times import (
     datetime2utctimestamp_milli,
     timeframe2minutes,
@@ -75,11 +75,12 @@ class StockHelper:
         self,
         interval: Interval,
         adjust: Adjust,
+        product=Product.STOCK,
         workers: int = 0,
         end_time: datetime | None = None,
         time_col: str = "datetime",
     ) -> bool:
-        table = self.data_proxy.get_table(interval, adjust)
+        table = self.data_proxy.get_table(interval, adjust, product)
         if table is None:
             return False
 
