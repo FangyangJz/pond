@@ -339,7 +339,7 @@ class ClickHouseManager:
         )
         return tasks
 
-    def get_latest_record_time(
+    def get_latest_record(
         self, table: TsTable, filters: list[str] | None = None
     ) -> dtm.datetime:
         with Session(self.engine) as session:
@@ -349,7 +349,12 @@ class ClickHouseManager:
                     filters = [filters]
                 for f in filters:
                     query = query.filter(f)
-            record = query.order_by(desc(table.datetime)).limit(1).one_or_none()
+            return query.order_by(desc(table.datetime)).limit(1).one_or_none()
+
+    def get_latest_record_time(
+        self, table: TsTable, filters: list[str] | None = None
+    ) -> dtm.datetime:
+        record = self.get_latest_record(table, filters)
         if record is not None:
             begin = record.datetime
         else:
