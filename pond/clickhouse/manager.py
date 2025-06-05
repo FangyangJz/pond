@@ -157,6 +157,9 @@ class ClickHouseManager:
         trunk_days: int = None,
         columns=[],
     ) -> pd.DataFrame:
+        # 解决时间左开问题
+        if start_date is not None:
+            start_date -= dtm.timedelta(seconds=1)
         if trunk_days is None:
             starts = [start_date]
             ends = [end_date]
