@@ -169,14 +169,18 @@ class StockHelper:
                     f"stock helper sync kline ignore too short duration {lastest_record}-{signal}"
                 )
                 continue
-            klines_df = self.data_proxy.get_klines(
-                symbol=symbol,
-                period=interval,
-                adjust=adjust,
-                start=lastest_record,
-                end=None,
-                limit=1000,
-            )
+            try:
+                klines_df = self.data_proxy.get_klines(
+                    symbol=symbol,
+                    period=interval,
+                    adjust=adjust,
+                    start=lastest_record,
+                    end=None,
+                    limit=1000,
+                )
+            except Exception as e:
+                logger.error(f"stock helper sync kline failed for {symbol} {e}")
+                klines_df = None
             if klines_df is not None and len(klines_df) > 0:
                 klines_df["code"] = symbol
                 if "turn" not in klines_df.columns:
