@@ -319,3 +319,25 @@ class FundKlineDailyHFQ(TsTable):
             primary_key=(datetime, code),
         ),
     )
+
+
+class FundNetValue(TsTable):
+    """
+    基金净值数据
+    """
+
+    __tablename__ = "fund_value"
+
+    datetime = Column(types.DateTime64, comment="净值日期", primary_key=True)
+    code = Column(types.String, comment="代码")
+    net_value = Column(types.Float64, comment="单位净值")
+    cumsum_value = Column(types.Float64, comment="累计净值")
+    tradable = Column(types.Boolean, comment="tradable")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
