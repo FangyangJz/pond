@@ -6,7 +6,7 @@ from datetime import timedelta
 import threading
 
 from loguru import logger
-
+import polars as pl
 from pond.clickhouse import TsTable
 from pond.clickhouse.data_proxy import DataProxy
 from pond.clickhouse.data_proxy.tdx import TdxDataProxy
@@ -117,10 +117,10 @@ class StockHelper:
                 return False
 
         request_count = len(symbols)
-        latest_kline_df = self.clickhouse.read_table(
-            table,
-            signal - timedelta(minutes=timeframe2minutes(interval) * 2),
-            signal,
+        latest_kline_df = self.clickhouse.native_read_table(
+            table=table,
+            start_date=signal - timedelta(minutes=timeframe2minutes(interval) * 2),
+            end_date=signal,
             filters=None,
             rename=True,
         )
@@ -129,6 +129,7 @@ class StockHelper:
                 f"stock helper sync kline for {signal} into {table} failed, latest kline df is empty."
             )
             return False
+        latest_kline_df = pl.from_pandas(latest_kline_df)
         lastest_count = (
             latest_kline_df.group_by(time_col).count().sort(time_col)[-1, "count"]
         )
