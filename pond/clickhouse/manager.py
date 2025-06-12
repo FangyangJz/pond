@@ -142,7 +142,7 @@ class ClickHouseManager:
                 query=sql, params=query_params, settings=dict(use_numpy=True)
             )
             if rename and not isinstance(table, str):
-                df = df.rename(columns=table().get_colcom_names())
+                df = df.rename(mapper=table().get_colcom_names())
             return df
 
     def native_read_table(
