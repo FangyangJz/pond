@@ -145,6 +145,17 @@ class ClickHouseManager:
                 df = df.rename(mapper=table().get_colcom_names())
             return df
 
+    def native_sql_read_table(
+        self,
+        sql: str,
+        query_params: dict[str, Any] | None = None,
+    ) -> pd.DataFrame:
+        with Client.from_url(self.native_uri) as client:
+            df = client.query_dataframe(
+                query=sql, params=query_params, settings=dict(use_numpy=True)
+            )
+            return df
+
     def native_read_table(
         self,
         table: str | TsTable,
