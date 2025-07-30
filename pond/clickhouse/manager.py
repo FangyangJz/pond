@@ -393,6 +393,33 @@ class ClickHouseManager:
             pass
         return self.data_start
 
+    def read_latest_n_record(
+        self,
+        table_name,
+        start: dtm.datetime,
+        end: dtm.datetime,
+        n=1,
+        group_by_col="code",
+        time_col="datetime",
+    ) -> pd.DataFrame:
+        query_params = {"start": start, "end": end}
+        sql = f"""
+            SELECT *
+            FROM (
+                SELECT 
+                    *,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY {group_by_col} 
+                        ORDER BY {time_col} DESC
+                    ) AS row_n
+                FROM {table_name}
+                WHERE {time_col} >= %(start)s AND {time_col} <= %(end)s
+            ) t
+            WHERE row_n <= {n}
+            ORDER BY {group_by_col}, {time_col} DESC;
+        """
+        return self.native_sql_read_table(sql, query_params=query_params)
+
     def create_table(self, table_name: str, order_by_cols: list[str], df: pl.DataFrame):
         columns_ddl = ""
         for i in range(len(df.columns)):
