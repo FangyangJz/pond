@@ -195,6 +195,27 @@ class KlineDailyNFQ(TsTable):
     )
 
 
+class FutureInfo(TsTable):
+    """
+    合约信息表
+    """
+
+    __tablename__ = "future_info"
+
+    datetime = Column(types.DateTime64, comment="datetime", primary_key=True)
+    code = Column(types.String, comment="jj_code")
+    total_supply = Column(types.Float64, comment="total_supply")
+    market_cap_fdv_ratio = Column(types.Float64, comment="market_cap_fdv_ratio")
+
+    __table_args__ = (
+        engines.MergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
 class FuturesKline1H(TsTable):
     __tablename__ = "kline_futures_1h"
 

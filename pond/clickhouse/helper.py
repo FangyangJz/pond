@@ -6,6 +6,7 @@ import datetime as dtm
 from datetime import datetime
 from binance.um_futures import UMFutures
 from pond.clickhouse.kline import (
+    FutureInfo,
     FuturesKline5m,
     FuturesKline1H,
     FuturesKline1d,
@@ -23,6 +24,8 @@ from pond.utils.times import (
     utcstamp_mill2datetime,
     timeframe2minutes,
 )
+from pond.coin_gecko.coin_info import get_coin_market_data
+from pond.coin_gecko.id_mapper import CoinGeckoIDMapper
 
 
 class DataProxy:
@@ -65,6 +68,7 @@ class FuturesHelper:
     exchange: UMFutures = None
     data_proxy: DataProxy = None
     fix_kline_with_cryptodb: bool = None
+    gecko_id_mapper: CoinGeckoIDMapper = CoinGeckoIDMapper()
 
     def __init__(
         self,
@@ -131,6 +135,23 @@ class FuturesHelper:
     def sync_futures_kline(
         self, interval, workers=None, end_time: datetime = None
     ) -> bool:
+        ret = self.sync(interval, workers, end_time, sync_kline=True, sync_info=False)
+        return ret
+
+    def sync_futures_info(
+        self, interval, workers=None, end_time: datetime = None
+    ) -> bool:
+        ret = self.sync(interval, workers, end_time, sync_kline=False, sync_info=True)
+        return ret
+
+    def sync(
+        self,
+        interval,
+        workers=None,
+        end_time: datetime = None,
+        sync_kline=False,
+        sync_info=False,
+    ) -> bool:
         table = self.get_futures_table(interval)
         if table is None:
             return False
@@ -146,12 +167,20 @@ class FuturesHelper:
         threads = []
         for i in range(0, workers):
             worker_symbols = symbols[i * task_counts : (i + 1) * task_counts]
-            worker = Thread(
-                target=self.__sync_futures_kline,
-                args=(signal, table, worker_symbols, interval, res_dict),
-            )
-            worker.start()
-            threads.append(worker)
+            if sync_kline:
+                worker = Thread(
+                    target=self.__sync_futures_kline,
+                    args=(signal, table, worker_symbols, interval, res_dict),
+                )
+                worker.start()
+                threads.append(worker)
+            if sync_info:
+                worker2 = Thread(
+                    target=self.__sync_futures_info,
+                    args=(signal, FutureInfo, worker_symbols, res_dict),
+                )
+                worker2.start()
+                threads.append(worker2)
 
         [t.join() for t in threads]
 
@@ -242,6 +271,45 @@ class FuturesHelper:
             self.clickhouse.save_to_db(table, klines_df, table.code == code)
         res_dict[tid] = True
 
+    def __sync_futures_info(self, signal, table, symbols, res_dict: dict):
+        tid = threading.current_thread().ident
+        res_dict[tid] = False
+        if signal is None:
+            signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        count = 0
+        for symbol in symbols:
+            code = symbol["pair"]
+            lastest_record = self.clickhouse.get_latest_record_time(
+                table, table.code == code
+            )
+            if signal - lastest_record < timedelta(days=1):
+                count += 1
+                logger.info(
+                    f"futures helper sync info ignore too short duration for {code}"
+                )
+                continue
+            query = code[:-4]
+            cg_id = self.gecko_id_mapper.get_coingecko_id(query, exact_match=True)
+            data = get_coin_market_data(cg_id)
+            if data is None:
+                continue
+            total_supply = data.get("total_supply", None)
+            market_cap_fdv_ratio = data.get("market_cap_fdv_ratio", None)
+            self.clickhouse.save_to_db(
+                table,
+                pd.DataFrame(
+                    {
+                        "datetime": [signal],
+                        "code": [code],
+                        "total_supply": [total_supply],
+                        "market_cap_fdv_ratio": [market_cap_fdv_ratio],
+                    }
+                ),
+                table.code == code,
+            )
+            count += 1
+        res_dict[tid] = count == len(symbols)
+
 
 if __name__ == "__main__":
     import os
@@ -254,7 +322,11 @@ if __name__ == "__main__":
         conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
     )
     helper = FuturesHelper(crypto_db, manager)
-    ret = helper.sync_futures_kline(
-        "1d", workers=1, end_time=datetime.now().replace(hour=0).replace(minute=0)
+    ret = helper.sync(
+        "5m",
+        workers=1,
+        end_time=datetime.now().replace(hour=0).replace(minute=0),
+        sync_kline=False,
+        sync_info=True,
     )
     print(f"sync ret {ret}")
