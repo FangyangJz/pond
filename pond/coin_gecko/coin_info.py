@@ -4,7 +4,7 @@ from loguru import logger
 
 
 def get_coin_market_data(coingecko_id) -> dict:
-    """从CoinGecko获取代币总供应量"""
+    """从CoinGecko获取代币信息"""
     url = f"https://api.coingecko.com/api/v3/coins/{coingecko_id}"
     try:
         sleep(1)
@@ -13,5 +13,5 @@ def get_coin_market_data(coingecko_id) -> dict:
         data = response.json()
         return data.get("market_data", {})
     except Exception as e:
-        logger.exception(e)
+        logger.error(f"获取代币信息失败: {str(e)}")
         return None
