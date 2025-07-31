@@ -26,6 +26,7 @@ from pond.utils.times import (
 )
 from pond.coin_gecko.coin_info import get_coin_market_data
 from pond.coin_gecko.id_mapper import CoinGeckoIDMapper
+import polars as pl
 
 
 class DataProxy:
@@ -318,6 +319,43 @@ class FuturesHelper:
             )
             count += 1
         res_dict[tid] = count == len(symbols)
+
+    def attach_future_info(self, df: pl.DataFrame, back_fill=True):
+        start = df["close_time"].min()
+        end = df["close_time"].max()
+        info_df = self.clickhouse.native_read_table(
+            FutureInfo, start, end, filters=None, rename=True
+        )
+        info_df = pl.from_pandas(info_df).with_columns(
+            date=pl.col("datetime").dt.date(),
+            market_cap_fdv_ratio=pl.col("market_cap_fdv_ratio").fill_null(1),
+        )
+        df = df.with_columns(date=pl.col("close_time").dt.date())
+        df = df.join(
+            info_df,
+            on=["jj_code", "date"],
+            how="left",
+        ).sort(["jj_code", "close_time"])
+        if back_fill:
+            df = df.with_columns(
+                [
+                    pl.col("total_supply")
+                    .fill_null(strategy="backward")
+                    .over("jj_code"),
+                    pl.col("market_cap_fdv_ratio")
+                    .fill_null(strategy="backward")
+                    .over("jj_code"),
+                ]
+            )
+        df = df.with_columns(
+            [
+                pl.col("total_supply").fill_null(strategy="forward").over("jj_code"),
+                pl.col("market_cap_fdv_ratio")
+                .fill_null(strategy="forward")
+                .over("jj_code"),
+            ]
+        )
+        return df
 
 
 if __name__ == "__main__":
