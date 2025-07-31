@@ -323,19 +323,40 @@ class FuturesHelper:
     def attach_future_info(self, df: pl.DataFrame, back_fill=True):
         start = df["close_time"].min()
         end = df["close_time"].max()
+        # 限制扫描时间
+        latest_time = self.clickhouse.get_latest_record_time(FutureInfo)
+        latest_time = min(latest_time, start) - timedelta(days=365)
+        # 获取每个标的最后一个记录时间
+        last_1_df = self.clickhouse.read_latest_n_record(
+            FutureInfo.__tablename__, latest_time, datetime.now()
+        )
+        latest_time = last_1_df["datetime"].min()
+        # 读取数据
         info_df = self.clickhouse.native_read_table(
-            FutureInfo, start, end, filters=None, rename=True
+            FutureInfo,
+            min(latest_time, start),
+            datetime.now(),
+            filters=None,
+            rename=True,
         )
         info_df = pl.from_pandas(info_df).with_columns(
             date=pl.col("datetime").dt.date(),
             market_cap_fdv_ratio=pl.col("market_cap_fdv_ratio").fill_null(1),
         )
         df = df.with_columns(date=pl.col("close_time").dt.date())
+        base_col_df = pl.concat(
+            [info_df.select(["jj_code", "date"]), df.select(["jj_code", "date"])]
+        ).unique(subset=["jj_code", "date"])
+        df = base_col_df.join(
+            df,
+            on=["jj_code", "date"],
+            how="left",
+        )
         df = df.join(
             info_df,
             on=["jj_code", "date"],
             how="left",
-        ).sort(["jj_code", "close_time"])
+        ).sort(["jj_code", "date", "close_time"])
         if back_fill:
             df = df.with_columns(
                 [
@@ -354,6 +375,11 @@ class FuturesHelper:
                 .fill_null(strategy="forward")
                 .over("jj_code"),
             ]
+        )
+        df = (
+            df.filter(pl.col("close_time") >= start)
+            .filter(pl.col("close_time") <= end)
+            .sort(["jj_code", "close_time"])
         )
         return df
 
