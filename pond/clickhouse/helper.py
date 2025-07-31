@@ -152,7 +152,10 @@ class FuturesHelper:
         sync_kline=False,
         sync_info=False,
     ) -> bool:
-        table = self.get_futures_table(interval)
+        if sync_kline:
+            table = self.get_futures_table(interval)
+        else:
+            table = FutureInfo
         if table is None:
             return False
         if end_time is not None:
@@ -177,7 +180,7 @@ class FuturesHelper:
             if sync_info:
                 worker2 = Thread(
                     target=self.__sync_futures_info,
-                    args=(signal, FutureInfo, worker_symbols, res_dict),
+                    args=(signal, table, worker_symbols, res_dict),
                 )
                 worker2.start()
                 threads.append(worker2)
