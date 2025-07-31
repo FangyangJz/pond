@@ -293,6 +293,12 @@ class FuturesHelper:
                 continue
             query = code[:-4]
             cg_id = self.gecko_id_mapper.get_coingecko_id(query, exact_match=True)
+            if cg_id is None:
+                logger.warning(
+                    f"futures helper sync info can not find coin gecko id for {code}"
+                )
+                count += 1
+                continue
             data = get_coin_market_data(cg_id)
             if data is None:
                 continue
