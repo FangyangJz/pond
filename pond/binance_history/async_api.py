@@ -11,15 +11,15 @@ from pathlib import Path
 from loguru import logger
 from urllib.parse import urlparse
 from httpx._types import ProxiesTypes
-from tenacity import retry, wait_fixed
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from pond.utils.crawler import get_mock_headers
 
 
-@retry(wait=wait_fixed(3))
+@retry(wait=wait_fixed(10), stop=stop_after_attempt(3))
 async def download_file(url: str, path: Path, proxies: ProxiesTypes = {}):
     async with httpx.AsyncClient(proxies=proxies) as client:
-        response = await client.get(url, timeout=None, headers=get_mock_headers())
+        response = await client.get(url, timeout=30, headers=get_mock_headers())
 
         if response.status_code == 200:
             logger.success(f"[{response.status_code}] {url}")
@@ -30,7 +30,9 @@ async def download_file(url: str, path: Path, proxies: ProxiesTypes = {}):
                 f.write(response.content)
                 logger.success(f"Save to {file_path}")
         else:
-            logger.error(f"[{response.status_code}] {url}")
+            error_msg = f"[{response.status_code}] {url}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
 
 
 async def async_tasks(
