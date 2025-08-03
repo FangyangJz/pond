@@ -116,6 +116,7 @@ def get_klines(
                         # startTime=start,
                         endTime=end,
                         limit=fix_limit,
+                        timeout=30,
                     ),
                     schema=klines_schema,
                 )
