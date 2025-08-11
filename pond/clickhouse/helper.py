@@ -8,6 +8,7 @@ from binance.um_futures import UMFutures
 from pond.clickhouse.kline import (
     FutureInfo,
     FuturesKline5m,
+    FuturesKline4H,
     FuturesKline1H,
     FuturesKline1d,
     FuturesKline15m,
@@ -105,6 +106,8 @@ class FuturesHelper:
         ]
 
     def get_futures_table(self, interval) -> Optional[FuturesKline1H]:
+        if interval == "4h":
+            return FuturesKline4H
         if interval == "1h":
             return FuturesKline1H
         if interval == "5m":
@@ -396,10 +399,10 @@ if __name__ == "__main__":
     )
     helper = FuturesHelper(crypto_db, manager)
     ret = helper.sync(
-        "5m",
+        "4h",
         workers=1,
         end_time=datetime.now().replace(hour=0).replace(minute=0),
-        sync_kline=False,
-        sync_info=True,
+        sync_kline=True,
+        sync_info=False,
     )
     print(f"sync ret {ret}")

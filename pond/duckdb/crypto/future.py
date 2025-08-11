@@ -85,6 +85,9 @@ def get_klines(
     if interval == "1d":
         coef = 60 * 60 * 24
         limit = int(deltaTime / coef) + 1
+    elif interval == "4h":
+        coef = 60 * 60 * 4
+        limit = int(deltaTime / coef) + 1
     elif interval == "1h":
         coef = 60 * 60
         limit = int(deltaTime / coef) + 1
