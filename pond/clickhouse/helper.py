@@ -365,18 +365,20 @@ class FuturesHelper:
                 [
                     pl.col("total_supply")
                     .fill_null(strategy="backward")
-                    .over("jj_code"),
+                    .over("jj_code", order_by="close_time"),
                     pl.col("market_cap_fdv_ratio")
                     .fill_null(strategy="backward")
-                    .over("jj_code"),
+                    .over("jj_code", order_by="close_time"),
                 ]
             )
         df = df.with_columns(
             [
-                pl.col("total_supply").fill_null(strategy="forward").over("jj_code"),
+                pl.col("total_supply")
+                .fill_null(strategy="forward")
+                .over("jj_code", order_by="close_time"),
                 pl.col("market_cap_fdv_ratio")
                 .fill_null(strategy="forward")
-                .over("jj_code"),
+                .over("jj_code", order_by="close_time"),
             ]
         )
         df = (
