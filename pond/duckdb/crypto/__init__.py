@@ -6,7 +6,9 @@ import os
 import time
 from pathlib import Path
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
+import numpy as np
 import polars as pl
 import pandas as pd
 from tqdm import tqdm
@@ -164,12 +166,6 @@ class CryptoDB(DuckDB):
         ignore_cache=False,
         workers=None,
     ):
-        from threading import Thread
-        import math
-
-        if workers is None:
-            workers = int(os.cpu_count() / 2)
-
         df = self.get_future_info(asset_type, from_local=False)
         if self.is_future_type(asset_type):
             df = df[df["contractType"] == "PERPETUAL"][
@@ -202,30 +198,14 @@ class CryptoDB(DuckDB):
         assert len(df) == len(set(df["symbol"].to_list())), (
             "symbol have duplicated data"
         )
-        task_size = math.ceil(len(df) / workers)
-        threads = []
-        for i in range(workers):
-            ### for debug
-            # self.update_history_data(
-            #     df[i * task_size : (i + 1) * task_size],
-            #     start,
-            #     end,
-            #     asset_type,
-            #     data_type,
-            #     timeframe,
-            #     httpx_proxies,
-            #     self.requests_proxies,
-            #     skip_symbols,
-            #     do_filter_quote_volume_0,
-            #     if_skip_usdc,
-            #     ignore_cache,
-            #     i,
-            # )
 
-            t = Thread(
-                target=self.update_history_data,
-                args=(
-                    df[i * task_size : (i + 1) * task_size],
+        # 自动均分DataFrame，无需计算task_size
+        chunks = np.array_split(df, workers)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [
+                executor.submit(
+                    self.update_history_data,
+                    chunk,
                     start,
                     end,
                     asset_type,
@@ -237,12 +217,13 @@ class CryptoDB(DuckDB):
                     if_skip_usdc,
                     ignore_cache,
                     i,
-                ),
-            )
-            threads.append(t)
-            t.start()
-        for t in threads:
-            t.join()
+                )
+                for i, chunk in enumerate(chunks)
+            ]
+
+            # 等待所有任务完成
+            for future in futures:
+                future.result()
 
     def update_history_data(
         self,
@@ -461,16 +442,20 @@ class CryptoDB(DuckDB):
             # .to_pandas()
         )
 
-        lack_df = df.filter(pl.col("open_time_diff") != 0).select([
-            "open_time",
-            "close_time",
-        ])
+        lack_df = df.filter(pl.col("open_time_diff") != 0).select(
+            [
+                "open_time",
+                "close_time",
+            ]
+        )
         if len(lack_df) > 0:
             if len(lack_df) % 2 != 0:
-                lack_df = pl.concat([
-                    lack_df,
-                    df.select(["open_time", "close_time"])[-1],
-                ])
+                lack_df = pl.concat(
+                    [
+                        lack_df,
+                        df.select(["open_time", "close_time"])[-1],
+                    ]
+                )
 
             supply_df = get_supply_df(
                 client=self.get_client(asset_type, self.requests_proxies),
@@ -556,7 +541,7 @@ class CryptoDB(DuckDB):
 
 if __name__ == "__main__":
     db = CryptoDB(
-        Path(r"E:\DuckDB"),
+        Path(r"/home/fangyang/DuckDB/"),
         requests_proxies={
             "http": "127.0.0.1:7890",
             "https": "127.0.0.1:7890",
@@ -574,10 +559,10 @@ if __name__ == "__main__":
 
     db.update_history_data_parallel(
         start="2020-1-1",
-        end="2025-7-22",
+        end="2025-8-3",
         asset_type=AssetType.spot,
         data_type=DataType.klines,
-        timeframe='1h',
+        timeframe="1h",
         # httpx_proxies={"https://": "https://127.0.0.1:7890"},
         skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT"],
         do_filter_quote_volume_0=False,
