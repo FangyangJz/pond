@@ -252,16 +252,20 @@ class FuturesHelper:
                 continue
 
             startTime = datetime2utctimestamp_milli(lastest_record)
-            klines_list = self.data_proxy.um_future_klines(
-                code,
-                "PERPETUAL",
-                interval,
-                startTime=startTime,
-                limit=1000,
-            )
-            if not klines_list:
-                # generate stub kline to mark latest sync time.
-                klines_list = [self.gen_stub_kline_as_list(lastest_record, signal)]
+            try:
+                klines_list = self.data_proxy.um_future_klines(
+                    code,
+                    "PERPETUAL",
+                    interval,
+                    startTime=startTime,
+                    limit=1000,
+                )
+                if not klines_list:
+                    # generate stub kline to mark latest sync time.
+                    klines_list = [self.gen_stub_kline_as_list(lastest_record, signal)]
+            except Exception as e:
+                logger.error(f"futures helper sync kline failed {e}")
+                continue
             cols = list(table().get_colcom_names().values())[1:] + ["stub"]
             klines_df = pd.DataFrame(klines_list, columns=cols)
             klines_df["code"] = code
