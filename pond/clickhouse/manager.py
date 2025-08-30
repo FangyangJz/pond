@@ -203,6 +203,7 @@ class ClickHouseManager:
         filters: list[str] | None = None,
         rename=False,
     ) -> pl.DataFrame:
+        start_date -= dtm.timedelta(seconds=1)
         with Session(self.engine) as session:
             query = session.query(table)
             if start_date is not None:
