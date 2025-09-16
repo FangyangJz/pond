@@ -23,6 +23,7 @@ from pond.utils.times import (
     timeframe2minutes,
 )
 from pond.coin_gecko.id_mapper import CoinGeckoIDMapper
+from binance.error import ClientError
 
 
 class DataProxy:
@@ -97,6 +98,8 @@ class SpotHelper:
             symbol
             for symbol in exchange_info_dict["symbols"]
             if symbol["contractType"] == "PERPETUAL"
+            and symbol["pair"].endswith("USDT")
+            and symbol["status"] == "TRADING"
         ]
 
     def get_table(self, interval) -> Optional[SpotKline1H]:
@@ -140,12 +143,13 @@ class SpotHelper:
         symbols = self.get_symbols(signal)
         task_counts = math.ceil(len(symbols) / workers)
         res_dict = {}
+        ignored_dict = {}
         threads = []
         for i in range(0, workers):
             worker_symbols = symbols[i * task_counts : (i + 1) * task_counts]
             worker = Thread(
                 target=self.__sync_kline,
-                args=(signal, table, worker_symbols, interval, res_dict),
+                args=(signal, table, worker_symbols, interval, res_dict, ignored_dict),
             )
             worker.start()
             threads.append(worker)
@@ -156,6 +160,7 @@ class SpotHelper:
             if not res_dict[tid]:
                 # return false if any thread failed.
                 return False
+        ignored_count_total = sum(ignored_dict.values())
         request_count = len(symbols)
         latest_kline_df = self.clickhouse.read_table(
             table,
@@ -171,14 +176,16 @@ class SpotHelper:
             .count()
             .sort("close_time")[-1, "count"]
         )
-        # current about 300 futues, allow 5 target kline missing.
-        if lastest_count / request_count < 0.98:
+        if request_count == lastest_count + ignored_count_total:
             return False
         return True
 
-    def __sync_kline(self, signal, table, symbols, interval, res_dict: dict):
+    def __sync_kline(
+        self, signal, table, symbols, interval, res_dict: dict, ignored_dict: dict
+    ):
         tid = threading.current_thread().ident
-        res_dict[tid] = False
+        res_dict[tid] = 0
+        ignored_count = 0
         interval_seconds = timeframe2minutes(interval) * 60
         data_limit = 720  # 1 month, max 1000
         limit_seconds = data_limit * timeframe2minutes(interval) * 60
@@ -228,8 +235,13 @@ class SpotHelper:
                 if not klines_list:
                     # generate stub kline to mark latest sync time.
                     klines_list = [self.gen_stub_kline_as_list(lastest_record, signal)]
+            except ClientError as ce:
+                if ce.error_code == -1121:
+                    logger.info(f"futures helper ignored for invalid symbol {code}")
+                    ignored_count += 1
+                    continue
             except Exception as e:
-                logger.error(f"futures helper sync kline failed {e}")
+                logger.error(f"futures helper sync kline for {code} failed {e}")
                 continue
             cols = list(table().get_colcom_names().values())[1:] + ["stub"]
             klines_df = pd.DataFrame(klines_list, columns=cols)
@@ -246,6 +258,7 @@ class SpotHelper:
             klines_df = klines_df.drop_duplicates(subset=["close_time"])
             self.clickhouse.save_to_db(table, klines_df, table.code == code)
         res_dict[tid] = True
+        ignored_dict[tid] = ignored_count
 
 
 if __name__ == "__main__":

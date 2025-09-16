@@ -100,13 +100,15 @@ def get_klines(
     else:
         raise ValueError(f"Invalid interval: {interval}")
 
-    logger.info(f"Requesting limit {limit} klines for {symbol} {interval}")
+    logger.info(
+        f"Requesting limit {limit} klines for {symbol} {interval} from {start} to {end}"
+    )
     if (symbol in ["ICPUSDT"]) and (limit > 1500):
         dd = mock_empty_klines(start, end, coef)
 
     elif limit > 1500:
         logger.info(
-            f"Requesting limit {limit} > 1500 for {symbol} {interval}, loop limit fix 499."
+            f"Requesting limit {limit} > 1500 for {symbol} {interval} from {start} to {end}, loop limit fix 499."
         )
         fix_limit = 499
         # raise ValueError("manual breakpoint")
