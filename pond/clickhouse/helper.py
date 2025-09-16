@@ -7,6 +7,7 @@ from datetime import datetime
 from binance.um_futures import UMFutures
 from pond.clickhouse.kline import (
     FutureInfo,
+    FutureFundingRate,
     FuturesKline5m,
     FuturesKline4H,
     FuturesKline1H,
@@ -39,6 +40,9 @@ class DataProxy:
     ) -> list:
         pass
 
+    def um_future_funding_rate(self, symbol, contract_type, interval, startTime, limit):
+        pass
+
 
 class DirectDataProxy(DataProxy):
     exchange: UMFutures = None
@@ -61,6 +65,9 @@ class DirectDataProxy(DataProxy):
             startTime=startTime,
             limit=1000,
         )
+
+    def um_future_funding_rate(self, symbol, contract_type, interval, startTime, limit):
+        return self.exchange.funding_rate(symbol, startTime=startTime, limit=limit)
 
 
 class FuturesHelper:
@@ -102,7 +109,9 @@ class FuturesHelper:
         return [
             symbol
             for symbol in exchange_info_dict["symbols"]
-            if symbol["contractType"] == "PERPETUAL" and symbol["pair"].endswith("USDT")
+            if symbol["contractType"] == "PERPETUAL"
+            and symbol["pair"].endswith("USDT")
+            and symbol["status"] == "TRADING"
         ]
 
     def get_futures_table(self, interval) -> Optional[FuturesKline1H]:
@@ -139,13 +148,13 @@ class FuturesHelper:
     def sync_futures_kline(
         self, interval, workers=None, end_time: datetime = None
     ) -> bool:
-        ret = self.sync(interval, workers, end_time, sync_kline=True, sync_info=False)
+        ret = self.sync(interval, workers, end_time, what="kline")
         return ret
 
     def sync_futures_info(
         self, interval, workers=None, end_time: datetime = None
     ) -> bool:
-        ret = self.sync(interval, workers, end_time, sync_kline=False, sync_info=True)
+        ret = self.sync(interval, workers, end_time, what="info")
         return ret
 
     def sync(
@@ -153,13 +162,14 @@ class FuturesHelper:
         interval,
         workers=None,
         end_time: datetime = None,
-        sync_kline=False,
-        sync_info=False,
+        what=None,
     ) -> bool:
-        if sync_kline:
+        if what == "kline":
             table = self.get_futures_table(interval)
-        else:
+        elif what == "info":
             table = FutureInfo
+        elif what == "funding_rate":
+            table = FutureFundingRate
         if table is None:
             return False
         if end_time is not None:
@@ -174,20 +184,27 @@ class FuturesHelper:
         threads = []
         for i in range(0, workers):
             worker_symbols = symbols[i * task_counts : (i + 1) * task_counts]
-            if sync_kline:
+            if what == "kline":
                 worker = Thread(
                     target=self.__sync_futures_kline,
                     args=(signal, table, worker_symbols, interval, res_dict),
                 )
                 worker.start()
                 threads.append(worker)
-            if sync_info:
+            elif what == "info":
                 worker2 = Thread(
                     target=self.__sync_futures_info,
                     args=(signal, table, worker_symbols, res_dict),
                 )
                 worker2.start()
                 threads.append(worker2)
+            elif what == "funding_rate":
+                worker3 = Thread(
+                    target=self.__sync_futures_funding_rate,
+                    args=(signal, table, worker_symbols, interval, res_dict),
+                )
+                worker3.start()
+                threads.append(worker3)
 
         [t.join() for t in threads]
 
@@ -195,7 +212,7 @@ class FuturesHelper:
             if not res_dict[tid]:
                 # return false if any thread failed.
                 return False
-        if sync_kline:
+        if what in ["kline", "funding_rate"]:
             request_count = len(symbols)
             latest_kline_df = self.clickhouse.read_table(
                 table,
@@ -206,10 +223,9 @@ class FuturesHelper:
             )
             if len(latest_kline_df) == 0:
                 return False
+            time_col = "close_time" if what == "kline" else "fundingTime"
             lastest_count = (
-                latest_kline_df.group_by("close_time")
-                .count()
-                .sort("close_time")[-1, "count"]
+                latest_kline_df.group_by(time_col).len().sort(time_col)[-1, "len"]
             )
             # current about 300 futues, allow 5 target kline missing.
             if lastest_count / request_count < 0.98:
@@ -280,6 +296,53 @@ class FuturesHelper:
             ]
             klines_df = klines_df.drop_duplicates(subset=["close_time"])
             self.clickhouse.save_to_db(table, klines_df, table.code == code)
+        res_dict[tid] = True
+
+    def __sync_futures_funding_rate(
+        self, signal, table: FutureFundingRate, symbols, interval, res_dict: dict
+    ):
+        tid = threading.current_thread().ident
+        res_dict[tid] = False
+        interval_seconds = timeframe2minutes(interval) * 60
+        if signal is None:
+            signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        for symbol in symbols:
+            code = symbol["pair"]
+            lastest_record = self.clickhouse.get_latest_record_time(
+                table, table.code == code
+            )
+            data_duration_seconds = (signal - lastest_record).total_seconds()
+
+            if data_duration_seconds < interval_seconds:
+                logger.debug(
+                    f"futures helper sync funding rate ignore too short duration {lastest_record}-{signal} for {code}"
+                )
+                continue
+            startTime = datetime2utctimestamp_milli(lastest_record)
+            try:
+                funding_list = self.data_proxy.um_future_funding_rate(
+                    code,
+                    "PERPETUAL",
+                    interval,
+                    startTime=startTime,
+                    limit=1000,
+                )
+                if not funding_list or len(funding_list) == 0:
+                    continue
+            except Exception as e:
+                logger.error(f"futures helper sync funding rate for {code} failed {e}")
+                continue
+            cols = list(table().get_colcom_names().values())
+            funding_rate_df = pd.DataFrame(funding_list, columns=cols)
+            funding_rate_df["fundingRate"] = funding_rate_df["fundingRate"].astype(
+                "Float64"
+            )
+            funding_rate_df["markPrice"] = pd.to_numeric(funding_rate_df["markPrice"])
+            funding_rate_df["fundingTime"] = funding_rate_df["fundingTime"].apply(
+                utcstamp_mill2datetime
+            )
+            funding_rate_df = funding_rate_df.drop_duplicates(subset=["fundingTime"])
+            self.clickhouse.save_to_db(table, funding_rate_df, table.code == code)
         res_dict[tid] = True
 
     def __sync_futures_info(self, signal, table, symbols, res_dict: dict):
@@ -405,10 +468,9 @@ if __name__ == "__main__":
     )
     helper = FuturesHelper(crypto_db, manager)
     ret = helper.sync(
-        "4h",
-        workers=1,
+        "1h",
+        workers=3,
         end_time=datetime.now().replace(hour=0).replace(minute=0),
-        sync_kline=True,
-        sync_info=False,
+        what="funding_rate",
     )
     print(f"sync ret {ret}")

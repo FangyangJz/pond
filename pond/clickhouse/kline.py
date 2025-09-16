@@ -216,6 +216,27 @@ class FutureInfo(TsTable):
     )
 
 
+class FutureFundingRate(TsTable):
+    """
+    合约资金费率表
+    """
+
+    __tablename__ = "future_funding_rate"
+
+    datetime = Column(types.DateTime64, comment="fundingTime", primary_key=True)
+    code = Column(types.String, comment="symbol")
+    fundingRate = Column(types.Float64, comment="fundingRate")
+    markPrice = Column(types.Float64, comment="markPrice")
+
+    __table_args__ = (
+        engines.MergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
 class FuturesKline1H(TsTable):
     __tablename__ = "kline_futures_1h"
 

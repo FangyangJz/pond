@@ -3,7 +3,6 @@
 # @Author   : Fangyang
 # @Software : PyCharm
 import os
-import time
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
@@ -195,9 +194,9 @@ class CryptoDB(DuckDB):
             df = pd.concat([df, manual_df])
 
         df = df.sort_values(by="symbol")
-        assert len(df) == len(set(df["symbol"].to_list())), (
-            "symbol have duplicated data"
-        )
+        assert len(df) == len(
+            set(df["symbol"].to_list())
+        ), "symbol have duplicated data"
 
         # 自动均分DataFrame，无需计算task_size
         chunks = np.array_split(df, workers)
@@ -355,16 +354,14 @@ class CryptoDB(DuckDB):
         csv_schema = self.get_csv_schema(data_type)
 
         df_list = []
-        if data_type == DataType.klines:
-            for url in load_urls:
-                df = load_data_from_disk(
-                    url,
-                    self.crypto_path.crypto,
-                    dtypes=csv_schema,
-                )
-                if df is not None:
-                    df_list.append(df)
-
+        for url in load_urls:
+            df = load_data_from_disk(
+                url,
+                self.crypto_path.crypto,
+                dtypes=csv_schema,
+            )
+            if df is not None:
+                df_list.append(df)
         if df_list:
             df = pl.concat(df_list)
             if data_type == DataType.klines:
