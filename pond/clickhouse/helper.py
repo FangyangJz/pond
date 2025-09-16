@@ -368,6 +368,18 @@ class FuturesHelper:
                 logger.warning(
                     f"futures helper sync info can not find coin gecko id for {code}"
                 )
+                self.clickhouse.save_to_db(
+                    table,
+                    pd.DataFrame(
+                        {
+                            "datetime": [signal],
+                            "code": [code],
+                            "total_supply": None,
+                            "market_cap_fdv_ratio": None,
+                        }
+                    ),
+                    table.code == code,
+                )
                 count += 1
                 continue
             data = get_coin_market_data(cg_id)
