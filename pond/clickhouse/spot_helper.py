@@ -176,9 +176,9 @@ class SpotHelper:
             .count()
             .sort("close_time")[-1, "count"]
         )
-        if request_count == lastest_count + ignored_count_total:
-            return False
-        return True
+        if request_count <= lastest_count + ignored_count_total:
+            return True
+        return False
 
     def __sync_kline(
         self, signal, table, symbols, interval, res_dict: dict, ignored_dict: dict
@@ -272,9 +272,10 @@ if __name__ == "__main__":
         conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
     )
     helper = SpotHelper(crypto_db, manager)
+    helper.fix_kline_with_cryptodb = False
     ret = helper.sync(
         "1h",
-        workers=1,
+        workers=3,
         end_time=datetime.now().replace(hour=0).replace(minute=0),
     )
     print(f"sync ret {ret}")
