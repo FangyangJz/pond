@@ -170,7 +170,7 @@ class ClickHouseManager:
     ) -> pd.DataFrame:
         # 解决时间左开问题
         if start_date is not None:
-            start_date -= dtm.timedelta(seconds=1)
+            start_date -= dtm.timedelta(seconds=2)
         if trunk_days is None:
             starts = [start_date]
             ends = [end_date]
@@ -203,7 +203,7 @@ class ClickHouseManager:
         filters: list[str] | None = None,
         rename=False,
     ) -> pl.DataFrame:
-        start_date -= dtm.timedelta(seconds=1)
+        start_date -= dtm.timedelta(seconds=2)
         with Session(self.engine) as session:
             query = session.query(table)
             if start_date is not None:
