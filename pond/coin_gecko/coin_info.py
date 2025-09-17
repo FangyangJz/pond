@@ -13,5 +13,7 @@ def get_coin_market_data(coingecko_id) -> dict:
         data = response.json()
         return data.get("market_data", {})
     except Exception as e:
-        logger.error(f"获取代币信息失败: {str(e)}")
+        logger.error(f"获取代币信息 {coingecko_id} 失败: {str(e)}")
+        if str(e).startswith("404 Client Error: Not Found for url"):
+            return {}
         return None
