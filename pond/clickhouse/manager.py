@@ -379,19 +379,24 @@ class ClickHouseManager:
     def native_get_latest_record_time(
         self, table: TsTable, filters: str | list[str], datetime_col: str = "datetime"
     ) -> dtm.datetime:
-        if filters is None:
-            filters = []
-        elif isinstance(filters, str):
+        if isinstance(table, TsTable):
+            table = table.__tablename__
+        sql = f"""
+        SELECT * FROM {table} 
+        WHERE close_time = (
+            SELECT MAX({datetime_col}) 
+            FROM {table}
+        )
+        """
+        if isinstance(filters, str):
             filters = [filters]
-        filters.append(f"ORDER BY {datetime_col} DESC LIMIT 1")
-        try:
-            df = self.native_read_table(
-                table, None, None, filters, datetime_col=datetime_col
-            )
-            if len(df) > 0:
-                return df[datetime_col][0]
-        except Exception:
-            pass
+        if filters is not None and len(filters) > 0:
+            for f in filters:
+                sql += f" AND {f} "
+        sql += "LIMIT 1"
+        df = self.native_sql_read_table(sql, {})
+        if df is not None and len(df) > 0:
+            return df[datetime_col][0]
         return self.data_start
 
     def read_latest_n_record(
