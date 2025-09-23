@@ -421,7 +421,9 @@ class ClickHouseManager:
         """
         return self.native_sql_read_table(sql, query_params=query_params)
 
-    def create_table(self, table_name: str, order_by_cols: list[str], df: pl.DataFrame):
+    def create_table(
+        self, table_name: str, code_col=None, time_col=None, df: pl.DataFrame = None
+    ):
         columns_ddl = ""
         for i in range(len(df.columns)):
             col = df.columns[i]
@@ -438,9 +440,15 @@ class ClickHouseManager:
                 raise (f"unsupport dtype for {col} {dtype}")
         # remove last comma.
         columns_ddl = columns_ddl[:-1]
-        orderby = ",".join(order_by_cols)
-
-        ddl = f"CREATE TABLE IF NOT EXISTS {table_name} ( {columns_ddl} ) ENGINE = ReplacingMergeTree ORDER BY ({orderby})"
+        ddl = f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+          {columns_ddl} 
+        ) ENGINE = ReplacingMergeTree
+        PARTITION BY toYYYYMM({time_col})
+        PRIMARY KEY ({time_col}, {code_col}) 
+        ORDER BY ({time_col}, {code_col})
+        SETTINGS index_granularity = 8192;
+        """
         with Client.from_url(self.native_uri) as client:
             client.execute(ddl)
 
