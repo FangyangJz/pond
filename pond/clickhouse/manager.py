@@ -383,7 +383,7 @@ class ClickHouseManager:
             table = table.__tablename__
         sql = f"""
         SELECT * FROM {table} 
-        WHERE close_time = (
+        WHERE {datetime_col} = (
             SELECT MAX({datetime_col}) 
             FROM {table}
         )
