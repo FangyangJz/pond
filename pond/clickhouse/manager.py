@@ -376,6 +376,34 @@ class ClickHouseManager:
             begin = self.data_start
         return begin
 
+    def get_next_record(
+        self,
+        table: TsTable,
+        current_time: dtm.datetime,
+        filters: list[str] | None = None,
+    ) -> dtm.datetime:
+        with Session(self.engine) as session:
+            query = session.query(table).filter(table.datetime > current_time)
+            if filters is not None:
+                if not isinstance(filters, list):
+                    filters = [filters]
+                for f in filters:
+                    query = query.filter(f)
+            return query.order_by(table.datetime).limit(1).one_or_none()
+
+    def get_next_record_time(
+        self,
+        table: TsTable,
+        current_time: dtm.datetime,
+        filters: list[str] | None = None,
+    ) -> dtm.datetime:
+        record = self.get_next_record(table, current_time, filters)
+        if record is not None:
+            begin = record.datetime
+        else:
+            begin = self.data_start
+        return begin
+
     def native_get_latest_record_time(
         self, table: TsTable, filters: str | list[str], datetime_col: str = "datetime"
     ) -> dtm.datetime:
