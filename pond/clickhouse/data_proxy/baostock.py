@@ -122,7 +122,12 @@ class BaostockDataProxy(DataProxy):
             f"query_history_k_data_plus {symbol} from {start_date} to {end_date} data len {len(result)} respond error_code: {rs.error_code}, msg {rs.error_msg}"
         )
         if len(result) == 0:
-            return result
+            if end.date() < datetime.now().date():
+                return self.get_klines(
+                    symbol, period, adjust, end, end + timedelta(days=365)
+                )
+            else:
+                return result
         result["datetime"] = result.apply(
             lambda row: datetime.strptime(row["time"][:-4], "%Y%m%d%H%M%S"), axis=1
         )

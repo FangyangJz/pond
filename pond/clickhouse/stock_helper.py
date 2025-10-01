@@ -124,7 +124,7 @@ class StockHelper:
             filters=None,
             rename=True,
         )
-        if len(latest_kline_df) == 0:
+        if latest_kline_df is None or len(latest_kline_df) == 0:
             logger.warning(
                 f"stock helper sync kline for {signal} into {table} failed, latest kline df is empty."
             )
@@ -212,18 +212,19 @@ if __name__ == "__main__":
     helper = StockHelper(manager, tdx_path=tdx_path)
     helper.fix_data = False
     helper.sync_data_start = None  # sync_start  # datetime(2024, 10, 31, 15)
-    while sync_start < datetime.now().replace(hour=0).replace(minute=0) or True:
+    ret = False
+    sync_end = datetime(2025, 9, 30)
+    while sync_start < sync_end or not ret:
         sync_start = manager.get_latest_record_time(BaoStockKline5m)
         logger.info(f"sync at {sync_start} start")
         data_proxy = BaostockDataProxy(sync_stock_list_date=sync_start)
-        data_proxy.min_sync_interval_days = 5
+        data_proxy.min_sync_interval_days = 0
         data_proxy.min_start_date = helper.sync_data_start
         helper.set_data_proxy(data_proxy)
         ret = helper.sync_kline(
             interval=Interval.MINUTE_5,
             adjust=Adjust.NFQ,
             workers=1,
-            end_time=datetime.now().replace(hour=0).replace(minute=0),
+            end_time=sync_end,
         )
-        sync_start = sync_start + timedelta(days=1)
         logger.info(f"sync at {sync_start} end")
