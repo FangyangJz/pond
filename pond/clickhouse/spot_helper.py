@@ -26,9 +26,6 @@ from pond.coin_gecko.id_mapper import CoinGeckoIDMapper
 from binance.error import ClientError
 import polars as pl
 
-# TODO 2.修复没有现货的合约k线下载失败导致数据量判断错误，sync接口一致返回false问题
-# TODO 3.修改主项目预测服务，通过调整分组实现没有现货的合约不做空
-
 
 class DataProxy:
     def exchange_info(self) -> dict:
@@ -53,6 +50,59 @@ class DirectDataProxy(DataProxy):
     def exchange_info(self) -> dict:
         return self.um_future_exchange.exchange_info()
 
+    def get_spot_pairs(self):
+        spot_info = self.exchange.exchange_info()  # 调用现货exchange_info接口
+        spot_pairs = set()
+        for symbol in spot_info["symbols"]:
+            # 条件1：交易对状态为"TRADING"（可交易）
+            if symbol["status"] != "TRADING":
+                continue
+            has_spot_permission = any(
+                "SPOT" in perm_set for perm_set in symbol.get("permissionSets", [])
+            )
+            if has_spot_permission:
+                base = symbol["baseAsset"]
+                quote = symbol["quoteAsset"]
+                spot_pairs.add((base, quote))
+        return spot_pairs
+
+    def get_valid_um_futures(self):
+        """通过UMFutures类筛选有对应现货的永续合约"""
+        spot_pairs = self.get_spot_pairs()
+        if not spot_pairs:
+            return []
+
+        futures_info = self.um_future_exchange.exchange_info()
+
+        # 3. 筛选有对应现货的合约
+        valid_futures = []
+        for symbol in futures_info["symbols"]:
+            if symbol["status"] == "TRADING":
+                # 处理合约符号（去除永续合约的"PERP"后缀）
+                symbol_clean = symbol["symbol"].replace("PERP", "")
+                base_asset = None
+                quote_asset = "USDT"
+                if symbol_clean.endswith(quote_asset):
+                    base_asset = symbol_clean[: -len(quote_asset)]
+
+                # 检查是否在现货组合中
+                if (
+                    base_asset
+                    and quote_asset
+                    and (base_asset, quote_asset) in spot_pairs
+                ):
+                    valid_futures.append(
+                        {
+                            "symbol": symbol["symbol"],
+                            "base_asset": base_asset,
+                            "quote_asset": quote_asset,
+                            "contract_type": symbol.get("contractType"),
+                            "margin_asset": symbol.get("marginAsset"),
+                        }
+                    )
+
+        return valid_futures
+
     def klines(self, symbol, contract_type, interval, startTime, limit) -> list:
         return self.exchange.klines(
             symbol,
@@ -67,7 +117,7 @@ class SpotHelper:
     clickhouse: ClickHouseManager = None
     dict_exchange_info = {}
     exchange: Spot = None
-    data_proxy: DataProxy = None
+    data_proxy: DirectDataProxy = None
     fix_kline_with_cryptodb: bool = None
     gecko_id_mapper: CoinGeckoIDMapper = CoinGeckoIDMapper()
 
@@ -97,14 +147,8 @@ class SpotHelper:
         return self.dict_exchange_info[key]
 
     def get_symbols(self, signal: datetime):
-        exchange_info_dict = self.get_exchange_info(signal)
-        return [
-            symbol
-            for symbol in exchange_info_dict["symbols"]
-            if symbol["contractType"] == "PERPETUAL"
-            and symbol["pair"].endswith("USDT")
-            and symbol["status"] == "TRADING"
-        ]
+        symbols = self.data_proxy.get_valid_um_futures()
+        return symbols
 
     def get_table(self, interval) -> Optional[SpotKline1H]:
         if interval == "1h":
@@ -147,13 +191,12 @@ class SpotHelper:
         symbols = self.get_symbols(signal)
         task_counts = math.ceil(len(symbols) / workers)
         res_dict = {}
-        ignored_dict = {}
         threads = []
         for i in range(0, workers):
             worker_symbols = symbols[i * task_counts : (i + 1) * task_counts]
             worker = Thread(
                 target=self.__sync_kline,
-                args=(signal, table, worker_symbols, interval, res_dict, ignored_dict),
+                args=(signal, table, worker_symbols, interval, res_dict),
             )
             worker.start()
             threads.append(worker)
@@ -164,7 +207,6 @@ class SpotHelper:
             if not res_dict[tid]:
                 # return false if any thread failed.
                 return False
-        ignored_count_total = sum(ignored_dict.values())
         request_count = len(symbols)
         latest_kline_df = self.clickhouse.read_table(
             table,
@@ -176,27 +218,32 @@ class SpotHelper:
         if len(latest_kline_df) == 0:
             return False
         lastest_count = (
-            latest_kline_df.group_by("close_time")
-            .count()
-            .sort("close_time")[-1, "count"]
+            latest_kline_df.group_by("close_time").len().sort("close_time")[-1, "len"]
         )
-        if request_count <= lastest_count + ignored_count_total:
+        if request_count <= lastest_count:
+            logger.info(
+                f"futures helper sync kline for {interval} finished, request count: {request_count}, latest count: {lastest_count}"
+            )
             return True
         return False
 
     def __sync_kline(
-        self, signal, table, symbols, interval, res_dict: dict, ignored_dict: dict
+        self,
+        signal,
+        table,
+        symbols,
+        interval,
+        res_dict: dict,
     ):
         tid = threading.current_thread().ident
         res_dict[tid] = 0
-        ignored_count = 0
         interval_seconds = timeframe2minutes(interval) * 60
         data_limit = 720  # 1 month, max 1000
         limit_seconds = data_limit * timeframe2minutes(interval) * 60
         if signal is None:
             signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
         for symbol in symbols:
-            code = symbol["pair"]
+            code = symbol["symbol"]
             lastest_record = self.clickhouse.get_latest_record_time(
                 table, table.code == code
             )
@@ -239,11 +286,8 @@ class SpotHelper:
                 if not klines_list:
                     # generate stub kline to mark latest sync time.
                     klines_list = [self.gen_stub_kline_as_list(lastest_record, signal)]
-            except ClientError as ce:
-                if ce.error_code == -1121:
-                    logger.info(f"futures helper ignored for invalid symbol {code}")
-                    ignored_count += 1
-                    continue
+            except ClientError:
+                continue
             except Exception as e:
                 logger.error(f"futures helper sync kline for {code} failed {e}")
                 continue
@@ -262,7 +306,6 @@ class SpotHelper:
             klines_df = klines_df.drop_duplicates(subset=["close_time"])
             self.clickhouse.save_to_db(table, klines_df, table.code == code)
         res_dict[tid] = True
-        ignored_dict[tid] = ignored_count
 
     def attach_spot_existence(self, df: pl.DataFrame, extra_query_days=30):
         start = df["close_time"].min()
