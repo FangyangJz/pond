@@ -222,7 +222,7 @@ class SpotHelper:
         )
         if request_count <= lastest_count:
             logger.info(
-                f"futures helper sync kline for {interval} finished, request count: {request_count}, latest count: {lastest_count}"
+                f"spot helper sync kline for {interval} finished, request count: {request_count}, latest count: {lastest_count}"
             )
             return True
         return False
@@ -270,7 +270,7 @@ class SpotHelper:
 
             if data_duration_seconds < interval_seconds:
                 logger.debug(
-                    f"futures helper sync kline ignore too short duration {lastest_record}-{signal}"
+                    f"spot helper sync kline ignore too short duration {lastest_record}-{signal}"
                 )
                 continue
 
@@ -289,7 +289,7 @@ class SpotHelper:
             except ClientError:
                 continue
             except Exception as e:
-                logger.error(f"futures helper sync kline for {code} failed {e}")
+                logger.error(f"spot helper sync kline for {code} failed {e}")
                 continue
             cols = list(table().get_colcom_names().values())[1:] + ["stub"]
             klines_df = pd.DataFrame(klines_list, columns=cols)
