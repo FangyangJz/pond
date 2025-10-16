@@ -24,6 +24,10 @@ from pond.utils.times import (
 )
 from pond.coin_gecko.id_mapper import CoinGeckoIDMapper
 from binance.error import ClientError
+import polars as pl
+
+# TODO 2.修复没有现货的合约k线下载失败导致数据量判断错误，sync接口一致返回false问题
+# TODO 3.修改主项目预测服务，通过调整分组实现没有现货的合约不做空
 
 
 class DataProxy:
@@ -260,6 +264,35 @@ class SpotHelper:
         res_dict[tid] = True
         ignored_dict[tid] = ignored_count
 
+    def attach_spot_existence(self, df: pl.DataFrame, extra_query_days=30):
+        start = df["close_time"].min()
+        end = df["close_time"].max()
+
+        spot_kline_df = self.clickhouse.native_read_table(
+            SpotKline1H, start - timedelta(days=extra_query_days), end, rename=True
+        )
+        spot_kline_df = pl.from_pandas(spot_kline_df)
+        spot_kline_df = spot_kline_df.with_columns(
+            close_time=(pl.col("close_time") + pl.duration(seconds=1))
+            .dt.round(every="1m")
+            .dt.cast_time_unit("ms")
+        ).rename(
+            mapping={
+                col: f"spot_{col}"
+                for col in spot_kline_df.columns
+                if col not in ["close_time", "jj_code"]
+            }
+        )
+        existence_df = df.join(spot_kline_df, on=["close_time", "jj_code"], how="full")
+        existence_df = existence_df.sort(["jj_code", "close_time"]).with_columns(
+            pl.col("spot_volume").fill_null(strategy="forward").over("jj_code")
+        )
+        existence_df = existence_df.with_columns(
+            pl.col("spot_volume").is_not_null().alias("spot_existence")
+        ).filter(pl.col("close_time") >= start)
+        df = df.join(existence_df, on=["close_time", "jj_code"], how="left")
+        return df
+
 
 if __name__ == "__main__":
     import os
@@ -273,9 +306,11 @@ if __name__ == "__main__":
     )
     helper = SpotHelper(crypto_db, manager)
     helper.fix_kline_with_cryptodb = False
-    ret = helper.sync(
-        "1h",
-        workers=3,
-        end_time=datetime.now().replace(hour=0).replace(minute=0),
-    )
+    ret = False
+    while not ret:
+        ret = helper.sync(
+            "1h",
+            workers=3,
+            end_time=datetime.now().replace(hour=0).replace(minute=0),
+        )
     print(f"sync ret {ret}")
