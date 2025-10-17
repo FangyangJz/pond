@@ -4,7 +4,7 @@ from loguru import logger
 import pandas as pd
 import baostock as bs
 from pond.clickhouse.data_proxy import DataProxy
-from pond.clickhouse.kline import BaoStockKline5m
+from pond.clickhouse.kline import BaoStockKline5m, BaoStockKline1dHfq
 from pond.enums import Adjust, Interval, Product
 from pond.utils.times import timeit_cls_method_wrapper
 
@@ -26,6 +26,7 @@ class BaostockDataProxy(DataProxy):
     ) -> BaoStockKline5m:
         return {
             (Interval.MINUTE_5, Adjust.NFQ, Product.STOCK): BaoStockKline5m,
+            (Interval.DAY_1, Adjust.HFQ, Product.STOCK): BaoStockKline1dHfq,
         }[(interval, adjust, product)]
 
     def get_symobls(self) -> list[str]:
@@ -74,7 +75,9 @@ class BaostockDataProxy(DataProxy):
             return common_fields + ", turn, pctChg"
         elif interval == Interval.DAY_1:
             return (
-                common_fields + ", turn, pctChg, peTTM, pbMRQ, psTTM, pcfNcfTTM, isST"
+                common_fields[0:5]
+                + common_fields[11:]
+                + ", turn, pctChg, peTTM, pbMRQ, psTTM, pcfNcfTTM, isST"
             )
 
     @timeit_cls_method_wrapper
@@ -90,7 +93,10 @@ class BaostockDataProxy(DataProxy):
         # baostock always return data include start day but already existed.
         start += timedelta(days=1)
         if end is None:
-            end = start + timedelta(days=365)
+            if period == Interval.MINUTE_5:
+                end = start + timedelta(days=365)
+            elif period == Interval.DAY_1:
+                end = start + timedelta(days=365 * 50)
         if end > datetime.now():
             end = datetime.now()
         if end - start < timedelta(days=self.min_sync_interval_days):
@@ -105,10 +111,10 @@ class BaostockDataProxy(DataProxy):
             return None
         start_date = start.strftime("%Y-%m-%d")
         end_date = end.strftime("%Y-%m-%d")
-
+        fields = self.get_fields(period)
         rs = bs.query_history_k_data_plus(
             symbol,
-            fields=self.get_fields(period),
+            fields=fields,
             start_date=start_date,
             end_date=end_date,
             frequency=self.get_frequency(period),
@@ -128,7 +134,23 @@ class BaostockDataProxy(DataProxy):
                 )
             else:
                 return result
-        result["datetime"] = result.apply(
-            lambda row: datetime.strptime(row["time"][:-4], "%Y%m%d%H%M%S"), axis=1
+        if "datetime" in result.columns:
+            result["datetime"] = result.apply(
+                lambda row: datetime.strptime(row["time"][:-4], "%Y%m%d%H%M%S"), axis=1
+            )
+        elif "date" in result.columns:
+            result["datetime"] = pd.to_datetime(result["date"])
+        result = result.drop(
+            columns=[
+                col for col in ["date", "time", "adjustflag"] if col in result.columns
+            ],
+            axis=1,
         )
-        return result.drop(columns=["date", "time", "adjustflag"], axis=1)
+        result = result.replace("", None).astype(
+            {
+                col: "float64"
+                for col in result.columns
+                if col not in ["code", "date", "time", "datetime"]
+            }
+        )
+        return result

@@ -11,7 +11,6 @@ from pond.clickhouse import TsTable
 from pond.clickhouse.data_proxy import DataProxy
 from pond.clickhouse.data_proxy.tdx import TdxDataProxy
 from pond.clickhouse.manager import ClickHouseManager
-from pond.clickhouse.kline import BaoStockKline5m
 from pond.enums import Interval, Adjust, Product
 from pond.utils.times import (
     datetime2utctimestamp_milli,
@@ -68,7 +67,9 @@ class StockHelper:
             start_date=sync_time - timedelta(seconds=1),
             end_date=sync_time,
         )
-        latest_synced_codes = latest_records_df[code_col].unique()
+        latest_synced_codes = (
+            [] if latest_records_df is None else latest_records_df[code_col].unique()
+        )
         return latest_synced_codes
 
     def sync_kline(
@@ -205,25 +206,24 @@ if __name__ == "__main__":
     native_conn_str = f"clickhouse+native://default:{password}@localhost:9000/quant?tcp_keepalive=true"
     # 此处有天坑，原因是同步机制中增加了start-end限制，避免接口返回异常，如果部分标的再start附近没有数据，start就不会更新，再次查询还是同样的start-end,就下载不了数据。
     # 没想到好的办法解决，在以这个时间为起始时间全部同步完之后，按每次增加1年再同步一遍。
-    sync_start = datetime(2020, 1, 2)
+    sync_start = datetime(2015, 1, 5)
     manager = ClickHouseManager(
         conn_str, data_start=sync_start, native_uri=native_conn_str
     )
     helper = StockHelper(manager, tdx_path=tdx_path)
-    helper.fix_data = False
+    helper.fix_data = True
     helper.sync_data_start = None  # sync_start  # datetime(2024, 10, 31, 15)
     ret = False
-    sync_end = datetime(2025, 9, 30)
+    sync_end = datetime.now()
     while sync_start < sync_end or not ret:
-        sync_start = manager.get_latest_record_time(BaoStockKline5m)
         logger.info(f"sync at {sync_start} start")
-        data_proxy = BaostockDataProxy(sync_stock_list_date=sync_start)
+        data_proxy = BaostockDataProxy(sync_stock_list_date=sync_end)
         data_proxy.min_sync_interval_days = 0
         data_proxy.min_start_date = helper.sync_data_start
         helper.set_data_proxy(data_proxy)
         ret = helper.sync_kline(
-            interval=Interval.MINUTE_5,
-            adjust=Adjust.NFQ,
+            interval=Interval.DAY_1,
+            adjust=Adjust.HFQ,
             workers=1,
             end_time=sync_end,
         )

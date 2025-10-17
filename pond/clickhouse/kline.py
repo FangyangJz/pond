@@ -91,6 +91,35 @@ class BaoStockKline5m(TsTable):
     )
 
 
+class BaoStockKline1dHfq(TsTable):
+    """
+    5m K线，不复权
+    """
+
+    __tablename__ = "baostock_kline_1d_hfq"
+
+    datetime = Column(types.DateTime64, comment="datetime", primary_key=True)
+    code = Column(types.String, comment="code")
+    open = Column(types.Float64, comment="open")
+    high = Column(types.Float64, comment="high")
+    low = Column(types.Float64, comment="low")
+    close = Column(types.Float64, comment="close")
+    volume = Column(types.Float64, comment="volume")
+    amount = Column(types.Float64, comment="amount")
+    turn = Column(types.Float64, comment="turn")
+    peTTM = Column(types.Float64, comment="peTTM")
+    psTTM = Column(types.Float64, comment="psTTM")
+    pcfNcfTTM = Column(types.Float64, comment="pcfNcfTTM")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYear(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
 class BondKline5m(TsTable):
     """
     5m K线，不复权
