@@ -13,7 +13,7 @@ import pandas as pd
 from tqdm import tqdm
 from loguru import logger
 from dateutil import parser, tz
-from httpx._types import ProxiesTypes
+from httpx._types import ProxyTypes
 from binance.spot import Spot
 from binance.cm_futures import CMFutures
 from binance.um_futures import UMFutures
@@ -158,7 +158,7 @@ class CryptoDB(DuckDB):
         asset_type: AssetType = AssetType.future_um,
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
-        httpx_proxies: ProxiesTypes = {},
+        httpx_proxies: ProxyTypes = {},
         skip_symbols: list[str] = [],
         do_filter_quote_volume_0: bool = False,
         if_skip_usdc: bool = True,
@@ -232,7 +232,7 @@ class CryptoDB(DuckDB):
         asset_type: AssetType = AssetType.future_um,
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
-        httpx_proxies: ProxiesTypes = {},
+        httpx_proxies: ProxyTypes = {},
         skip_symbols: list[str] = [],
         do_filter_quote_volume_0: bool = False,
         if_skip_usdc: bool = True,
@@ -329,7 +329,7 @@ class CryptoDB(DuckDB):
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
         do_filter_quote_volume_0: bool = False,
-        httpx_proxies: ProxiesTypes = {},
+        httpx_proxies: ProxyTypes = {},
     ) -> pl.DataFrame:
         from pond.binance_history.utils import (
             get_urls_by_xml_parse,
