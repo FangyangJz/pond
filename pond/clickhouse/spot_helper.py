@@ -230,7 +230,7 @@ class SpotHelper:
     def __sync_kline(
         self,
         signal,
-        table,
+        table: SpotKline1H,
         symbols,
         interval,
         res_dict: dict,
@@ -242,13 +242,19 @@ class SpotHelper:
         limit_seconds = data_limit * timeframe2minutes(interval) * 60
         if signal is None:
             signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        kline_df = self.clickhouse.read_latest_n_record(
+            table.__tablename__, signal - timedelta(days=30), signal, 1
+        )
+        kline_df = pl.from_pandas(kline_df)
         for symbol in symbols:
             code = symbol["symbol"]
-            lastest_record = self.clickhouse.get_latest_record_time(
-                table, table.code == code
+            latest_record = kline_df.filter(pl.col("code") == code)
+            lastest_record = (
+                latest_record[0, "datetime"]
+                if len(latest_record) > 0
+                else self.clickhouse.data_start
             )
             data_duration_seconds = (signal - lastest_record).total_seconds()
-
             # load history data and save into db
             if data_duration_seconds > limit_seconds and self.fix_kline_with_cryptodb:
                 local_klines_df = self.crypto_db.load_history_data(
