@@ -10,14 +10,14 @@ from pathlib import Path
 
 from loguru import logger
 from urllib.parse import urlparse
-from httpx._types import ProxiesTypes
+from httpx._types import ProxyTypes
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 from pond.utils.crawler import get_mock_headers
 
 
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(3))
-async def download_file(url: str, path: Path, proxies: ProxiesTypes = {}):
+async def download_file(url: str, path: Path, proxies: ProxyTypes = {}):
     async with httpx.AsyncClient(proxies=proxies) as client:
         response = await client.get(url, timeout=30, headers=get_mock_headers())
 
@@ -49,7 +49,7 @@ async def async_tasks(
 
 
 def start_async_download_files(
-    url_list: list[str], path: Path, proxies: ProxiesTypes = {}
+    url_list: list[str], path: Path, proxies: ProxyTypes = {}
 ):
     func_param_list = [{"path": path, "proxies": proxies}]
     logger.info("Running asyncio tasks ......")
