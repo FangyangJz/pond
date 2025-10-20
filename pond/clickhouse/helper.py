@@ -438,11 +438,9 @@ class FuturesHelper:
                     continue
                 for chain, address in chain_info.items():
                     if address is None or len(address.strip()) == 0:
-                        synced_count += 1
                         continue
                     chain_id = ChainId.get_chain_id(chain)
                     if chain_id is None:
-                        synced_count += 1
                         continue
                     holders = self.chainbase_client.get_topn_holders(
                         chain_id, address, page=1, limit=20
