@@ -415,7 +415,7 @@ class FuturesHelper:
                 and lastest_record + timedelta(seconds=interval_seconds) > signal
             ):
                 logger.debug(
-                    f"futures helper sync funding rate ignore too short duration {lastest_record}-{signal} for {code}"
+                    f"futures helper token holders ignore too short duration {lastest_record}-{signal} for {code}"
                 )
                 synced_count += 1
                 continue
@@ -607,7 +607,7 @@ if __name__ == "__main__":
     helper = FuturesHelper(crypto_db, manager)
     ret = False
     while not ret:
-        helper.sync(
+        ret = helper.sync(
             "1d",
             workers=1,
             end_time=datetime.now().replace(hour=0).replace(minute=0)
