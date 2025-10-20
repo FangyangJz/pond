@@ -245,6 +245,29 @@ class FutureInfo(TsTable):
     )
 
 
+class TokenHolders(TsTable):
+    """
+    合约信息表
+    """
+
+    __tablename__ = "token_holders"
+
+    datetime = Column(types.DateTime64, comment="datetime", primary_key=True)
+    code = Column(types.String, comment="code")
+    chain = Column(types.String, comment="chain")
+    wallet_address = Column(types.String, comment="wallet_address")
+    amount = Column(types.Float64, comment="amount")
+    usd_value = Column(types.Float64, comment="usd_value")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code, chain, wallet_address),
+            primary_key=(datetime, code, chain, wallet_address),
+        ),
+    )
+
+
 class FutureFundingRate(TsTable):
     """
     合约资金费率表

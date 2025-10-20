@@ -4,6 +4,8 @@ from pond.clickhouse.manager import ClickHouseManager
 from typing import Optional
 import datetime as dtm
 from datetime import datetime
+import time
+import polars as pl
 from binance.um_futures import UMFutures
 from pond.clickhouse.kline import (
     FutureInfo,
@@ -13,6 +15,8 @@ from pond.clickhouse.kline import (
     FuturesKline1H,
     FuturesKline1d,
     FuturesKline15m,
+    TokenHolders,
+    SpotKline1H,
 )
 from threading import Thread
 import threading
@@ -28,7 +32,9 @@ from pond.utils.times import (
 )
 from pond.coin_gecko.coin_info import get_coin_market_data
 from pond.coin_gecko.id_mapper import CoinGeckoIDMapper
-import polars as pl
+from pond.coin_gecko.contract_info import BinanceContractTool
+from pond.chain_base.client import ChainbaseClient
+from pond.chain_base import ChainId
 
 
 class DataProxy:
@@ -78,6 +84,7 @@ class FuturesHelper:
     data_proxy: DataProxy = None
     fix_kline_with_cryptodb: bool = None
     gecko_id_mapper: CoinGeckoIDMapper = CoinGeckoIDMapper()
+    contact_tool: BinanceContractTool = BinanceContractTool()
 
     def __init__(
         self,
@@ -91,6 +98,10 @@ class FuturesHelper:
         self.configs = kwargs
         self.data_proxy = DirectDataProxy()
         self.fix_kline_with_cryptodb = fix_kline_with_cryptodb
+        api_key = kwargs.get(
+            "CHAIN_BASE_API_KEY", os.environ.get("CHAIN_BASE_API_KEY", None)
+        )
+        self.chainbase_client = ChainbaseClient(api_key)
 
     def set_data_prox(self, data_proxy: DataProxy):
         self.data_proxy = data_proxy
@@ -170,6 +181,8 @@ class FuturesHelper:
             table = FutureInfo
         elif what == "funding_rate":
             table = FutureFundingRate
+        elif what == "holders":
+            table = TokenHolders
         if table is None:
             return False
         if end_time is not None:
@@ -205,6 +218,13 @@ class FuturesHelper:
                 )
                 worker3.start()
                 threads.append(worker3)
+            elif what == "holders":
+                worker4 = Thread(
+                    target=self.__sync_futures_base_asset_holders,
+                    args=(table, worker_symbols, interval, res_dict),
+                )
+                worker4.start()
+                threads.append(worker4)
 
         [t.join() for t in threads]
 
@@ -345,6 +365,97 @@ class FuturesHelper:
             self.clickhouse.save_to_db(table, funding_rate_df, table.code == code)
         res_dict[tid] = True
 
+    def __sync_futures_base_asset_holders(
+        self, table: TokenHolders, symbols, interval, res_dict: dict
+    ):
+        table = TokenHolders
+        tid = threading.current_thread().ident
+        res_dict[tid] = False
+        interval_seconds = timeframe2minutes(interval) * 60
+        signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        spot_df = self.clickhouse.read_latest_n_record(
+            SpotKline1H.__tablename__, signal - timedelta(days=30), signal, 1
+        )
+        if spot_df is None or len(spot_df) == 0:
+            logger.error(
+                "futures helper sync base asset holders failed, no spot kline data"
+            )
+            return
+        holders_df = self.clickhouse.read_latest_n_record(
+            table.__tablename__, signal - timedelta(days=30), signal, 1
+        )
+        holders_df = pl.from_pandas(holders_df)
+        synced_count = 0
+        spot_df = pl.from_pandas(spot_df)
+        for symbol in symbols:
+            code = symbol["pair"]
+            spot_kline = spot_df.filter(pl.col("code") == code)
+            if len(spot_kline) > 0:
+                logger.info(
+                    f"futures helper sync base asset holders for {code} spot already synced, skip"
+                    ""
+                )
+                synced_count += 1
+                continue
+            base_asset = symbol["baseAsset"]
+            holder_info = holders_df.filter(pl.col("code") == code)
+            lastest_record = (
+                holder_info[0, "datetime"] if len(holder_info) > 0 else None
+            )
+            if (
+                lastest_record is not None
+                and lastest_record + timedelta(seconds=interval_seconds) > signal
+            ):
+                logger.debug(
+                    f"futures helper sync funding rate ignore too short duration {lastest_record}-{signal} for {code}"
+                )
+                synced_count += 1
+                continue
+            try:
+                cg_id = self.gecko_id_mapper.get_coingecko_id(
+                    base_asset, exact_match=True
+                )
+                if cg_id is None:
+                    logger.info(
+                        f"futures helper sync holders can not find coin gecko id for {code}"
+                    )
+                    synced_count += 1
+                    continue
+                chain_info = self.contact_tool.get_token_chain_info(cg_id)
+                holders_dfs = []
+                if chain_info is None:
+                    continue
+                if len(chain_info) == 0:
+                    synced_count += 1
+                    continue
+                for chain, address in chain_info.items():
+                    if address is None or len(address.strip()) == 0:
+                        synced_count += 1
+                        continue
+                    chain_id = ChainId.get_chain_id(chain)
+                    if chain_id is None:
+                        synced_count += 1
+                        continue
+                    holders = self.chainbase_client.get_topn_holders(
+                        chain_id, address, page=1, limit=20
+                    )
+                    time.sleep(1)
+                    df = pd.DataFrame(data=holders)
+                    df["chain"] = chain
+                    df["code"] = code
+                    df["datetime"] = signal
+                    holders_dfs.append(df)
+            except Exception as e:
+                logger.error(f"futures helper sync holders for {code} failed {e}")
+                continue
+            if len(holders_dfs) > 0:
+                result_df = pd.concat(holders_dfs)
+                self.clickhouse.save_to_db(
+                    table, result_df, table.code == code, drop_duplicates=False
+                )
+            synced_count += 1
+        res_dict[tid] = synced_count == len(symbols)
+
     def __sync_futures_info(self, signal, table, symbols, res_dict: dict):
         tid = threading.current_thread().ident
         res_dict[tid] = False
@@ -479,10 +590,13 @@ if __name__ == "__main__":
         conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
     )
     helper = FuturesHelper(crypto_db, manager)
-    ret = helper.sync(
-        "1h",
-        workers=3,
-        end_time=datetime.now().replace(hour=0).replace(minute=0),
-        what="funding_rate",
-    )
-    print(f"sync ret {ret}")
+    ret = False
+    while not ret:
+        helper.sync(
+            "1d",
+            workers=1,
+            end_time=datetime.now().replace(hour=0).replace(minute=0)
+            - timedelta(days=1),
+            what="holders",
+        )
+        print(f"sync ret {ret}")
