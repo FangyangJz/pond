@@ -1,11 +1,13 @@
 import requests
 import json
 from pathlib import Path
+import time
 
 
 class CoinGeckoIDMapper:
-    def __init__(self, cache_file="coingecko_precise_cache.json"):
+    def __init__(self, cache_file="coingecko_precise_cache.json", failure_expiry=86400):
         self.cache_file = cache_file
+        self.failure_expiry = failure_expiry  # 失败记录过期时间(秒)，默认24小时
         self.cache = self._load_cache()  # 缓存已查询过的结果，避免重复请求
 
     def _load_cache(self):
@@ -29,7 +31,18 @@ class CoinGeckoIDMapper:
         # 先查缓存，命中则直接返回
         query_lower = query.lower()
         if query_lower in self.cache:
-            return self.cache[query_lower]
+            cache_entry = self.cache[query_lower]
+
+            # 成功记录直接返回
+            if cache_entry["type"] == "success":
+                return cache_entry["value"]
+
+            # 失败记录检查是否过期
+            if cache_entry["type"] == "failure":
+                current_time = time.time()
+                if current_time - cache_entry["timestamp"] < self.failure_expiry:
+                    # 未过期，直接返回失败结果
+                    return None
 
         # 调用CoinGecko搜索API
         url = "https://api.coingecko.com/api/v3/search"
@@ -41,7 +54,14 @@ class CoinGeckoIDMapper:
             results = response.json().get("coins", [])  # 搜索结果列表
 
             if not results:
-                return None  # 无匹配结果
+                # 无匹配结果，缓存失败记录
+                self.cache[query_lower] = {
+                    "type": "failure",
+                    "timestamp": time.time(),
+                    "expiry": self.failure_expiry,
+                }
+                self._save_cache()
+                return None
 
             # 处理查询结果
             query_normalized = query.lower().strip()
@@ -54,18 +74,32 @@ class CoinGeckoIDMapper:
                 if exact_match:
                     if name == query_normalized or symbol == query_normalized:
                         coingecko_id = coin["id"]
-                        self.cache[query_lower] = coingecko_id  # 存入缓存
+                        # 缓存成功结果
+                        self.cache[query_lower] = {
+                            "type": "success",
+                            "value": coingecko_id,
+                        }
                         self._save_cache()
                         return coingecko_id
                 # 模糊匹配：名称或符号包含查询词
                 else:
                     if query_normalized in name or query_normalized in symbol:
                         coingecko_id = coin["id"]
-                        self.cache[query_lower] = coingecko_id  # 存入缓存
+                        # 缓存成功结果
+                        self.cache[query_lower] = {
+                            "type": "success",
+                            "value": coingecko_id,
+                        }
                         self._save_cache()
                         return coingecko_id
 
-            # 无精确匹配结果
+            # 无匹配结果，缓存失败记录
+            self.cache[query_lower] = {
+                "type": "failure",
+                "timestamp": time.time(),
+                "expiry": self.failure_expiry,
+            }
+            self._save_cache()
             return None
 
         except Exception as e:
