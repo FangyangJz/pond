@@ -227,6 +227,7 @@ class ClickHouseManager:
         df: pd.DataFrame,
         last_record_filters: list[str] | None,
         datetime_col="datetime",
+        drop_duplicates=True,
     ) -> int:
         # format data
         if isinstance(table, str):
@@ -237,7 +238,7 @@ class ClickHouseManager:
         else:
             table_name = table.__tablename__
             df = table().format_dataframe(df)
-            if "datetime" in df.columns and "code" in df.columns:
+            if "datetime" in df.columns and "code" in df.columns and drop_duplicates:
                 df.drop_duplicates(subset=["datetime", "code"], inplace=True)
             lastet_record_time = self.get_latest_record_time(table, last_record_filters)
 
