@@ -247,8 +247,8 @@ class FuturesHelper:
             lastest_count = (
                 latest_kline_df.group_by(time_col).len().sort(time_col)[-1, "len"]
             )
-            # current about 300 futues, allow 5 target kline missing.
-            if lastest_count / request_count < 0.98:
+            # allow 1 target data missing.
+            if lastest_count < request_count - 1:
                 return False
         return True
 
@@ -262,13 +262,13 @@ class FuturesHelper:
         limit_seconds = data_limit * timeframe2minutes(interval) * 60
         if signal is None:
             signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
-        klines_df = self.clickhouse.read_latest_n_record(
+        latest_klines_df = self.clickhouse.read_latest_n_record(
             table.__tablename__, signal - timedelta(days=30), signal, 1
         )
-        klines_df = pl.from_pandas(klines_df)
+        latest_klines_df = pl.from_pandas(latest_klines_df)
         for symbol in symbols:
             code = symbol["pair"]
-            latest_record = klines_df.filter(pl.col("code") == code)
+            latest_record = latest_klines_df.filter(pl.col("code") == code)
             lastest_record = (
                 latest_record[0, "datetime"]
                 if len(latest_record) > 0
