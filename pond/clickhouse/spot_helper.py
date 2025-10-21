@@ -316,7 +316,6 @@ class SpotHelper:
     def attach_spot_existence(self, df: pl.DataFrame, extra_query_days=30):
         start = df["close_time"].min()
         end = df["close_time"].max()
-
         spot_kline_df = self.clickhouse.native_read_table(
             SpotKline1H, start - timedelta(days=extra_query_days), end, rename=True
         )
@@ -339,6 +338,9 @@ class SpotHelper:
         existence_df = existence_df.with_columns(
             pl.col("spot_volume").is_not_null().alias("spot_existence")
         ).filter(pl.col("close_time") >= start)
+        existence_df = existence_df.select(
+            ["close_time", "jj_code", "spot_existence", "spot_volume"]
+        )
         df = df.join(existence_df, on=["close_time", "jj_code"], how="left")
         return df
 
