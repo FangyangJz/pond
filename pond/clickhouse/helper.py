@@ -116,14 +116,18 @@ class FuturesHelper:
         return self.dict_exchange_info[key]
 
     def get_perpetual_symbols(self, signal: datetime):
-        exchange_info_dict = self.get_exchange_info(signal)
-        return [
-            symbol
-            for symbol in exchange_info_dict["symbols"]
-            if symbol["contractType"] == "PERPETUAL"
-            and symbol["pair"].endswith("USDT")
-            and symbol["status"] == "TRADING"
-        ]
+        try:
+            exchange_info_dict = self.get_exchange_info(signal)
+            return [
+                symbol
+                for symbol in exchange_info_dict["symbols"]
+                if symbol["contractType"] == "PERPETUAL"
+                and symbol["pair"].endswith("USDT")
+                and symbol["status"] == "TRADING"
+            ]
+        except Exception as e:
+            logger.error(e)
+            return None
 
     def get_futures_table(self, interval) -> Optional[FuturesKline1H]:
         if interval == "4h":
@@ -192,6 +196,8 @@ class FuturesHelper:
         if workers is None:
             workers = math.ceil(os.cpu_count() / 2)
         symbols = self.get_perpetual_symbols(signal)
+        if symbols is None:
+            return False
         task_counts = math.ceil(len(symbols) / workers)
         res_dict = {}
         threads = []
