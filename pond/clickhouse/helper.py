@@ -51,6 +51,9 @@ class DataProxy:
 
 class DirectDataProxy(DataProxy):
     exchange: UMFutures = None
+    # 添加缓存相关变量
+    _exchange_info_cache = None
+    _exchange_info_cache_time = None
 
     def __init__(self) -> None:
         self.exchange = UMFutures(
@@ -58,7 +61,26 @@ class DirectDataProxy(DataProxy):
         )
 
     def um_future_exchange_info(self) -> dict:
-        return self.exchange.exchange_info()
+        # 检查缓存是否存在且未过期（24小时）
+        current_time = time.time()
+        if (
+            self._exchange_info_cache is not None
+            and self._exchange_info_cache_time is not None
+        ):
+            if (
+                current_time - self._exchange_info_cache_time < 24 * 60 * 60
+            ):  # 24小时有效期
+                logger.info(
+                    f"get exchanged info from cache within 24 hours, cache time is: {self._exchange_info_cache_time}"
+                )
+                return self._exchange_info_cache
+
+        # 缓存不存在或已过期，重新获取数据
+        exchange_info = self.exchange.exchange_info()
+        # 更新缓存和时间戳
+        self._exchange_info_cache = exchange_info
+        self._exchange_info_cache_time = current_time
+        return exchange_info
 
     def um_future_klines(
         self, symbol, contract_type, interval, startTime, limit
