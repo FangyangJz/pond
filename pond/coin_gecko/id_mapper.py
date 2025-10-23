@@ -42,7 +42,7 @@ class CoinGeckoIDMapper:
                 current_time = time.time()
                 if current_time - cache_entry["timestamp"] < self.failure_expiry:
                     # 未过期，直接返回失败结果
-                    return None
+                    return ""
 
         # 调用CoinGecko搜索API
         url = "https://api.coingecko.com/api/v3/search"
@@ -61,7 +61,7 @@ class CoinGeckoIDMapper:
                     "expiry": self.failure_expiry,
                 }
                 self._save_cache()
-                return None
+                return ""
 
             # 处理查询结果
             query_normalized = query.lower().strip()
@@ -100,7 +100,7 @@ class CoinGeckoIDMapper:
                 "expiry": self.failure_expiry,
             }
             self._save_cache()
-            return None
+            return ""
 
         except Exception as e:
             print(f"查询失败：{str(e)}")

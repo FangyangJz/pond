@@ -434,6 +434,11 @@ class FuturesHelper:
                     base_asset, exact_match=True
                 )
                 if cg_id is None:
+                    logger.warning(
+                        f"futures helper sync holders query coin gecko id for {code} failed"
+                    )
+                    continue
+                if cg_id == "":
                     logger.info(
                         f"futures helper sync holders can not find coin gecko id for {code}"
                     )
@@ -499,6 +504,11 @@ class FuturesHelper:
             query = code[:-4]
             cg_id = self.gecko_id_mapper.get_coingecko_id(query, exact_match=True)
             if cg_id is None:
+                logger.warning(
+                    f"futures helper sync info query coin gecko id for {code} failed"
+                )
+                continue
+            if cg_id == "":
                 logger.warning(
                     f"futures helper sync info can not find coin gecko id for {code}"
                 )
