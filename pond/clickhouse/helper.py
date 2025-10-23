@@ -16,7 +16,6 @@ from pond.clickhouse.kline import (
     FuturesKline1d,
     FuturesKline15m,
     TokenHolders,
-    SpotKline1H,
 )
 from threading import Thread
 import threading
@@ -387,30 +386,13 @@ class FuturesHelper:
         res_dict[tid] = False
         interval_seconds = timeframe2minutes(interval) * 60
         signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
-        spot_df = self.clickhouse.read_latest_n_record(
-            SpotKline1H.__tablename__, signal - timedelta(days=30), signal, 1
-        )
-        if spot_df is None or len(spot_df) == 0:
-            logger.error(
-                "futures helper sync base asset holders failed, no spot kline data"
-            )
-            return
         holders_df = self.clickhouse.read_latest_n_record(
             table.__tablename__, signal - timedelta(days=30), signal, 1
         )
         holders_df = pl.from_pandas(holders_df)
         synced_count = 0
-        spot_df = pl.from_pandas(spot_df)
         for symbol in symbols:
             code = symbol["pair"]
-            spot_kline = spot_df.filter(pl.col("code") == code)
-            if len(spot_kline) > 0:
-                logger.info(
-                    f"futures helper sync base asset holders for {code} spot already synced, skip"
-                    ""
-                )
-                synced_count += 1
-                continue
             base_asset = symbol["baseAsset"]
             holder_info = holders_df.filter(pl.col("code") == code)
             lastest_record = (
