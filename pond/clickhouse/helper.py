@@ -106,6 +106,7 @@ class FuturesHelper:
     fix_kline_with_cryptodb: bool = None
     gecko_id_mapper: CoinGeckoIDMapper = CoinGeckoIDMapper()
     contact_tool: BinanceContractTool = BinanceContractTool()
+    verbose_log = False
 
     def __init__(
         self,
@@ -317,9 +318,10 @@ class FuturesHelper:
                 data_duration_seconds = (signal - lastest_record).total_seconds()
 
             if data_duration_seconds < interval_seconds:
-                logger.debug(
-                    f"futures helper sync kline ignore too short duration {lastest_record}-{signal}"
-                )
+                if self.verbose_log:
+                    logger.debug(
+                        f"futures helper sync kline ignore too short duration {lastest_record}-{signal}"
+                    )
                 continue
 
             startTime = datetime2utctimestamp_milli(lastest_record)
@@ -369,9 +371,10 @@ class FuturesHelper:
             data_duration_seconds = (signal - lastest_record).total_seconds()
 
             if data_duration_seconds < interval_seconds:
-                logger.debug(
-                    f"futures helper sync funding rate ignore too short duration {lastest_record}-{signal} for {code}"
-                )
+                if self.verbose_log:
+                    logger.debug(
+                        f"futures helper sync funding rate ignore too short duration {lastest_record}-{signal} for {code}"
+                    )
                 continue
             startTime = datetime2utctimestamp_milli(lastest_record)
             try:
@@ -424,9 +427,10 @@ class FuturesHelper:
                 lastest_record is not None
                 and lastest_record + timedelta(seconds=interval_seconds) > signal
             ):
-                logger.debug(
-                    f"futures helper token holders ignore too short duration {lastest_record}-{signal} for {code}"
-                )
+                if self.verbose_log:
+                    logger.debug(
+                        f"futures helper token holders ignore too short duration {lastest_record}-{signal} for {code}"
+                    )
                 synced_count += 1
                 continue
             try:
@@ -439,9 +443,10 @@ class FuturesHelper:
                     )
                     continue
                 if cg_id == "":
-                    logger.info(
-                        f"futures helper sync holders can not find coin gecko id for {code}"
-                    )
+                    if self.verbose_log:
+                        logger.info(
+                            f"futures helper sync holders can not find coin gecko id for {code}"
+                        )
                     synced_count += 1
                     continue
                 chain_info = self.contact_tool.get_token_chain_info(cg_id)
@@ -497,9 +502,10 @@ class FuturesHelper:
             )
             if signal - lastest_record < timedelta(days=1):
                 count += 1
-                logger.info(
-                    f"futures helper sync info ignore too short duration for {code}"
-                )
+                if self.verbose_log:
+                    logger.info(
+                        f"futures helper sync info ignore too short duration for {code}"
+                    )
                 continue
             query = code[:-4]
             cg_id = self.gecko_id_mapper.get_coingecko_id(query, exact_match=True)

@@ -120,6 +120,7 @@ class SpotHelper:
     data_proxy: DirectDataProxy = None
     fix_kline_with_cryptodb: bool = None
     gecko_id_mapper: CoinGeckoIDMapper = CoinGeckoIDMapper()
+    verbose_log = False
 
     def __init__(
         self,
@@ -275,9 +276,10 @@ class SpotHelper:
                 data_duration_seconds = (signal - lastest_record).total_seconds()
 
             if data_duration_seconds < interval_seconds:
-                logger.debug(
-                    f"spot helper sync kline ignore too short duration {lastest_record}-{signal}"
-                )
+                if self.verbose_log:
+                    logger.debug(
+                        f"spot helper sync kline ignore too short duration {lastest_record}-{signal} for {code}"
+                    )
                 continue
 
             startTime = datetime2utctimestamp_milli(lastest_record)
