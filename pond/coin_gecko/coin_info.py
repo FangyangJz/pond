@@ -1,5 +1,6 @@
 import requests
 from loguru import logger
+import time
 
 
 def get_coin_info(coingecko_id) -> dict:
@@ -14,6 +15,8 @@ def get_coin_info(coingecko_id) -> dict:
         logger.error(f"获取代币信息 {coingecko_id} 失败: {str(e)}")
         if str(e).startswith("404 Client Error: Not Found for url"):
             return {}
+        if str(e).startswith("429 Client Error: Too Many Request"):
+            time.sleep(5)
         return None
 
 
