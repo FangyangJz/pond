@@ -252,8 +252,8 @@ class TokenHolders(TsTable):
 
     __tablename__ = "token_holders"
 
-    datetime = Column(types.DateTime64, comment="datetime", primary_key=True)
-    code = Column(types.String, comment="code")
+    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    code = Column(types.String, comment="jj_code")
     chain = Column(types.String, comment="chain")
     wallet_address = Column(types.String, comment="wallet_address")
     amount = Column(types.Float64, comment="amount")

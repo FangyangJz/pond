@@ -728,6 +728,34 @@ class FuturesHelper:
         )
         return df
 
+    def attach_futures_holders(self, df: pl.DataFrame):
+        start = df["close_time"].min() - timedelta(days=1)
+        end = df["close_time"].max() + timedelta(days=1)
+        df = df.with_columns(close_time=pl.col("close_time").dt.cast_time_unit("ns"))
+        if "date" not in df.columns:
+            df = df.with_columns(date=pl.col("close_time").dt.date())
+        holders_df = self.clickhouse.native_read_table(
+            TokenHolders, start, end, filters=None, rename=True
+        )
+        holders_df = pl.from_pandas(holders_df)
+        holders_df = holders_df.with_columns(
+            date=pl.col("close_time").dt.date(),
+        )
+        holders_df = holders_df.group_by(["jj_code", "date"]).agg(
+            top20_amount=pl.col("amount").sum(),
+            chain=pl.col("chain").unique().str.join(","),
+            top20_address=(pl.col("chain") + "-" + pl.col("wallet_address"))
+            .unique()
+            .str.join(","),
+            usd_value=pl.col("usd_value").sum(),
+        )
+        df = df.join(
+            holders_df,
+            on=["jj_code", "date"],
+            how="left",
+        )
+        return df
+
     def attach_future_extra_data(self, df: pl.DataFrame):
         start = df["close_time"].min()
         end = df["close_time"].max()
