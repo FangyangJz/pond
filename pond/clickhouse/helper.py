@@ -16,6 +16,8 @@ from pond.clickhouse.kline import (
     FuturesKline1d,
     FuturesKline15m,
     TokenHolders,
+    FutureOpenInterest,
+    FutureLongShortRatio,
 )
 from threading import Thread
 import threading
@@ -34,6 +36,11 @@ from pond.coin_gecko.id_mapper import CoinGeckoIDMapper
 from pond.coin_gecko.contract_info import BinanceContractTool
 from pond.chain_base.client import ChainbaseClient
 from pond.chain_base import ChainId
+from pond.binance_history.futures_api import (
+    get_long_short_account_ratio_history,
+    get_open_interest_history,
+)
+from binance.client import Client
 
 
 class DataProxy:
@@ -106,6 +113,7 @@ class FuturesHelper:
     fix_kline_with_cryptodb: bool = None
     gecko_id_mapper: CoinGeckoIDMapper = CoinGeckoIDMapper()
     contact_tool: BinanceContractTool = BinanceContractTool()
+    binance: Client = None
     verbose_log = False
 
     def __init__(
@@ -124,6 +132,13 @@ class FuturesHelper:
             "CHAIN_BASE_API_KEY", os.environ.get("CHAIN_BASE_API_KEY", None)
         )
         self.chainbase_client = ChainbaseClient(api_key)
+        binance_api_key = kwargs.get(
+            "BINANCE_API_KEY", os.environ.get("BINANCE_API_KEY", None)
+        )
+        binance_api_secret = kwargs.get(
+            "BINANCE_API_SECRET", os.environ.get("BINANCE_API_SECRET", None)
+        )
+        self.binance = Client(binance_api_key, binance_api_secret)
 
     def set_data_prox(self, data_proxy: DataProxy):
         self.data_proxy = data_proxy
@@ -209,8 +224,6 @@ class FuturesHelper:
             table = FutureFundingRate
         elif what == "holders":
             table = TokenHolders
-        if table is None:
-            return False
         if end_time is not None:
             signal = end_time
         else:
@@ -253,6 +266,13 @@ class FuturesHelper:
                 )
                 worker4.start()
                 threads.append(worker4)
+            else:
+                worker5 = Thread(
+                    target=self.__sync_futures_extra_info,
+                    args=(what, signal, worker_symbols, interval, res_dict),
+                )
+                worker5.start()
+                threads.append(worker5)
 
         [t.join() for t in threads]
 
@@ -552,6 +572,97 @@ class FuturesHelper:
             count += 1
         res_dict[tid] = count == len(symbols)
 
+    def __sync_futures_funding_rate(
+        self, signal, table: FutureFundingRate, symbols, interval, res_dict: dict
+    ):
+        tid = threading.current_thread().ident
+        res_dict[tid] = False
+        interval_seconds = timeframe2minutes(interval) * 60
+        if signal is None:
+            signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        for symbol in symbols:
+            code = symbol["pair"]
+            lastest_record = self.clickhouse.get_latest_record_time(
+                table, table.code == code
+            )
+            data_duration_seconds = (signal - lastest_record).total_seconds()
+
+            if data_duration_seconds < interval_seconds:
+                if self.verbose_log:
+                    logger.debug(
+                        f"futures helper sync funding rate ignore too short duration {lastest_record}-{signal} for {code}"
+                    )
+                continue
+            startTime = datetime2utctimestamp_milli(lastest_record)
+            try:
+                funding_list = self.data_proxy.um_future_funding_rate(
+                    code,
+                    "PERPETUAL",
+                    interval,
+                    startTime=startTime,
+                    limit=1000,
+                )
+                if not funding_list or len(funding_list) == 0:
+                    continue
+            except Exception as e:
+                logger.error(f"futures helper sync funding rate for {code} failed {e}")
+                continue
+            cols = list(table().get_colcom_names().values())
+            funding_rate_df = pd.DataFrame(funding_list, columns=cols)
+            funding_rate_df["fundingRate"] = funding_rate_df["fundingRate"].astype(
+                "Float64"
+            )
+            funding_rate_df["markPrice"] = pd.to_numeric(funding_rate_df["markPrice"])
+            funding_rate_df["fundingTime"] = funding_rate_df["fundingTime"].apply(
+                utcstamp_mill2datetime
+            )
+            funding_rate_df = funding_rate_df.drop_duplicates(subset=["fundingTime"])
+            self.clickhouse.save_to_db(table, funding_rate_df, table.code == code)
+        res_dict[tid] = True
+
+    def __sync_futures_extra_info(
+        self, data_name, signal, symbols, interval, res_dict: dict
+    ):
+        tid = threading.current_thread().ident
+        failure_count = 0
+        interval_seconds = timeframe2minutes(interval) * 60
+        if signal is None:
+            signal = datetime.now(tz=dtm.timezone.utc).replace(tzinfo=None)
+        if data_name == "long_short_ratio":
+            table = FutureLongShortRatio
+        elif data_name == "open_interest":
+            table = FutureOpenInterest
+
+        for symbol in symbols:
+            code = symbol["pair"]
+            lastest_record = self.clickhouse.get_latest_record_time(
+                table, table.code == code
+            )
+            data_duration_seconds = (signal - lastest_record).total_seconds()
+
+            if data_duration_seconds < interval_seconds:
+                if self.verbose_log:
+                    logger.debug(
+                        f"futures helper sync funding rate ignore too short duration {lastest_record}-{signal} for {code}"
+                    )
+                continue
+            if data_name == "long_short_ratio":
+                df = get_long_short_account_ratio_history(
+                    self.binance, code, interval, lastest_record, signal
+                )
+            elif data_name == "open_interest":
+                df = get_open_interest_history(
+                    self.binance, code, interval, lastest_record, signal
+                )
+            if df is None:
+                failure_count += 1
+                continue
+            if len(df) == 0:
+                continue
+            self.clickhouse.save_to_db(table, df, table.code == code)
+            time.sleep(0.1)
+        res_dict[tid] = failure_count == 0
+
     def attach_future_info(self, df: pl.DataFrame, back_fill=True):
         start = df["close_time"].min()
         end = df["close_time"].max()
@@ -617,6 +728,30 @@ class FuturesHelper:
         )
         return df
 
+    def attach_future_extra_data(self, df: pl.DataFrame):
+        start = df["close_time"].min()
+        end = df["close_time"].max()
+        df = df.with_columns(close_time=pl.col("close_time").dt.cast_time_unit("ns"))
+        open_interest_df = self.clickhouse.native_read_table(
+            FutureOpenInterest, start, end, filters=None, rename=True
+        )
+        open_interest_df = pl.from_pandas(open_interest_df)
+        long_short_ratio_df = self.clickhouse.native_read_table(
+            FutureLongShortRatio, start, end, filters=None, rename=True
+        )
+        long_short_ratio_df = pl.from_pandas(long_short_ratio_df)
+        df = df.join(
+            open_interest_df,
+            on=["jj_code", "close_time"],
+            how="left",
+        )
+        df = df.join(
+            long_short_ratio_df,
+            on=["jj_code", "close_time"],
+            how="left",
+        )
+        return df
+
 
 if __name__ == "__main__":
     import os
@@ -629,13 +764,13 @@ if __name__ == "__main__":
         conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
     )
     helper = FuturesHelper(crypto_db, manager)
+    end_time = datetime.now().replace(minute=0).replace(second=0).replace(microsecond=0)
     ret = False
     while not ret:
         ret = helper.sync(
-            "1d",
+            "1h",
             workers=1,
-            end_time=datetime.now().replace(hour=0).replace(minute=0)
-            - timedelta(days=1),
-            what="holders",
+            end_time=end_time,
+            what="long_short_ratio",
         )
         print(f"sync ret {ret}")

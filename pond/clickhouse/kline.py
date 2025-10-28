@@ -268,6 +268,62 @@ class TokenHolders(TsTable):
     )
 
 
+class FutureLongShortRatio(TsTable):
+    """
+    合约多空账户数比信息表
+
+    按保证金余额（账户资金规模）排名前 20% 的用户（即 “大户”），仅统计有未平仓合约的账户。
+
+    longAccount: 有净多头头寸的大户账户数 ÷ 有未平仓头寸的大户总账户数
+    shortAccount: 有净空头头寸的大户账户数 ÷ 有未平仓头寸的大户总账户数
+    longShortRatio: 多空账户数比
+    """
+
+    __tablename__ = "future_long_short_ratio"
+
+    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    code = Column(types.String, comment="jj_code")
+    longAccount = Column(types.Float64, comment="longAccount")
+    shortAccount = Column(types.Float64, comment="shortAccount")
+    longShortRatio = Column(types.Float64, comment="longShortRatio")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
+class FutureOpenInterest(TsTable):
+    """
+    合约持仓信息表
+    sumOpenInterest: 总持仓量
+    sumOpenInterestValue: 总持仓价值
+    CMCCirculatingSupply: CMC 统计的总流通量
+        总流通量: 排除项目方未解锁、团队锁仓、基金会储备等 “暂不可交易” 的部分，仅统计当前能在交易所、钱包间自由流通的代币数量
+        数据来源：由 CMC 统计并提供，币安 API 仅做同步展示，其统计逻辑可能与项目方官方数据略有差异（如是否计入跨链流通的代币、解锁进度更新时效等）。
+        非实时更新：CMC 流通供应量通常每日更新一次，并非实时变动，因此不适合作为实时交易决策的直接依据，仅用于中长期趋势参考。
+    """
+
+    __tablename__ = "future_open_interest"
+
+    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    code = Column(types.String, comment="jj_code")
+    sumOpenInterest = Column(types.Float64, comment="sumOpenInterest")
+    sumOpenInterestValue = Column(types.Float64, comment="sumOpenInterestValue")
+    CMCCirculatingSupply = Column(types.Float64, comment="CMCCirculatingSupply")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
 class FutureFundingRate(TsTable):
     """
     合约资金费率表
