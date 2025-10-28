@@ -325,7 +325,7 @@ class SpotHelper:
         spot_kline_df = spot_kline_df.with_columns(
             close_time=(pl.col("close_time") + pl.duration(seconds=1))
             .dt.round(every="1m")
-            .dt.cast_time_unit("ms")
+            .dt.cast_time_unit(df["close_time"].dtype.time_unit)
         ).rename(
             mapping={
                 col: f"spot_{col}"
