@@ -275,7 +275,11 @@ class FuturesHelper:
                 threads.append(worker5)
 
         [t.join() for t in threads]
-
+        if len(res_dict) != len(threads):
+            logger.error(
+                "res dict length not equal to threads length, child thread may exited unexpectedly."
+            )
+            return False
         for tid in res_dict.keys():
             if not res_dict[tid]:
                 # return false if any thread failed.
