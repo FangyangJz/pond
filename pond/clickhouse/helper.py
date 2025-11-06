@@ -400,6 +400,9 @@ class FuturesHelper:
                         f"futures helper sync funding rate ignore too short duration {lastest_record}-{signal} for {code}"
                     )
                 continue
+            logger.info(
+                f"futures helper sync funding rate for {code}, lastest record is {lastest_record}, signal {signal}"
+            )
             startTime = datetime2utctimestamp_milli(lastest_record)
             try:
                 funding_list = self.data_proxy.um_future_funding_rate(
@@ -650,6 +653,9 @@ class FuturesHelper:
                         f"futures helper sync funding rate ignore too short duration {lastest_record}-{signal} for {code}"
                     )
                 continue
+            logger.info(
+                f"futures helper __sync_futures_extra_info {data_name} for {code}, lastest record is {lastest_record}, signal {signal}"
+            )
             if data_name == "long_short_ratio":
                 df = get_long_short_account_ratio_history(
                     self.binance, code, interval, lastest_record, signal
