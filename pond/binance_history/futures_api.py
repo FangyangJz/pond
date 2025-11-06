@@ -13,15 +13,14 @@ def get_long_short_account_ratio_history(
     params["endTime"] = int(end_time.timestamp() * 1000)
     try:
         data = client.futures_top_longshort_account_ratio(**params)
-        if not data:
+        if not data or len(data) == 0:
             return []
         df = pd.DataFrame(data=data)
-        if not df.empty:
-            df["close_time"] = pd.to_datetime(df["timestamp"], unit="ms")
-            df["jj_code"] = symbol
+        df["close_time"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df["jj_code"] = symbol
         return df
     except Exception as e:
-        logger.warning(f"{e}")
+        logger.warning(f"failed for {symbol}, {e}")
     return None
 
 
@@ -43,13 +42,13 @@ def get_open_interest_history(
         params["startTime"] = int(start_time.timestamp() * 1000)
         params["endTime"] = int(end_time.timestamp() * 1000)
         data = client.futures_open_interest_hist(**params)
-        if not data:
+        if not data or len(data) == 0:
             return []
         df = pd.DataFrame(data)
-        if not df.empty:
-            df["close_time"] = pd.to_datetime(df["timestamp"], unit="ms")
-            df["jj_code"] = symbol
+        df["close_time"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df["jj_code"] = symbol
+        return df
     except Exception as e:
-        logger.warning(f"{e}")
+        logger.warning(f"failed for {symbol}, {e}")
 
-    return df
+    return None
