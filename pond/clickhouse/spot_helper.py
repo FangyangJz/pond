@@ -148,8 +148,12 @@ class SpotHelper:
         return self.dict_exchange_info[key]
 
     def get_symbols(self, signal: datetime):
-        symbols = self.data_proxy.get_valid_um_futures()
-        return symbols
+        try:
+            symbols = self.data_proxy.get_valid_um_futures()
+            return symbols
+        except BaseException as e:
+            logger.error(f"get valid um futures failed, {e}")
+        return None
 
     def get_table(self, interval) -> Optional[SpotKline1H]:
         if interval == "1h":
@@ -190,6 +194,8 @@ class SpotHelper:
         if workers is None:
             workers = math.ceil(os.cpu_count() / 2)
         symbols = self.get_symbols(signal)
+        if symbols is None or len(symbols) == 0:
+            return False
         task_counts = math.ceil(len(symbols) / workers)
         res_dict = {}
         threads = []
