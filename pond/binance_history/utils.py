@@ -14,7 +14,6 @@ import threading
 import polars as pl
 import pandas as pd
 import httpx
-from httpx._types import ProxyTypes
 
 from pond.utils.crawler import get_mock_headers
 from pond.binance_history.vision import get_vision_data_url_list
@@ -52,7 +51,7 @@ def gen_data_url(
     return url
 
 
-def ping_url_is_exist(url: str, proxies: ProxyTypes):
+def ping_url_is_exist(url: str, proxies: dict[str, str]) -> bool:
     try:
         logger.info(f"Ping {url}")
         resp = httpx.head(
