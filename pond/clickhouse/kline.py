@@ -296,6 +296,34 @@ class FutureLongShortRatio(TsTable):
     )
 
 
+class FutureLongShortPositionRatio(TsTable):
+    """
+    合约多空持仓量比信息表
+
+    前 20% 拥有最高保证金余额的用户的净多头和净空头持仓占其总未平仓持仓的比例。
+
+    longAccount: 高级交易者的多头持仓 / 高级交易者的总未平仓持仓
+    shortAccount: 高级交易者的空头持仓 / 高级交易者的总未平仓持仓
+    longShortRatio: 多空比率（持仓） = 多头持仓百分比 / 空头持仓百分比
+    """
+
+    __tablename__ = "future_long_short_position_ratio"
+
+    datetime = Column(types.DateTime64, comment="close_time", primary_key=True)
+    code = Column(types.String, comment="jj_code")
+    longAccount = Column(types.Float64, comment="longAccount")
+    shortAccount = Column(types.Float64, comment="shortAccount")
+    longShortRatio = Column(types.Float64, comment="longShortRatio")
+
+    __table_args__ = (
+        engines.ReplacingMergeTree(
+            partition_by=func.toYYYYMM(datetime),
+            order_by=(datetime, code),
+            primary_key=(datetime, code),
+        ),
+    )
+
+
 class FutureOpenInterest(TsTable):
     """
     合约持仓信息表

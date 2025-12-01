@@ -18,6 +18,7 @@ from pond.clickhouse.kline import (
     TokenHolders,
     FutureOpenInterest,
     FutureLongShortRatio,
+    FutureLongShortPositionRatio,
 )
 from threading import Thread
 import threading
@@ -38,6 +39,7 @@ from pond.chain_base.client import ChainbaseClient
 from pond.chain_base import ChainId
 from pond.binance_history.futures_api import (
     get_long_short_account_ratio_history,
+    get_long_short_position_ratio_history,
     get_open_interest_history,
 )
 from binance.client import Client
@@ -639,6 +641,8 @@ class FuturesHelper:
             table = FutureLongShortRatio
         elif data_name == "open_interest":
             table = FutureOpenInterest
+        elif data_name == "long_short_position_ratio":
+            table = FutureLongShortPositionRatio
 
         for symbol in symbols:
             code = symbol["pair"]
@@ -658,6 +662,10 @@ class FuturesHelper:
             )
             if data_name == "long_short_ratio":
                 df = get_long_short_account_ratio_history(
+                    self.binance, code, interval, lastest_record, signal
+                )
+            elif data_name == "long_short_position_ratio":
+                df = get_long_short_position_ratio_history(
                     self.binance, code, interval, lastest_record, signal
                 )
             elif data_name == "open_interest":
