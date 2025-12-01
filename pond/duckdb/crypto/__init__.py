@@ -13,7 +13,7 @@ import pandas as pd
 from tqdm import tqdm
 from loguru import logger
 from dateutil import parser, tz
-from httpx._types import ProxyTypes
+
 from binance.spot import Spot
 from binance.cm_futures import CMFutures
 from binance.um_futures import UMFutures
@@ -22,6 +22,8 @@ from pond.duckdb import DuckDB, DataFrameStrType, df_types
 from pond.binance_history.type import TIMEFRAMES, AssetType, DataType
 from pond.duckdb.crypto.const import timeframe_data_types_dict
 from pond.duckdb.crypto.path import CryptoPath
+from pond.binance_history.utils import get_urls_by_xml_parse, load_data_from_disk
+from pond.binance_history.async_api import start_async_download_files
 
 
 class CryptoDB(DuckDB):
@@ -158,7 +160,7 @@ class CryptoDB(DuckDB):
         asset_type: AssetType = AssetType.future_um,
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
-        httpx_proxies: ProxyTypes = {},
+        httpx_proxies: dict[str, str] = {},
         skip_symbols: list[str] = [],
         do_filter_quote_volume_0: bool = False,
         if_skip_usdc: bool = True,
@@ -193,11 +195,7 @@ class CryptoDB(DuckDB):
             manual_df = pd.read_csv(Path(__file__).parent / "UMFutures_manual.csv")
             df = pd.concat([df, manual_df])
 
-        df = df.sort_values(by="symbol")
-        assert len(df) == len(
-            set(df["symbol"].to_list())
-        ), "symbol have duplicated data"
-
+        df = df.sort_values(by="symbol").drop_duplicates(subset=["symbol"])
         # 自动均分DataFrame，无需计算task_size
         chunks = np.array_split(df, workers)
         with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -232,7 +230,7 @@ class CryptoDB(DuckDB):
         asset_type: AssetType = AssetType.future_um,
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
-        httpx_proxies: ProxyTypes = {},
+        httpx_proxies: dict[str, str] = {},
         skip_symbols: list[str] = [],
         do_filter_quote_volume_0: bool = False,
         if_skip_usdc: bool = True,
@@ -329,14 +327,8 @@ class CryptoDB(DuckDB):
         data_type: DataType = DataType.klines,
         timeframe: TIMEFRAMES = "1m",
         do_filter_quote_volume_0: bool = False,
-        httpx_proxies: ProxyTypes = {},
+        httpx_proxies: dict[str, str] = {},
     ) -> pl.DataFrame:
-        from pond.binance_history.utils import (
-            get_urls_by_xml_parse,
-            load_data_from_disk,
-        )
-        from pond.binance_history.async_api import start_async_download_files
-
         load_urls, download_urls = get_urls_by_xml_parse(
             data_type=data_type,
             asset_type=asset_type,
@@ -556,37 +548,37 @@ if __name__ == "__main__":
 
     db.update_history_data_parallel(
         start="2020-1-1",
-        end="2025-8-3",
+        end="2025-11-21",
         asset_type=AssetType.spot,
         data_type=DataType.klines,
-        timeframe="1h",
+        timeframe="1d",
         # httpx_proxies={"https://": "https://127.0.0.1:7890"},
         skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT"],
         do_filter_quote_volume_0=False,
         if_skip_usdc=True,
-        ignore_cache=False,
+        ignore_cache=True,
         workers=os.cpu_count() - 2,
     )
 
-    def try_update_data(interval) -> bool:
-        try:
-            db.update_history_data_parallel(
-                start="2020-1-1",
-                end="2025-7-22",
-                asset_type=AssetType.spot,
-                data_type=DataType.klines,
-                timeframe=interval,
-                # httpx_proxies={"https://": "https://127.0.0.1:7890"},
-                skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT"],
-                do_filter_quote_volume_0=False,
-                if_skip_usdc=True,
-                ignore_cache=False,
-                workers=os.cpu_count() - 2,
-            )
-        except BaseException as e:
-            print(e)
-            return False
-        return True
+    # def try_update_data(interval) -> bool:
+    #     try:
+    #         db.update_history_data_parallel(
+    #             start="2020-1-1",
+    #             end="2025-7-22",
+    #             asset_type=AssetType.spot,
+    #             data_type=DataType.klines,
+    #             timeframe=interval,
+    #             # httpx_proxies={"https://": "https://127.0.0.1:7890"},
+    #             skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT"],
+    #             do_filter_quote_volume_0=False,
+    #             if_skip_usdc=True,
+    #             ignore_cache=False,
+    #             workers=os.cpu_count() - 2,
+    #         )
+    #     except BaseException as e:
+    #         print(e)
+    #         return False
+    #     return True
 
     # ...start downloading...
     # interval = "1h"
