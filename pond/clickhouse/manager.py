@@ -276,6 +276,7 @@ class ClickHouseManager:
             logger.success(
                 f"total {len(df)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
             )
+            logger.success(df[:1])
             return rows
 
     def get_syncing_tasks(self, date: dtm.datetime) -> list[Task]:
