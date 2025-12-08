@@ -217,6 +217,7 @@ class FuturesHelper:
         workers=None,
         end_time: datetime = None,
         what=None,
+        allow_missing_count=0,
     ) -> bool:
         if what == "kline":
             table = self.get_futures_table(interval)
@@ -302,7 +303,7 @@ class FuturesHelper:
                 latest_kline_df.group_by(time_col).len().sort(time_col)[-1, "len"]
             )
             # allow 1 target data missing.
-            if lastest_count < request_count - 1:
+            if lastest_count < request_count - allow_missing_count:
                 return False
         return True
 
