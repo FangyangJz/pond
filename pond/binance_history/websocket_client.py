@@ -234,6 +234,121 @@ class BinanceWebSocketClient:
             self.kline_data_store.clear()
 
 
+class BinanceWSClientWrapper:
+    """管理多个BinanceWebSocketClient实例的包装类，实现标的分组订阅和数据聚合"""
+
+    def __init__(
+        self,
+        api_key=None,
+        api_secret=None,
+        symbols=[],
+        interval=Client.KLINE_INTERVAL_1HOUR,
+        proxy_host="127.0.0.1",
+        proxy_port=7890,
+        market_type="spot",
+        max_symbols_per_client=200,
+    ):
+        """
+        初始化WebSocket客户端包装器
+        :param symbols: 所有需要订阅的交易对列表
+        :param interval: K线周期
+        :param proxy_host: 代理主机
+        :param proxy_port: 代理端口
+        :param market_type: 市场类型
+        :param max_symbols_per_client: 每个客户端最多订阅的交易对数量
+        """
+        self.api_key = api_key
+        self.api_secret = api_secret
+        self.interval = interval
+        self.proxy_host = proxy_host
+        self.proxy_port = proxy_port
+        self.market_type = market_type
+        self.max_symbols_per_client = max_symbols_per_client
+        self.clients: list[
+            BinanceWebSocketClient
+        ] = []  # 存储所有BinanceWebSocketClient实例
+        self.clients_lock = Lock()  # 保护clients列表的线程锁
+        self.data_lock = Lock()  # 保护聚合数据操作的线程锁
+
+        # 将交易对分组
+        self.symbol_groups = self._split_symbols_into_groups(symbols)
+        # 为每个组创建客户端
+        self._init_clients()
+
+    def _split_symbols_into_groups(self, symbols):
+        """将交易对列表拆分为多个组，每组不超过max_symbols_per_client个"""
+        if not symbols:
+            return []
+        # 确保输入是列表
+        if isinstance(symbols, str):
+            symbols = [symbols]
+        # 去重并排序（可选）
+        unique_symbols = list(set(symbols))
+        unique_symbols.sort()
+        # 分组
+        return [
+            unique_symbols[i : i + self.max_symbols_per_client]
+            for i in range(0, len(unique_symbols), self.max_symbols_per_client)
+        ]
+
+    def _init_clients(self):
+        """为每个交易对组初始化一个BinanceWebSocketClient实例"""
+        with self.clients_lock:
+            self.clients = []
+            for group in self.symbol_groups:
+                client = BinanceWebSocketClient(
+                    api_key=self.api_key,
+                    api_secret=self.api_secret,
+                    symbols=group,
+                    interval=self.interval,
+                    proxy_host=self.proxy_host,
+                    proxy_port=self.proxy_port,
+                    market_type=self.market_type,
+                )
+                self.clients.append(client)
+
+    def start_all(self):
+        """启动所有WebSocket客户端"""
+        with self.clients_lock:
+            for i, client in enumerate(self.clients):
+                print(
+                    f"启动客户端 {i+1}/{len(self.clients)}，订阅 {len(client.symbols)} 个交易对"
+                )
+                client.start_kline_websocket()
+
+    def stop_all(self):
+        """停止所有WebSocket客户端"""
+        with self.clients_lock:
+            for i, client in enumerate(self.clients):
+                print(f"停止客户端 {i+1}/{len(self.clients)}")
+                client.stop()
+            self.clients = []
+
+    def get_aggregated_kline_dataframe(self) -> pl.DataFrame:
+        """聚合所有客户端的K线数据并返回合并后的DataFrame"""
+        with self.data_lock and self.clients_lock:
+            if not self.clients:
+                return pl.DataFrame()
+            # 收集所有客户端的数据
+            dataframes = [client.get_kline_dataframe() for client in self.clients]
+            # 合并DataFrame
+            combined_df = pl.concat(dataframes)
+            # 按交易对和时间排序
+            if not combined_df.is_empty():
+                combined_df = combined_df.sort(by=["pair", "open_time"])
+            return combined_df
+
+    def clear_all_data(self):
+        """清空所有客户端的K线数据"""
+        with self.data_lock and self.clients_lock:
+            for client in self.clients:
+                client.clear_kline_data()
+
+    def __del__(self):
+        """析构函数，确保停止所有客户端"""
+        self.stop_all()
+
+
 if __name__ == "__main__":
     # 订阅期货K线（需确保代理支持期货域名访问）
     client = BinanceWebSocketClient(
