@@ -2,9 +2,12 @@ import websocket
 import threading
 import json
 from binance.client import Client
-from datetime import datetime
 import polars as pl
 from threading import Lock
+from pond.utils.times import (
+    utcstamp_mill2datetime,
+)
+from loguru import logger
 
 
 class BinanceWebSocketClient:
@@ -80,17 +83,15 @@ class BinanceWebSocketClient:
         is_kline_closed = kline["x"]  # 是否是已收盘的K线（True=收盘，False=实时更新中）
         if not is_kline_closed:
             return  # 仅处理已收盘的K线
-        event_time = datetime.fromtimestamp(data["E"] / 1000)  # 事件时间（毫秒转秒）
-        kline_start_time = datetime.fromtimestamp(kline["t"] / 1000)  # K线开始时间
-        kline_end_time = datetime.fromtimestamp(kline["T"] / 1000)  # K线结束时间
+        event_time = utcstamp_mill2datetime(data["E"])
 
         # 2. 提取关键K线字段
         kline_info = {
             "pair": kline["s"],
             "interval": kline["i"],
-            "event_time": event_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "open_time": kline_start_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "close_time": kline_end_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "event_time": event_time,
+            "open_time": utcstamp_mill2datetime(kline["t"]),
+            "close_time": utcstamp_mill2datetime(kline["T"]),
             "open": float(kline["o"]),
             "close": float(kline["c"]),
             "high": float(kline["h"]),
@@ -101,11 +102,9 @@ class BinanceWebSocketClient:
             "take_buy_quote_volume": float(kline["Q"]),
             "count": int(kline["n"]),
         }
-        # print("\n" + "-" * 50)
-        # print("收到K线更新：")
-        for key, value in kline_info.items():
-            print(f"{key}: {value}")
-
+        logger.debug(
+            f"收到K线更新：{kline_info['pair']} {kline_info['interval']} close_time:{kline_info['close_time']}"
+        )
         with self.data_lock:
             self.kline_data_store.append(kline_info)
 

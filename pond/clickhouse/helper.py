@@ -43,6 +43,7 @@ from pond.binance_history.futures_api import (
     get_open_interest_history,
 )
 from binance.client import Client
+from pond.binance_history.websocket_client import BinanceWSClientWrapper
 
 
 class DataProxy:
@@ -116,7 +117,10 @@ class FuturesHelper:
     gecko_id_mapper: CoinGeckoIDMapper = CoinGeckoIDMapper()
     contact_tool: BinanceContractTool = BinanceContractTool()
     binance: Client = None
+    binance_wss: dict[str, BinanceWSClientWrapper] = {}
     verbose_log = False
+    proxy_host = None
+    proxy_port = None
 
     def __init__(
         self,
@@ -141,6 +145,8 @@ class FuturesHelper:
             "BINANCE_API_SECRET", os.environ.get("BINANCE_API_SECRET", None)
         )
         self.binance = Client(binance_api_key, binance_api_secret)
+        self.proxy_host = kwargs.get("proxy_host", None)
+        self.proxy_port = kwargs.get("proxy_port", None)
 
     def set_data_prox(self, data_proxy: DataProxy):
         self.data_proxy = data_proxy
@@ -306,6 +312,59 @@ class FuturesHelper:
             if lastest_count < request_count - allow_missing_count:
                 return False
         return True
+
+    def save_klines_from_ws(self, interval):
+        client = self.binance_wss.get(interval, None)
+        if client is None:
+            logger.debug("futures helper save_klines_from_ws ignored, client is None")
+            return
+        klines_df = client.get_aggregated_kline_dataframe()
+        client.clear_all_data()
+        if klines_df is None or len(klines_df) == 0:
+            logger.debug(
+                "futures helper save_klines_from_ws ignored, klines_df is None or empty"
+            )
+            return
+        # check kline completed.
+        klines_df = (
+            klines_df.sort(["pair", "open_time"])
+            .with_columns(
+                open_time_1=pl.col("open_time")
+                .shift(1)
+                .over("pair", order_by="open_time")
+            )
+            .with_columns(open_time_gap=pl.col("open_time") - pl.col("open_time_1"))
+        )
+        uncomplited_klines_df = klines_df.filter(
+            pl.col("open_time_gap") > pl.duration(minutes=timeframe2minutes(interval))
+        )
+        klines_df = klines_df.filter(
+            ~pl.col("pair").is_in(uncomplited_klines_df["pair"])
+        )
+        # check kline start time.
+        min_open_time_df: pl.DataFrame = (
+            klines_df.group_by("pair")
+            .agg(pl.col("open_time").min().alias("min_open_time"))
+            .rename({"pair": "code"})
+        )
+        table = self.get_futures_table(interval)
+        latest_klines_df = self.clickhouse.read_latest_n_record(
+            table.__tablename__, datetime.now() - timedelta(days=30), datetime.now(), 1
+        )
+        latest_klines_df = pl.from_pandas(
+            latest_klines_df[["code", "datetime"]]
+        ).with_columns(datetime=pl.col("datetime").dt.replace_time_zone("UTC"))
+        min_open_time_df = min_open_time_df.join(
+            latest_klines_df, on="code", how="left"
+        )
+        min_open_time_df = min_open_time_df.filter(
+            pl.col("min_open_time") - pl.col("datetime") <= pl.duration(seconds=1)
+        )
+        klines_df = klines_df.filter(pl.col("pair").is_in(min_open_time_df["code"]))
+        klines_df = klines_df.to_pandas()
+        klines_df["code"] = klines_df["pair"]
+        logger.debug(f"futures helper save_klines_from_ws data len {len(klines_df)}")
+        self.clickhouse.save_to_db(table, klines_df)
 
     def __sync_futures_kline(
         self, signal, table: FuturesKline1H, symbols, interval, res_dict: dict
@@ -682,6 +741,34 @@ class FuturesHelper:
             time.sleep(0.1)
         res_dict[tid] = failure_count == 0
 
+    def subscribe_futures(
+        self,
+        interval,
+    ):
+        binance_ws = self.binance_wss.get(interval, None)
+        if binance_ws is None:
+            symbols = self.get_perpetual_symbols(datetime.now())
+            symbols = [s["pair"] for s in symbols]
+            binance_ws = BinanceWSClientWrapper(
+                symbols=symbols,
+                interval=interval,
+                proxy_host=self.proxy_host,
+                proxy_port=self.proxy_port,
+                market_type="futures",
+            )
+            binance_ws.start_all()
+            self.binance_wss[interval] = binance_ws
+            logger.debug(
+                f"futures helper subscribe_futures {interval} total symbols {len(symbols)}"
+            )
+
+    def unsubscribe_futures(self, interval):
+        binance_ws = self.binance_wss.get(interval, None)
+        if binance_ws is not None:
+            binance_ws.stop_all()
+            self.binance_wss[interval] = None
+            logger.debug(f"futures helper unsubscribe_futures {interval}")
+
     def attach_future_info(self, df: pl.DataFrame, back_fill=True):
         start = df["close_time"].min()
         end = df["close_time"].max()
@@ -810,14 +897,23 @@ if __name__ == "__main__":
     manager = ClickHouseManager(
         conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
     )
-    helper = FuturesHelper(crypto_db, manager)
-    end_time = datetime.now().replace(minute=0).replace(second=0).replace(microsecond=0)
-    ret = False
-    while not ret:
-        ret = helper.sync(
-            "1h",
-            workers=1,
-            end_time=end_time,
-            what="long_short_ratio",
-        )
-        print(f"sync ret {ret}")
+    helper = FuturesHelper(
+        crypto_db,
+        manager,
+        proxy_host="127.0.0.1",
+        proxy_port=7890,
+    )
+    helper.subscribe_futures("1m")
+    time.sleep(60)
+    # helper.unsubscribe_futures("1m")
+    helper.save_klines_from_ws("1m")
+    # end_time = datetime.now().replace(minute=0).replace(second=0).replace(microsecond=0)
+    # ret = False
+    # while not ret:
+    #     ret = helper.sync(
+    #         "1h",
+    #         workers=1,
+    #         end_time=end_time,
+    #         what="long_short_ratio",
+    #     )
+    #     print(f"sync ret {ret}")
