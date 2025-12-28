@@ -98,8 +98,8 @@ class BinanceWebSocketClient:
             "low": float(kline["l"]),
             "volume": float(kline["v"]),
             "quote_volume": float(kline["q"]),
-            "take_buy_volume": float(kline["V"]),
-            "take_buy_quote_volume": float(kline["Q"]),
+            "taker_buy_volume": float(kline["V"]),
+            "taker_buy_quote_volume": float(kline["Q"]),
             "count": int(kline["n"]),
         }
         logger.debug(

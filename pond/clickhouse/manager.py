@@ -268,16 +268,18 @@ class ClickHouseManager:
                 f"dataframe is empty after filter by latest record, original len {origin_len}"
             )
             return 0
-        query = f"INSERT INTO {table_name} (*) VALUES"
-        with Client.from_url(self.native_uri) as client:
-            rows = client.insert_dataframe(
-                query=query, dataframe=df, settings=dict(use_numpy=True)
-            )
-            logger.success(
-                f"total {len(df)} saved {rows} into table {table_name}, latest record time {lastet_record_time}"
-            )
-            logger.success(df[:1])
-            return rows
+        self.save_dataframe(table_name, df)
+
+    def save_dataframe(self, table_name: str, df: pd.DataFrame):
+        if df is not None and len(df) > 0:
+            query = f"INSERT INTO {table_name} (*) VALUES"
+            with Client.from_url(self.native_uri) as client:
+                rows = client.insert_dataframe(
+                    query=query, dataframe=df, settings=dict(use_numpy=True)
+                )
+                logger.success(f"total {len(df)} saved {rows} into table {table_name}")
+                logger.success(df[:1].to_dict())
+                return rows
 
     def get_syncing_tasks(self, date: dtm.datetime) -> list[Task]:
         tasks: list[Task] = []

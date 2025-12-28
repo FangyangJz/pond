@@ -363,8 +363,9 @@ class FuturesHelper:
         klines_df = klines_df.filter(pl.col("pair").is_in(min_open_time_df["code"]))
         klines_df = klines_df.to_pandas()
         klines_df["code"] = klines_df["pair"]
+        klines_df["datetime"] = klines_df["close_time"]
         logger.debug(f"futures helper save_klines_from_ws data len {len(klines_df)}")
-        self.clickhouse.save_to_db(table, klines_df)
+        self.clickhouse.save_dataframe(table.__tablename__, klines_df)
 
     def __sync_futures_kline(
         self, signal, table: FuturesKline1H, symbols, interval, res_dict: dict
@@ -903,17 +904,21 @@ if __name__ == "__main__":
         proxy_host="127.0.0.1",
         proxy_port=7890,
     )
-    helper.subscribe_futures("1m")
+    interval = "15m"
+    end_time = datetime.now().replace(minute=0).replace(second=0).replace(microsecond=0)
+    ret = False
+    while not ret:
+        ret = helper.sync(
+            interval,
+            workers=1,
+            end_time=end_time,
+            what="kline",
+        )
+        print(f"sync ret {ret}")
+
+    helper.subscribe_futures(interval)
     time.sleep(60)
     # helper.unsubscribe_futures("1m")
-    helper.save_klines_from_ws("1m")
-    # end_time = datetime.now().replace(minute=0).replace(second=0).replace(microsecond=0)
-    # ret = False
-    # while not ret:
-    #     ret = helper.sync(
-    #         "1h",
-    #         workers=1,
-    #         end_time=end_time,
-    #         what="long_short_ratio",
-    #     )
-    #     print(f"sync ret {ret}")
+    while True:
+        helper.save_klines_from_ws(interval)
+        time.sleep(10)
