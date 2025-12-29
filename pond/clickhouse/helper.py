@@ -742,7 +742,7 @@ class FuturesHelper:
             if len(df) == 0:
                 continue
             self.clickhouse.save_to_db(table, df, table.code == code)
-            time.sleep(0.1)
+            time.sleep(0.01)
         res_dict[tid] = failure_count == 0
 
     def subscribe_futures(
