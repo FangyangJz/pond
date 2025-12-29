@@ -53,7 +53,7 @@ class BinanceWebSocketClient:
         # 断线重连相关参数
         self.is_connected = False
         self.reconnect_attempts = 0
-        self.max_reconnect_attempts = 5  # 最大重连尝试次数
+        self.max_reconnect_attempts = -1  # 最大重连尝试次数
         self.reconnect_base_delay = 1  # 初始重连延迟(秒)
 
     def process_kline_data(self, kline_data):
@@ -115,12 +115,16 @@ class BinanceWebSocketClient:
 
     def reconnect(self):
         """使用指数退避策略进行重连尝试"""
-        if self.reconnect_attempts >= self.max_reconnect_attempts:
+        if (
+            self.max_reconnect_attempts > 0
+            and self.reconnect_attempts >= self.max_reconnect_attempts
+        ):
             print(f"已达到最大重连尝试次数 ({self.max_reconnect_attempts})，停止尝试")
             return
 
         # 指数退避算法：delay = base_delay * (2 ^ attempts)
         delay = self.reconnect_base_delay * (2**self.reconnect_attempts)
+        delay = min(delay, 60)  # 最大延迟为60秒
         print(f"计划第 {self.reconnect_attempts + 1} 次重连，延迟 {delay} 秒...")
         threading.Timer(delay, self.start_kline_websocket).start()
 
