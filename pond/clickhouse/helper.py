@@ -174,17 +174,27 @@ class FuturesHelper:
             logger.error(e)
             return None
 
-    def get_futures_table(self, interval) -> Optional[FuturesKline1H]:
-        if interval == "4h":
-            return FuturesKline4H
-        if interval == "1h":
-            return FuturesKline1H
-        if interval == "5m":
-            return FuturesKline5m
-        if interval == "1d":
-            return FuturesKline1d
-        if interval == "15m":
-            return FuturesKline15m
+    def get_futures_table(self, interval, data) -> Optional[FuturesKline1H]:
+        if data == "kline":
+            if interval == "4h":
+                return FuturesKline4H
+            if interval == "1h":
+                return FuturesKline1H
+            if interval == "5m":
+                return FuturesKline5m
+            if interval == "1d":
+                return FuturesKline1d
+            if interval == "15m":
+                return FuturesKline15m
+        elif data == "info":
+            if interval == "1h":
+                return FutureInfo
+        elif data == "funding_rate":
+            if interval == "1h":
+                return FutureFundingRate
+        elif data == "holders":
+            if interval == "1h":
+                return TokenHolders
         return None
 
     def gen_stub_kline_as_list(self, start: datetime, end: datetime):
@@ -225,14 +235,9 @@ class FuturesHelper:
         what=None,
         allow_missing_count=0,
     ) -> bool:
-        if what == "kline":
-            table = self.get_futures_table(interval)
-        elif what == "info":
-            table = FutureInfo
-        elif what == "funding_rate":
-            table = FutureFundingRate
-        elif what == "holders":
-            table = TokenHolders
+        table = self.get_futures_table(interval, what)
+        if table is None:
+            return
         if end_time is not None:
             signal = end_time
         else:
@@ -347,7 +352,7 @@ class FuturesHelper:
             .agg(pl.col("open_time").min().alias("min_open_time"))
             .rename({"pair": "code"})
         )
-        table = self.get_futures_table(interval)
+        table = self.get_futures_table(interval, "kline")
         latest_klines_df = self.clickhouse.read_latest_n_record(
             table.__tablename__, datetime.now() - timedelta(days=30), datetime.now(), 1
         )
