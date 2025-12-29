@@ -236,8 +236,6 @@ class FuturesHelper:
         allow_missing_count=0,
     ) -> bool:
         table = self.get_futures_table(interval, what)
-        if table is None:
-            return
         if end_time is not None:
             signal = end_time
         else:
