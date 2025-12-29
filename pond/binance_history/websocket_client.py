@@ -63,14 +63,14 @@ class BinanceWebSocketClient:
         """
         # 添加数据结构验证
         if not isinstance(kline_data, dict):
-            print(f"无效的数据格式: {kline_data}")
+            logger.warning(f"无效的数据格式: {kline_data}")
             return
 
         # 检查是否包含必要的键
         required_keys = ["data"] if "stream" in kline_data else ["k"]
         for key in required_keys:
             if key not in kline_data:
-                print(f"数据缺少必要字段 '{key}': {kline_data}")
+                logger.warning(f"数据缺少必要字段 '{key}': {kline_data}")
                 return
 
         # 1. 解析原始数据（处理不同格式的数据）
@@ -102,7 +102,7 @@ class BinanceWebSocketClient:
             "taker_buy_quote_volume": float(kline["Q"]),
             "count": int(kline["n"]),
         }
-        logger.debug(
+        logger.info(
             f"收到K线更新：{kline_info['pair']} {kline_info['interval']} close_time:{kline_info['close_time']}"
         )
         with self.data_lock:
@@ -119,13 +119,15 @@ class BinanceWebSocketClient:
             self.max_reconnect_attempts > 0
             and self.reconnect_attempts >= self.max_reconnect_attempts
         ):
-            print(f"已达到最大重连尝试次数 ({self.max_reconnect_attempts})，停止尝试")
+            logger.warning(
+                f"已达到最大重连尝试次数 ({self.max_reconnect_attempts})，停止尝试"
+            )
             return
 
         # 指数退避算法：delay = base_delay * (2 ^ attempts)
         delay = self.reconnect_base_delay * (2**self.reconnect_attempts)
         delay = min(delay, 60)  # 最大延迟为60秒
-        print(f"计划第 {self.reconnect_attempts + 1} 次重连，延迟 {delay} 秒...")
+        logger.info(f"计划第 {self.reconnect_attempts + 1} 次重连，延迟 {delay} 秒...")
         threading.Timer(delay, self.start_kline_websocket).start()
 
     def start_batch_kline_subscription(
@@ -181,7 +183,7 @@ class BinanceWebSocketClient:
 
     def on_open(self, ws):
         """WebSocket连接打开时的回调"""
-        print("WebSocket连接已打开")
+        logger.info("WebSocket连接已打开")
         self.is_connected = True
         self.reconnect_attempts = 0  # 重置重连尝试次数
 
@@ -191,15 +193,15 @@ class BinanceWebSocketClient:
             data = json.loads(message)
             self.process_kline_data(data)
         except json.JSONDecodeError:
-            print(f"无法解析WebSocket消息: {message}")
+            logger.info(f"无法解析WebSocket消息: {message}")
 
     def on_error(self, ws, error):
         """WebSocket错误时的回调"""
-        print(f"WebSocket错误: {error}")
+        logger.info(f"WebSocket错误: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
         """WebSocket关闭时的回调"""
-        print(f"WebSocket连接已关闭: {close_status_code} - {close_msg}")
+        logger.info(f"WebSocket连接已关闭: {close_status_code} - {close_msg}")
         self.is_connected = False
 
         # 触发重连逻辑
@@ -215,7 +217,7 @@ class BinanceWebSocketClient:
             self.ws_thread = None
             self.is_connected = False
             self.reconnect_attempts = 0  # 重置重连状态
-            print("WebSocket连接已停止")
+            logger.info("WebSocket连接已停止")
 
     def get_kline_dataframe(self) -> pl.DataFrame:
         """
@@ -314,7 +316,7 @@ class BinanceWSClientWrapper:
         """启动所有WebSocket客户端"""
         with self.clients_lock:
             for i, client in enumerate(self.clients):
-                print(
+                logger.info(
                     f"启动客户端 {i+1}/{len(self.clients)}，订阅 {len(client.symbols)} 个交易对"
                 )
                 client.start_kline_websocket()
@@ -323,7 +325,7 @@ class BinanceWSClientWrapper:
         """停止所有WebSocket客户端"""
         with self.clients_lock:
             for i, client in enumerate(self.clients):
-                print(f"停止客户端 {i+1}/{len(self.clients)}")
+                logger.info(f"停止客户端 {i+1}/{len(self.clients)}")
                 client.stop()
             self.clients = []
 
@@ -362,4 +364,4 @@ if __name__ == "__main__":
         market_type="futures",  # 指定为期货市场
     )
     client.start_kline_websocket()
-    print("done")
+    logger.info("done")
