@@ -219,7 +219,7 @@ class BinanceWebSocketClient:
             self.reconnect_attempts = 0  # 重置重连状态
             logger.info("WebSocket连接已停止")
 
-    def get_kline_dataframe(self) -> pl.DataFrame:
+    def get_kline_dataframe(self, clear_cache=False) -> pl.DataFrame:
         """
         将内存中的K线数据转换为Polars DataFrame
 
@@ -230,13 +230,10 @@ class BinanceWebSocketClient:
                 return pl.DataFrame()
 
             # 转换为Polars DataFrame并按时间排序
-            return pl.DataFrame(self.kline_data_store).sort("open_time")
-
-    # 新增：清空内存数据
-    def clear_kline_data(self):
-        """清空内存中的K线数据"""
-        with self.data_lock:
-            self.kline_data_store.clear()
+            df = pl.DataFrame(self.kline_data_store).sort("open_time")
+            if clear_cache:
+                self.kline_data_store.clear()  # 清空内存数据
+            return df
 
 
 class BinanceWSClientWrapper:
@@ -329,13 +326,15 @@ class BinanceWSClientWrapper:
                 client.stop()
             self.clients = []
 
-    def get_aggregated_kline_dataframe(self) -> pl.DataFrame:
+    def get_aggregated_kline_dataframe(self, clear_cache=False) -> pl.DataFrame:
         """聚合所有客户端的K线数据并返回合并后的DataFrame"""
         with self.data_lock and self.clients_lock:
             if not self.clients:
                 return pl.DataFrame()
             # 收集所有客户端的数据
-            dataframes = [client.get_kline_dataframe() for client in self.clients]
+            dataframes = [
+                client.get_kline_dataframe(clear_cache) for client in self.clients
+            ]
             dataframes = [df for df in dataframes if not df.is_empty()]
             if len(dataframes) == 0:
                 return pl.DataFrame()
