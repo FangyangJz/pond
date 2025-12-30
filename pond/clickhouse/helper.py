@@ -187,13 +187,13 @@ class FuturesHelper:
             if interval == "15m":
                 return FuturesKline15m
         elif data == "info":
-            if interval == "1h":
+            if interval == "1d":
                 return FutureInfo
         elif data == "funding_rate":
             if interval == "1h":
                 return FutureFundingRate
         elif data == "holders":
-            if interval == "1h":
+            if interval == "1d":
                 return TokenHolders
         return None
 
