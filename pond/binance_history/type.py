@@ -40,6 +40,9 @@ class DataType(Enum):
     aggTrades = "aggTrades"
     metrics = "metrics"
     fundingRate = "fundingRate"
+    openInterest = "openInterest"
+    topLongShortAccountRatio = "topLongShortAccountRatio"
+    topLongShortPositionRatio = "topLongShortPositionRatio"
 
 
 class AssetType(Enum):
