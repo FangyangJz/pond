@@ -8,12 +8,13 @@ from zoneinfo import ZoneInfo
 def get_long_short_account_ratio_history(
     client: Client, symbol, period, start_time: datetime, end_time: datetime
 ):
-    start_time = max(start_time, datetime.now() - timedelta(days=29))
-    start_time = max(start_time, datetime.now() - timedelta(days=29))
     if start_time.tzinfo is None:
         start_time = start_time.replace(tzinfo=ZoneInfo("UTC"))
     if end_time.tzinfo is None:
         end_time = end_time.replace(tzinfo=ZoneInfo("UTC"))
+    start_time = max(
+        start_time, datetime.now().astimezone(ZoneInfo("UTC")) - timedelta(days=29)
+    )
     params = {"symbol": symbol, "period": period, "limit": 1000}
     params["startTime"] = int(start_time.timestamp() * 1000)
     params["endTime"] = int(end_time.timestamp() * 1000)
@@ -33,12 +34,13 @@ def get_long_short_account_ratio_history(
 def get_long_short_position_ratio_history(
     client: Client, symbol, period, start_time: datetime, end_time: datetime
 ):
-    start_time = max(start_time, datetime.now() - timedelta(days=29))
-    start_time = max(start_time, datetime.now() - timedelta(days=29))
     if start_time.tzinfo is None:
         start_time = start_time.replace(tzinfo=ZoneInfo("UTC"))
     if end_time.tzinfo is None:
         end_time = end_time.replace(tzinfo=ZoneInfo("UTC"))
+    start_time = max(
+        start_time, datetime.now().astimezone(ZoneInfo("UTC")) - timedelta(days=29)
+    )
     params = {"symbol": symbol, "period": period, "limit": 1000}
     params["startTime"] = int(start_time.timestamp() * 1000)
     params["endTime"] = int(end_time.timestamp() * 1000)
@@ -63,11 +65,13 @@ def get_open_interest_history(
     end_time: datetime,
     limit_per_request=1000,
 ):
-    start_time = max(start_time, datetime.now() - timedelta(days=29))
     if start_time.tzinfo is None:
         start_time = start_time.replace(tzinfo=ZoneInfo("UTC"))
     if end_time.tzinfo is None:
         end_time = end_time.replace(tzinfo=ZoneInfo("UTC"))
+    start_time = max(
+        start_time, datetime.now().astimezone(ZoneInfo("UTC")) - timedelta(days=29)
+    )
     try:
         params = {
             "symbol": symbol,
