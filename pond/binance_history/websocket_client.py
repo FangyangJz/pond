@@ -336,6 +336,9 @@ class BinanceWSClientWrapper:
                 return pl.DataFrame()
             # 收集所有客户端的数据
             dataframes = [client.get_kline_dataframe() for client in self.clients]
+            dataframes = [df for df in dataframes if not df.is_empty()]
+            if len(dataframes) == 0:
+                return pl.DataFrame()
             # 合并DataFrame
             combined_df = pl.concat(dataframes)
             # 按交易对和时间排序
