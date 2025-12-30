@@ -321,8 +321,7 @@ class FuturesHelper:
         if client is None:
             logger.debug("futures helper save_klines_from_ws ignored, client is None")
             return
-        klines_df = client.get_aggregated_kline_dataframe()
-        client.clear_all_data()
+        klines_df = client.get_aggregated_kline_dataframe(clear_cache=True)
         if klines_df is None or len(klines_df) == 0:
             logger.debug(
                 "futures helper save_klines_from_ws ignored, klines_df is None or empty"

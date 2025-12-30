@@ -345,12 +345,6 @@ class BinanceWSClientWrapper:
                 combined_df = combined_df.sort(by=["pair", "open_time"])
             return combined_df
 
-    def clear_all_data(self):
-        """清空所有客户端的K线数据"""
-        with self.data_lock and self.clients_lock:
-            for client in self.clients:
-                client.clear_kline_data()
-
     def __del__(self):
         """析构函数，确保停止所有客户端"""
         self.stop_all()
