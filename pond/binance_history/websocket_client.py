@@ -13,8 +13,8 @@ from loguru import logger
 class BinanceWebSocketClient:
     """Binance K线数据WebSocket客户端"""
 
-    api_key = (None,)
-    api_secret = (None,)
+    api_key = None
+    api_secret = None
 
     def __init__(
         self,
@@ -102,9 +102,9 @@ class BinanceWebSocketClient:
             "taker_buy_quote_volume": float(kline["Q"]),
             "count": int(kline["n"]),
         }
-        logger.info(
-            f"收到K线更新：{kline_info['pair']} {kline_info['interval']} close_time:{kline_info['close_time']}"
-        )
+        # logger.info(
+        #     f"收到K线更新：{kline_info['pair']} {kline_info['interval']} close_time:{kline_info['close_time']}"
+        # )
         with self.data_lock:
             self.kline_data_store.append(kline_info)
 
