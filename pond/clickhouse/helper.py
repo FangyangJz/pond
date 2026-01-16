@@ -889,6 +889,40 @@ class FuturesHelper:
         )
         return df
 
+    def attach_funding_rate(self, df: pl.DataFrame):
+        start = df["close_time"].min()
+        end = df["close_time"].max()
+        df = df.with_columns(close_time=pl.col("close_time").dt.cast_time_unit("ns"))
+        funding_df = self.clickhouse.native_read_table(
+            FutureFundingRate, start, end, filters=None, rename=True
+        )
+        funding_df = pl.from_pandas(funding_df)
+        funding_df = funding_df.with_columns(
+            prev_funding_time=pl.col("fundingTime")
+            .shift(1)
+            .over("symbol", order_by="fundingTime")
+        ).with_columns(
+            funding_interval=(
+                pl.col("fundingTime") - pl.col("prev_funding_time")
+            ).dt.total_hours()
+        )
+        df = df.join(
+            funding_df,
+            left_on=["jj_code", "close_time"],
+            right_on=["symbol", "fundingTime"],
+            how="left",
+        )
+        df = df.with_columns(
+            funding_interval=pl.col("funding_interval")
+            .fill_null(strategy="forward")
+            .over("jj_code", order_by="close_time")
+        ).with_columns(
+            funding_interval=pl.col("funding_interval")
+            .fill_null(strategy="backward")
+            .over("jj_code", order_by="close_time")
+        )
+        return df
+
 
 if __name__ == "__main__":
     import os
