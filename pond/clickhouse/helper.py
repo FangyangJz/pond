@@ -281,7 +281,14 @@ class FuturesHelper:
             else:
                 worker5 = Thread(
                     target=self.__sync_futures_extra_info,
-                    args=(what, signal, worker_symbols, interval, res_dict),
+                    args=(
+                        what,
+                        signal,
+                        worker_symbols,
+                        interval,
+                        allow_missing_count,
+                        res_dict,
+                    ),
                 )
                 worker5.start()
                 threads.append(worker5)
@@ -693,7 +700,7 @@ class FuturesHelper:
         res_dict[tid] = True
 
     def __sync_futures_extra_info(
-        self, data_name, signal, symbols, interval, res_dict: dict
+        self, data_name, signal, symbols, interval, allow_missing_count, res_dict: dict
     ):
         tid = threading.current_thread().ident
         failure_count = 0
@@ -742,7 +749,7 @@ class FuturesHelper:
                 continue
             self.clickhouse.save_to_db(table, df, table.code == code)
             time.sleep(0.01)
-        res_dict[tid] = failure_count == 0
+        res_dict[tid] = failure_count <= allow_missing_count
 
     def subscribe_futures(
         self,
