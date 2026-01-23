@@ -530,7 +530,7 @@ class CryptoDB(DuckDB):
 
 if __name__ == "__main__":
     db = CryptoDB(
-        Path(r"/home/fangyang/DuckDB/"),
+        Path(r"E:\DuckDB"),
         requests_proxies={
             "http": "127.0.0.1:7890",
             "https": "127.0.0.1:7890",
@@ -548,13 +548,13 @@ if __name__ == "__main__":
 
     db.update_history_data_parallel(
         start="2020-1-1",
-        end="2025-11-21",
-        asset_type=AssetType.spot,
+        end="2026-1-7",
+        asset_type=AssetType.future_um,
         data_type=DataType.klines,
-        timeframe="1d",
+        timeframe="5m",
         # httpx_proxies={"https://": "https://127.0.0.1:7890"},
-        skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT"],
-        do_filter_quote_volume_0=False,
+        skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT", "BTCSTUSDT"],
+        do_filter_quote_volume_0=True,
         if_skip_usdc=True,
         ignore_cache=True,
         workers=os.cpu_count() - 2,

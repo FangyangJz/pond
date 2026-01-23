@@ -79,6 +79,7 @@ def get_klines(
     start: int,
     end: int,
     res_list: list[pl.DataFrame],
+    max_limit: int = 60 * 24 * 10,
 ):
     deltaTime = (end - start) / 1000
     coef = 1
@@ -106,7 +107,10 @@ def get_klines(
     if (symbol in ["ICPUSDT"]) and (limit > 1500):
         dd = mock_empty_klines(start, end, coef)
 
-    elif limit > 1500:
+    elif max_limit < limit:
+        dd = mock_empty_klines(start, end, coef)
+
+    elif max_limit >= limit > 1500:
         logger.info(
             f"Requesting limit {limit} > 1500 for {symbol} {interval} from {start} to {end}, loop limit fix 499."
         )
