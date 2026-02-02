@@ -228,6 +228,7 @@ class ClickHouseManager:
         last_record_filters: list[str] | None,
         datetime_col="datetime",
         drop_duplicates=True,
+        trunk_size=None,
     ) -> int:
         # format data
         if isinstance(table, str):
@@ -268,18 +269,24 @@ class ClickHouseManager:
                 f"dataframe is empty after filter by latest record, original len {origin_len}"
             )
             return 0
-        self.save_dataframe(table_name, df)
+        self.save_dataframe(table_name, df, trunk_size)
 
-    def save_dataframe(self, table_name: str, df: pd.DataFrame):
-        if df is not None and len(df) > 0:
+    def save_dataframe(self, table_name: str, df: pd.DataFrame, trunk_size=None):
+        if df is None or len(df) == 0:
+            return
+        if trunk_size is None:
+            trunk_size = len(df)
+        rows = 0
+        for i in range(0, len(df), trunk_size):
+            df_trunk = df[i : i + trunk_size]
             query = f"INSERT INTO {table_name} (*) VALUES"
             with Client.from_url(self.native_uri) as client:
-                rows = client.insert_dataframe(
-                    query=query, dataframe=df, settings=dict(use_numpy=True)
+                rows += client.insert_dataframe(
+                    query=query, dataframe=df_trunk, settings=dict(use_numpy=True)
                 )
-                logger.success(f"total {len(df)} saved {rows} into table {table_name}")
-                logger.success(df[:1].to_dict())
-                return rows
+        logger.success(df[:1].to_dict())
+        logger.success(f"total {len(df_trunk)} saved {rows} into table {table_name}")
+        return rows
 
     def get_syncing_tasks(self, date: dtm.datetime) -> list[Task]:
         tasks: list[Task] = []
