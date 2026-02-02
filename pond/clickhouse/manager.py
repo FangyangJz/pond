@@ -284,8 +284,12 @@ class ClickHouseManager:
                 rows += client.insert_dataframe(
                     query=query, dataframe=df_trunk, settings=dict(use_numpy=True)
                 )
+                logger.success(
+                    f"trunk data {len(df_trunk)} saved {rows} into table {table_name}"
+                )
+
         logger.success(df[:1].to_dict())
-        logger.success(f"total {len(df_trunk)} saved {rows} into table {table_name}")
+        logger.success(f"total {len(df)} saved {rows} into table {table_name}")
         return rows
 
     def get_syncing_tasks(self, date: dtm.datetime) -> list[Task]:
