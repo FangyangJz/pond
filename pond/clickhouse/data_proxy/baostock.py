@@ -134,10 +134,11 @@ class BaostockDataProxy(DataProxy):
                 )
             else:
                 return result
-        if "datetime" in result.columns:
-            result["datetime"] = result.apply(
+        if "time" in result.columns:
+            result["time"] = result.apply(
                 lambda row: datetime.strptime(row["time"][:-4], "%Y%m%d%H%M%S"), axis=1
             )
+            result["datetime"] = pd.to_datetime(result["time"])
         elif "date" in result.columns:
             result["datetime"] = pd.to_datetime(result["date"])
         result = result.drop(
