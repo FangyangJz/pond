@@ -963,7 +963,7 @@ if __name__ == "__main__":
     while not ret:
         ret = helper.sync(
             interval,
-            workers=1,
+            workers=5,
             end_time=end_time,
             what="kline",
         )

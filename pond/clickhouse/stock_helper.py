@@ -216,17 +216,18 @@ if __name__ == "__main__":
     helper.sync_data_start = None  # sync_start  # datetime(2024, 10, 31, 15)
     ret = False
     sync_end = datetime.now()
-    sync_end = datetime(2022, 8, 31)
-    while sync_start < sync_end or not ret:
-        logger.info(f"sync at {sync_start} start")
-        data_proxy = BaostockDataProxy(sync_stock_list_date=sync_end)
-        data_proxy.min_sync_interval_days = 0
-        data_proxy.min_start_date = helper.sync_data_start
-        helper.set_data_proxy(data_proxy)
+    sync_end = datetime(2026, 2, 13)
+    logger.info(f"sync at {sync_start} start")
+    data_proxy = BaostockDataProxy(sync_stock_list_date=sync_end)
+    data_proxy.min_sync_interval_days = 0
+    data_proxy.min_start_date = helper.sync_data_start
+    helper.set_data_proxy(data_proxy)
+    while sync_end > datetime(2020, 1, 1):
         ret = helper.sync_kline(
             interval=Interval.MINUTE_5,
             adjust=Adjust.NFQ,
             workers=1,
             end_time=sync_end,
         )
-        logger.info(f"sync at {sync_start} end")
+        sync_end -= timedelta(days=1)
+    logger.info(f"sync at {sync_start} end")
