@@ -17,7 +17,7 @@ from pond.utils.crawler import get_mock_headers
 
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(3))
 async def download_file(url: str, path: Path, proxies: dict[str, str] = {}):
-    async with httpx.AsyncClient(proxies=proxies) as client:
+    async with httpx.AsyncClient(proxy=proxies.get("https", None)) as client:
         response = await client.get(url, timeout=30, headers=get_mock_headers())
 
         if response.status_code == 200:

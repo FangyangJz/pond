@@ -402,7 +402,13 @@ class FuturesHelper:
             # load history data and save into db
             if data_duration_seconds > limit_seconds and self.fix_kline_with_cryptodb:
                 local_klines_df = self.crypto_db.load_history_data(
-                    code, lastest_record, signal, timeframe=interval, **self.configs
+                    code,
+                    lastest_record,
+                    signal,
+                    timeframe=interval,
+                    httpx_proxies={
+                        "https": f"http://{self.proxy_host}:{self.proxy_port}"
+                    },
                 )
                 self.clickhouse.save_to_db(
                     table, local_klines_df.to_pandas(), table.code == code
@@ -697,6 +703,7 @@ class FuturesHelper:
             )
             funding_rate_df = funding_rate_df.drop_duplicates(subset=["fundingTime"])
             self.clickhouse.save_to_db(table, funding_rate_df, table.code == code)
+            time.sleep(0.01)
         res_dict[tid] = True
 
     def __sync_futures_extra_info(
@@ -935,9 +942,12 @@ if __name__ == "__main__":
     import os
 
     crypto_db = CryptoDB(Path(r"E:\DuckDB"))
-    password = os.environ.get("CLICKHOUSE_PWD")
-    conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
-    native_conn_str = f"clickhouse+native://default:{password}@localhost:9000/quant?tcp_keepalive=true"
+    host = os.environ.get("CLICKHOUSE_HOST").strip()
+    password = os.environ.get("CLICKHOUSE_PWD").strip()
+    conn_str = f"clickhouse://default:{password}@{host}:8123/quant"
+    native_conn_str = (
+        f"clickhouse+native://default:{password}@{host}:9000/quant?tcp_keepalive=true"
+    )
     manager = ClickHouseManager(
         conn_str, data_start=datetime(2020, 1, 1), native_uri=native_conn_str
     )
@@ -947,7 +957,7 @@ if __name__ == "__main__":
         proxy_host="127.0.0.1",
         proxy_port=7890,
     )
-    interval = "15m"
+    interval = "1h"
     end_time = datetime.now().replace(minute=0).replace(second=0).replace(microsecond=0)
     ret = False
     while not ret:
@@ -959,9 +969,9 @@ if __name__ == "__main__":
         )
         print(f"sync ret {ret}")
 
-    helper.subscribe_futures(interval)
-    time.sleep(60)
-    # helper.unsubscribe_futures("1m")
-    while True:
-        helper.save_klines_from_ws(interval)
-        time.sleep(10)
+    # helper.subscribe_futures(interval)
+    # time.sleep(60)
+    # # helper.unsubscribe_futures("1m")
+    # while True:
+    #     helper.save_klines_from_ws(interval)
+    #     time.sleep(10)
