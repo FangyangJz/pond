@@ -163,10 +163,9 @@ class StockHelper:
             symbol = symbols[i]
             time.sleep(0.1)
             lastest_record = self.clickhouse.get_latest_record_time(
-                table, table.code == symbol
+                table, [table.code == symbol, table.datetime <= signal]
             )
-            data_duration_seconds = (signal - lastest_record).total_seconds()
-            if data_duration_seconds < interval.seconds:
+            if lastest_record.date() == signal.date():
                 logger.debug(
                     f"stock helper sync kline ignore too short duration {lastest_record}-{signal}"
                 )
@@ -177,7 +176,7 @@ class StockHelper:
                     period=interval,
                     adjust=adjust,
                     start=lastest_record,
-                    end=None,
+                    end=signal,
                     limit=1000,
                 )
             except Exception as e:
@@ -191,7 +190,7 @@ class StockHelper:
                     mapper={"date": "datetime"}, axis="columns"
                 )
                 klines_df = klines_df.drop_duplicates(subset=["datetime"])
-                self.clickhouse.save_to_db(table, klines_df, table.code == symbol)
+                self.clickhouse.save_dataframe(table.__tablename__, klines_df)
         res_dict[tid] = True
 
 
@@ -200,10 +199,12 @@ if __name__ == "__main__":
     from pond.clickhouse.data_proxy.baostock import BaostockDataProxy
 
     tdx_path = None  # r"D:\windows\programs\TongDaXin"
-    password = ""
-    password = os.environ.get("CLICKHOUSE_PWD")
-    conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
-    native_conn_str = f"clickhouse+native://default:{password}@localhost:9000/quant?tcp_keepalive=true"
+    host = os.environ.get("CLICKHOUSE_HOST").strip()
+    password = os.environ.get("CLICKHOUSE_PWD").strip()
+    conn_str = f"clickhouse://default:{password}@{host}:8123/quant"
+    native_conn_str = (
+        f"clickhouse+native://default:{password}@{host}:9000/quant?tcp_keepalive=true"
+    )
     # 此处有天坑，原因是同步机制中增加了start-end限制，避免接口返回异常，如果部分标的再start附近没有数据，start就不会更新，再次查询还是同样的start-end,就下载不了数据。
     # 没想到好的办法解决，在以这个时间为起始时间全部同步完之后，按每次增加1年再同步一遍。
     sync_start = datetime(2015, 1, 5)
@@ -215,6 +216,7 @@ if __name__ == "__main__":
     helper.sync_data_start = None  # sync_start  # datetime(2024, 10, 31, 15)
     ret = False
     sync_end = datetime.now()
+    sync_end = datetime(2022, 8, 31)
     while sync_start < sync_end or not ret:
         logger.info(f"sync at {sync_start} start")
         data_proxy = BaostockDataProxy(sync_stock_list_date=sync_end)
@@ -222,8 +224,8 @@ if __name__ == "__main__":
         data_proxy.min_start_date = helper.sync_data_start
         helper.set_data_proxy(data_proxy)
         ret = helper.sync_kline(
-            interval=Interval.DAY_1,
-            adjust=Adjust.HFQ,
+            interval=Interval.MINUTE_5,
+            adjust=Adjust.NFQ,
             workers=1,
             end_time=sync_end,
         )

@@ -91,7 +91,7 @@ class BaostockDataProxy(DataProxy):
         limit: int = 1000,
     ) -> pd.DataFrame:
         # baostock always return data include start day but already existed.
-        start += timedelta(days=1)
+        start = start.replace(hour=0) + timedelta(days=1)
         if end is None:
             if period == Interval.MINUTE_5:
                 end = start + timedelta(days=365)
