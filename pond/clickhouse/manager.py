@@ -233,42 +233,9 @@ class ClickHouseManager:
         # format data
         if isinstance(table, str):
             table_name = table
-            lastet_record_time = self.native_get_latest_record_time(
-                table, last_record_filters, datetime_col
-            )
         else:
             table_name = table.__tablename__
             df = table().format_dataframe(df)
-            if "datetime" in df.columns and "code" in df.columns and drop_duplicates:
-                df.drop_duplicates(subset=["datetime", "code"], inplace=True)
-            lastet_record_time = self.get_latest_record_time(table, last_record_filters)
-
-        origin_len = len(df)
-        if lastet_record_time is not None:
-            tz = None
-            try:
-                tz = getattr(df.dtypes[datetime_col], "tz")
-            except Exception:
-                pass
-            if tz is not None and lastet_record_time.tzinfo is not None:
-                lastet_record_time = lastet_record_time.astimezone(tz)
-            elif tz is not None and lastet_record_time.tzinfo is None:
-                lastet_record_time = lastet_record_time.replace(
-                    tzinfo=dtm.timezone.utc
-                ).astimezone(tz)
-            elif tz is None and lastet_record_time.tzinfo is not None:
-                lastet_record_time = lastet_record_time.astimezone(
-                    dtm.timezone.utc
-                ).replace(tzinfo=None)
-
-            df[datetime_col] = df[datetime_col].dt.floor(freq="1s")
-            df = df[df[datetime_col] > lastet_record_time]
-            # df = df[df["datetime"] > lastet_record_time.replace(tzinfo=df.dtypes['datetime'].tz)]
-        if len(df) == 0:
-            logger.info(
-                f"dataframe is empty after filter by latest record, original len {origin_len}"
-            )
-            return 0
         self.save_dataframe(table_name, df, trunk_size)
 
     def save_dataframe(self, table_name: str, df: pd.DataFrame, trunk_size=None):
