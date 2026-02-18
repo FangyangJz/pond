@@ -32,7 +32,7 @@ class KlineDailyHFQ(TsTable):
     turn = Column(types.Float64, comment="换手率")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -216,7 +216,7 @@ class KlineDailyNFQ(TsTable):
     turn = Column(types.Float64, comment="换手率")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -237,7 +237,7 @@ class FutureInfo(TsTable):
     market_cap_fdv_ratio = Column(types.Float64, comment="market_cap_fdv_ratio")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -365,7 +365,7 @@ class FutureFundingRate(TsTable):
     markPrice = Column(types.Float64, comment="markPrice")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -390,7 +390,7 @@ class FuturesKline1H(TsTable):
     taker_buy_quote_volume = Column(types.Float64, comment="taker_buy_quote_volume")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -415,7 +415,7 @@ class SpotKline1H(TsTable):
     taker_buy_quote_volume = Column(types.Float64, comment="taker_buy_quote_volume")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -440,7 +440,7 @@ class FuturesKline4H(TsTable):
     taker_buy_quote_volume = Column(types.Float64, comment="taker_buy_quote_volume")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -465,7 +465,7 @@ class FuturesKline15m(TsTable):
     taker_buy_quote_volume = Column(types.Float64, comment="taker_buy_quote_volume")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -490,7 +490,7 @@ class FuturesKline5m(TsTable):
     taker_buy_quote_volume = Column(types.Float64, comment="taker_buy_quote_volume")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),

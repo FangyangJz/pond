@@ -13,7 +13,7 @@ class StockFactor(TsTable):
     value = Column(types.String, comment="value")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -31,7 +31,7 @@ class CryptoFactor(TsTable):
     value = Column(types.String, comment="value")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -49,7 +49,7 @@ class FuturesFactor(TsTable):
     value = Column(types.String, comment="value")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),

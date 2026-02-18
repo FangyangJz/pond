@@ -25,7 +25,7 @@ class FreeHoldingDetail(TsTable):
     publish_date = Column(types.DateTime64, comment="公告日")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -52,7 +52,7 @@ class HoldingDetail(TsTable):
     publish_date = Column(types.DateTime64, comment="公告日")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -101,7 +101,7 @@ class FreeHoldingStatistic(TsTable):
     holding_codes = Column(types.String, comment="持有个股")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime),
             primary_key=(datetime),
@@ -151,7 +151,7 @@ class HoldingStatistic(TsTable):
     holding_codes = Column(types.String, comment="持有个股")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -182,7 +182,7 @@ class HolderCounts(TsTable):
     publish_date = Column(types.DateTime64, comment="公告日期")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
@@ -205,7 +205,7 @@ class StockRestrictedReleaseDetail(TsTable):
     chg_pct_afer_day20 = Column(types.Float64, comment="解禁后20日涨跌幅")
 
     __table_args__ = (
-        engines.MergeTree(
+        engines.ReplacingMergeTree(
             partition_by=func.toYYYYMM(datetime),
             order_by=(datetime, code),
             primary_key=(datetime, code),
