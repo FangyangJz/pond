@@ -93,11 +93,6 @@ class StockHelper:
         if self.fix_data:
             latest_synced_codes = self.get_synced_codes(table, sync_time=signal)
             symbols = [s for s in symbols if s not in latest_synced_codes]
-        if self.sync_data_start is not None:
-            available_codes = self.get_synced_codes(
-                table, sync_time=self.sync_data_start
-            )
-            symbols = [s for s in symbols if s in available_codes]
         task_counts = math.ceil(len(symbols) / workers)
         res_dict = {}
         threads: list[threading.Thread] = []
@@ -156,14 +151,20 @@ class StockHelper:
         if signal is None:
             signal = datetime.now().replace(hour=15, minute=0, second=0, microsecond=0)
 
+        latest_klines_df = self.clickhouse.read_latest_n_record(
+            table.__tablename__, signal - timedelta(days=30), signal, 1
+        )
+        latest_klines_df = pl.from_pandas(latest_klines_df)
+
         for i in range(0, len(symbols)):
             logger.debug(
                 f"stock helper sync kline counting {i}/{len(symbols)} for {signal}"
             )
             symbol = symbols[i]
             time.sleep(0.1)
-            lastest_record = self.clickhouse.get_latest_record_time(
-                table, [table.code == symbol, table.datetime <= signal]
+            latest_record = latest_klines_df.filter(pl.col("code") == symbol)
+            lastest_record = (
+                latest_record[0, "datetime"] if len(latest_record) > 0 else sync_start
             )
             if lastest_record.date() == signal.date():
                 logger.debug(
