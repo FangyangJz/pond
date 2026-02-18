@@ -90,6 +90,12 @@ class StockHelper:
         workers = math.ceil(os.cpu_count() / 2) if workers <= 0 else workers
 
         symbols = self.data_proxy.get_symobls()
+
+        if symbols is None or len(symbols) == 0:
+            logger.warning(
+                f"stock helper sync kline for {signal} into {table} at {end_time} failed, symbols is empty."
+            )
+            return False
         if self.fix_data:
             latest_synced_codes = self.get_synced_codes(table, sync_time=signal)
             symbols = [s for s in symbols if s not in latest_synced_codes]
@@ -224,6 +230,7 @@ if __name__ == "__main__":
     data_proxy.min_start_date = helper.sync_data_start
     helper.set_data_proxy(data_proxy)
     while sync_end > datetime(2020, 1, 1):
+        data_proxy.sync_stock_list_date = sync_end
         ret = helper.sync_kline(
             interval=Interval.MINUTE_5,
             adjust=Adjust.NFQ,
