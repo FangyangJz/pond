@@ -236,7 +236,7 @@ class ClickHouseManager:
         else:
             table_name = table.__tablename__
             df = table().format_dataframe(df)
-        self.save_dataframe(table_name, df, trunk_size)
+        return self.save_dataframe(table_name, df, trunk_size)
 
     def save_dataframe(self, table_name: str, df: pd.DataFrame, trunk_size=None):
         if df is None or len(df) == 0:
@@ -251,10 +251,6 @@ class ClickHouseManager:
                 rows += client.insert_dataframe(
                     query=query, dataframe=df_trunk, settings=dict(use_numpy=True)
                 )
-                logger.success(
-                    f"trunk data {len(df_trunk)} saved {rows} into table {table_name}"
-                )
-
         logger.success(df[:1].to_dict())
         logger.success(f"total {len(df)} saved {rows} into table {table_name}")
         return rows
