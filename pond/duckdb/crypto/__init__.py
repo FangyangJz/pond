@@ -242,7 +242,17 @@ class CryptoDB(DuckDB):
         assert data_type in timeframe_data_types_dict[timeframe]
 
         base_path = self.crypto_path.get_base_path(asset_type, data_type)
-        exist_files = [f.stem for f in (base_path / timeframe).glob("*.parquet")]
+        # 根据数据类型确定存储路径
+        if data_type == DataType.klines:
+            storage_path = base_path / timeframe
+        elif data_type == DataType.metrics:
+            storage_path = base_path / "5m"
+        elif data_type == DataType.fundingRate:
+            storage_path = base_path / "8h"
+        else:
+            storage_path = base_path / timeframe
+
+        exist_files = {f.stem: f for f in storage_path.glob("*.parquet")}
 
         input_start = parser.parse(start).replace(tzinfo=tz.tzutc())
         input_end = parser.parse(end).replace(tzinfo=tz.tzutc())
@@ -271,16 +281,49 @@ class CryptoDB(DuckDB):
                 )
                 continue
 
-            if symbol in exist_files and not ignore_cache:
-                logger.warning(f"{symbol} is existed, skip download.")
-                continue
-
             if symbol in skip_symbols:
                 logger.warning(f"{symbol} in skip_symbols, skip download.")
                 continue
             if if_skip_usdc and symbol.endswith("USDC"):
                 logger.warning(f"{symbol} is USDC, skip download.")
                 continue
+
+            # 增量更新逻辑：检查已有数据的最大时间
+            existing_df = None
+            if symbol in exist_files and not ignore_cache:
+                try:
+                    existing_df = pl.read_parquet(exist_files[symbol])
+                    # 根据数据类型获取时间列和最大时间
+                    time_column = {
+                        DataType.klines: "close_time",
+                        DataType.metrics: "create_time",
+                        DataType.fundingRate: "calc_time",
+                    }.get(data_type, "close_time")
+
+                    max_time = existing_df[time_column].max()
+                    if max_time:
+                        # 处理不同的时间类型
+                        if hasattr(max_time, "to_datetime"):
+                            max_time_dt = max_time.to_datetime()
+                        elif hasattr(max_time, "to_python"):
+                            max_time_dt = max_time.to_python()
+                        else:
+                            # 已经是 Python datetime
+                            max_time_dt = max_time
+
+                        # 使用已有数据的最大时间作为新的起始时间
+                        _start = max(_start.replace(tzinfo=None), max_time_dt)
+                        _start = _start.replace(tzinfo=tz.tzutc())
+
+                    # 如果起始时间已经超过结束时间，跳过
+                    if _start.replace(tzinfo=None) >= _end.replace(tzinfo=None):
+                        logger.info(f"{symbol} already up-to-date (max: {_start}), skip.")
+                        continue
+
+                    logger.info(f"{symbol} incremental update from {_start} to {_end}")
+                except Exception as e:
+                    logger.warning(f"{symbol} failed to read existing file: {e}, will re-download")
+                    existing_df = None
 
             df = self.load_history_data(
                 symbol,
@@ -300,16 +343,26 @@ class CryptoDB(DuckDB):
                 df = df.filter(pl.col("create_time") < _end.replace(tzinfo=None))
 
             if len(df) == 0:
-                logger.warning(
-                    f"{symbol} load df is empty, and skip save to parquet file"
-                )
+                if existing_df is not None:
+                    logger.info(f"{symbol} no new data, keep existing file")
+                else:
+                    logger.warning(
+                        f"{symbol} load df is empty, and skip save to parquet file"
+                    )
             else:
-                if data_type == DataType.klines:
-                    df.write_parquet(base_path / timeframe / f"{symbol}.parquet")
-                elif data_type == DataType.metrics:
-                    df.write_parquet(base_path / "5m" / f"{symbol}.parquet")
-                elif data_type == DataType.fundingRate:
-                    df.write_parquet(base_path / "8h" / f"{symbol}.parquet")
+                # 如果有已有数据，合并新旧数据
+                if existing_df is not None:
+                    df = pl.concat([existing_df, df])
+                    # 去重并保持顺序
+                    if data_type == DataType.klines:
+                        df = df.unique(subset=["open_time"], maintain_order=True)
+                    elif data_type == DataType.metrics:
+                        df = df.unique(subset=["create_time"], maintain_order=True)
+                    elif data_type == DataType.fundingRate:
+                        df = df.unique(subset=["calc_time"], maintain_order=True)
+                    logger.success(f"{symbol} merged, total rows: {len(df)}")
+
+                df.write_parquet(storage_path / f"{symbol}.parquet")
 
             pbar.set_description_str(
                 f"[Worker_{worker_id}] Total {total_len}", refresh=False
@@ -530,7 +583,7 @@ class CryptoDB(DuckDB):
 
 if __name__ == "__main__":
     db = CryptoDB(
-        Path(r"E:\DuckDB"),
+        Path(r"/home/fangyang/DuckDB"),
         requests_proxies={
             "http": "127.0.0.1:7890",
             "https": "127.0.0.1:7890",
@@ -548,15 +601,15 @@ if __name__ == "__main__":
 
     db.update_history_data_parallel(
         start="2020-1-1",
-        end="2026-1-7",
+        end="2026-12-7",
         asset_type=AssetType.future_um,
         data_type=DataType.klines,
-        timeframe="5m",
+        timeframe="1d",
         # httpx_proxies={"https://": "https://127.0.0.1:7890"},
         skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT", "BTCSTUSDT"],
         do_filter_quote_volume_0=True,
         if_skip_usdc=True,
-        ignore_cache=True,
+        ignore_cache=False,
         workers=os.cpu_count() - 2,
     )
 
