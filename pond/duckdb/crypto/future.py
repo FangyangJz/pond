@@ -9,36 +9,66 @@ import polars as pl
 import datetime as dt
 from loguru import logger
 
-from binance.spot import Spot
-from binance.cm_futures import CMFutures
-from binance.um_futures import UMFutures
+from binance_sdk_spot import Spot
+from binance_sdk_derivatives_trading_usds_futures import DerivativesTradingUsdsFutures
+
 from pond.duckdb.crypto.const import klines_schema
 from pond.binance_history.type import TIMEFRAMES
 from tenacity import retry, stop_after_delay, wait_fixed
 from concurrent.futures import ThreadPoolExecutor
 
 
+def _call_klines(client, symbol: str, interval: str, start_time: int = None, end_time: int = None, limit: int = None):
+    """Helper function to call klines API on either Spot or Futures client."""
+    # Spot uses klines, Futures uses kline_candlestick_data
+    if isinstance(client, Spot):
+        return client.rest_api.klines(
+            symbol=symbol,
+            interval=interval,
+            start_time=start_time,
+            end_time=end_time,
+            limit=limit,
+        ).data()
+    else:  # DerivativesTradingUsdsFutures
+        return client.rest_api.kline_candlestick_data(
+            symbol=symbol,
+            interval=interval,
+            start_time=start_time,
+            end_time=end_time,
+            limit=limit,
+        ).data()
+
+
 @retry(wait=wait_fixed(3), stop=stop_after_delay(10))
-def get_future_info_df(client: CMFutures | UMFutures | Spot) -> pd.DataFrame:
-    info = client.exchange_info()
-    df = pd.DataFrame.from_records(info["symbols"])
+def get_future_info_df(client: DerivativesTradingUsdsFutures | Spot) -> pd.DataFrame:
+    # 新 SDK 返回 typed model，需要调用 .data() 方法
+    # Futures 使用 exchange_information, Spot 使用 exchange_info
+    if isinstance(client, Spot):
+        info = client.rest_api.exchange_info().data()
+    else:
+        info = client.rest_api.exchange_information().data()
+    # symbols 是 model 列表，需要用 model_dump() 转换
+    symbols_list = [s.model_dump() for s in info.symbols]
+    df = pd.DataFrame(symbols_list)
     df["update_datetime"] = dt.datetime.fromtimestamp(
-        info["serverTime"] / 1000, dt.timezone.utc
+        info.server_time / 1000, dt.timezone.utc
     )
     if not isinstance(client, Spot):
-        df["deliveryDate"] = df["deliveryDate"].apply(
+        # 新 SDK 使用 snake_case: delivery_date, onboard_date
+        df["deliveryDate"] = df["delivery_date"].apply(
             lambda x: dt.datetime.fromtimestamp(x / 1000, dt.timezone.utc)
         )
-        df["onboardDate"] = df["onboardDate"].apply(
+        df["onboardDate"] = df["onboard_date"].apply(
             lambda x: dt.datetime.fromtimestamp(x / 1000, tz=dt.timezone.utc)
         )
     return df
 
 
-def get_future_symbol_list(client: CMFutures | UMFutures) -> list[str]:
+def get_future_symbol_list(client: DerivativesTradingUsdsFutures) -> list[str]:
     df = get_future_info_df(client)
+    # 新 SDK 使用 snake_case: contract_type
     return [
-        ss["symbol"] for _, ss in df.iterrows() if ss["contractType"] == "PERPETUAL"
+        ss["symbol"] for _, ss in df.iterrows() if ss["contract_type"] == "PERPETUAL"
     ]
 
 
@@ -73,7 +103,7 @@ def mock_empty_klines(start: int, end: int, coef: int) -> pl.DataFrame:
 
 @retry(wait=wait_fixed(3))
 def get_klines(
-    client: CMFutures | UMFutures | Spot,
+    client: DerivativesTradingUsdsFutures | Spot,
     symbol: str,
     interval: TIMEFRAMES,
     start: int,
@@ -119,11 +149,12 @@ def get_klines(
         while True:
             dd = (
                 pl.from_records(
-                    client.klines(
+                    _call_klines(
+                        client=client,
                         symbol=symbol,
                         interval=interval,
-                        # startTime=start,
-                        endTime=end,
+                        # start_time=start,
+                        end_time=end,
                         limit=fix_limit,
                     ),
                     schema=klines_schema,
@@ -141,11 +172,12 @@ def get_klines(
             else:
                 res_list.append(dd)
     else:
-        dd = client.klines(
+        dd = _call_klines(
+            client=client,
             symbol=symbol,
             interval=interval,
-            startTime=start,
-            endTime=end,
+            start_time=start,
+            end_time=end,
             limit=limit,
         )
         dd = (
@@ -171,7 +203,7 @@ def get_klines(
 
 
 def get_supply_df(
-    client: CMFutures | UMFutures | Spot,
+    client: DerivativesTradingUsdsFutures | Spot,
     lack_df: pl.DataFrame,
     symbol: str,
     interval: TIMEFRAMES = "1d",
@@ -209,14 +241,17 @@ def get_supply_df(
 if __name__ == "__main__":
     import polars as pl
     from pond.duckdb.crypto.const import klines_schema
+    from binance_common.configuration import ConfigurationRestAPI
 
     symbol = "IOTAUSDT"
-    client = UMFutures(proxies={"http": "127.0.0.1:7890", "https": "127.0.0.1:7890"})
-    dd = client.klines(
+    config = ConfigurationRestAPI(proxy={"http": "127.0.0.1:7890", "https": "127.0.0.1:7890"})
+    client = DerivativesTradingUsdsFutures(config_rest_api=config)
+    dd = _call_klines(
+        client=client,
         symbol=symbol,
         interval="5m",
-        startTime=1645833300000,
-        endTime=1646092800000,
+        start_time=1645833300000,
+        end_time=1646092800000,
         limit=1500,
     )
     dd = (
@@ -236,17 +271,21 @@ if __name__ == "__main__":
     dt_format = "%Y-%m-%d"
     start_dt = dt.datetime.strptime(start, dt_format).timestamp() * 1e3
     end_dt = dt.datetime.strptime(end, dt_format).timestamp() * 1e3
-    # proxies = {"https": "127.0.0.1:7890"}
-    proxies = {}
+    # proxy = {"https": "127.0.0.1:7890"}
+    proxy = None
 
-    um_client = UMFutures(proxies=proxies)
-    cm_client = CMFutures(proxies=proxies)
+    config = ConfigurationRestAPI(proxy=proxy) if proxy else None
+    um_client = DerivativesTradingUsdsFutures(config_rest_api=config)
 
     res_list = []
     symbols = ["BTCUSDT", "BTSUSDT", "ETHUSDT"]
     # r = get_future_info_df(um_client)
-    dd = um_client.klines(
-        symbol=symbol, interval=interval, startTime=int(start_dt), endTime=int(end_dt)
+    dd = _call_klines(
+        client=um_client,
+        symbol=symbol,
+        interval=interval,
+        start_time=int(start_dt),
+        end_time=int(end_dt),
     )
     df = (
         pl.from_records(dd, schema=klines_schema)
@@ -258,7 +297,6 @@ if __name__ == "__main__":
         .to_pandas()
     )
 
-    cm_symbol_list = get_future_symbol_list(cm_client)
     um_symbol_list = get_future_symbol_list(um_client)
 
     tz = "Asia/Shanghai"

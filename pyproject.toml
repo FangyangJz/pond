@@ -9,6 +9,8 @@ dependencies = [
     "baostock>=0.8.9",
     "binance-connector==3.11.0",
     "binance-futures-connector>=4.1.0",
+    "binance-sdk-derivatives-trading-usds-futures>=9.0.0",
+    "binance-sdk-spot>=8.0.0",
     "clickhouse-connect>=0.8.17",
     "clickhouse-sqlalchemy>=0.3.2",
     "deprecated>=1.2.18",

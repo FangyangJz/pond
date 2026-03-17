@@ -14,9 +14,9 @@ from tqdm import tqdm
 from loguru import logger
 from dateutil import parser, tz
 
-from binance.spot import Spot
-from binance.cm_futures import CMFutures
-from binance.um_futures import UMFutures
+from binance_sdk_spot import Spot
+from binance_sdk_derivatives_trading_usds_futures import DerivativesTradingUsdsFutures
+from binance_common.configuration import ConfigurationRestAPI
 
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
 from pond.binance_history.type import TIMEFRAMES, AssetType, DataType
@@ -30,24 +30,41 @@ class CryptoDB(DuckDB):
     def __init__(
         self,
         db_path: Path,
-        requests_proxies: dict[str, str] = {},
+        requests_proxies: dict | None = None,
         df_type: DataFrameStrType = df_types.polars,
     ):
         self.crypto_path = CryptoPath(crypto_path=db_path / "crypto")
         self.init_db_path = self.crypto_path.init_db_path
-        self.requests_proxies = requests_proxies
+        self.requests_proxies = requests_proxies or {}
         super().__init__(db_path, df_type)
+
+    @staticmethod
+    def _convert_proxies_for_requests(proxies: dict | None) -> dict[str, str]:
+        """Convert new SDK proxy format to requests library format.
+
+        New SDK format: {"host": "127.0.0.1", "port": 7890, "protocol": "http"}
+        Requests format: {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
+        """
+        if not proxies or "host" not in proxies:
+            return {}
+
+        host = proxies.get("host", "")
+        port = proxies.get("port", "")
+        protocol = proxies.get("protocol", "http")
+        proxy_url = f"{protocol}://{host}:{port}"
+
+        return {"http": proxy_url, "https": proxy_url}
 
     def get_local_future_perpetual_symbol_list(
         self, asset_type: AssetType
     ) -> list[str]:
         df = self.get_future_info(asset_type)
-        df = df[df["contractType"] == "PERPETUAL"]
+        df = df[df["contract_type"] == "PERPETUAL"]
         return df.symbol.to_list()
 
     @staticmethod
     def is_future_type(asset_type: AssetType):
-        return asset_type in [AssetType.future_um, AssetType.future_cm]
+        return asset_type == AssetType.future_um
 
     def get_future_info(self, asset_type: AssetType, from_local=True) -> pd.DataFrame:
         if self.is_future_type(asset_type):
@@ -58,43 +75,56 @@ class CryptoDB(DuckDB):
 
         if from_local:
             if file.exists():
-                return pd.read_csv(file)
+                df = pd.read_csv(file)
+                # 兼容旧 CSV 文件的列名
+                if "contractType" in df.columns and "contract_type" not in df.columns:
+                    df = df.rename(columns={"contractType": "contract_type"})
+                return df
 
         self.update_future_info()
 
-        return pd.read_csv(file)
+        df = pd.read_csv(file)
+        # 兼容旧 CSV 文件的列名
+        if "contractType" in df.columns and "contract_type" not in df.columns:
+            df = df.rename(columns={"contractType": "contract_type"})
+        return df
 
-    def update_future_info(self):
+    def update_future_info(self, force: bool = False):
         """
         字段说明: https://binance-docs.github.io/apidocs/futures/cn/#0f3f2d5ee7
 
-        params: proxies={"https": "127.0.0.1:7890"}
+        params: force=True 强制更新，忽略缓存
         """
         from pond.duckdb.crypto.future import get_future_info_df
 
-        file = self.crypto_path.info / "info.csv"
-        logger.info(f"Update {file} from network...")
+        config = ConfigurationRestAPI(proxy=self.requests_proxies) if self.requests_proxies else None
 
         for c in [
-            CMFutures(proxies=self.requests_proxies),
-            UMFutures(proxies=self.requests_proxies),
-            Spot(proxies=self.requests_proxies),
+            DerivativesTradingUsdsFutures(config_rest_api=config),
+            Spot(config_rest_api=config),
         ]:
+            file_path = self.crypto_path.info / f"{c.__class__.__name__}.csv"
+
+            # 检查文件是否存在且在48小时内已更新
+            if not force and file_path.exists():
+                file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+                if (datetime.now() - file_mtime).total_seconds() < 48 * 3600:
+                    logger.info(f"{file_path.name} is up-to-date (modified: {file_mtime}), skip download.")
+                    continue
+
+            logger.info(f"Updating {file_path} from network...")
             info_df = get_future_info_df(c)
-            info_df.to_csv(
-                self.crypto_path.info / f"{c.__class__.__name__}.csv", index_label=False
-            )
+            info_df.to_csv(file_path, index_label=False)
 
     def get_client(
-        self, asset_type: AssetType, proxies: dict[str, str] = {}
-    ) -> CMFutures | UMFutures | Spot:
+        self, asset_type: AssetType, proxies: dict | None = None
+    ) -> DerivativesTradingUsdsFutures | Spot:
+        config = ConfigurationRestAPI(proxy=proxies) if proxies else None
         match asset_type:
-            case AssetType.future_cm:
-                return CMFutures(proxies=proxies)
             case AssetType.future_um:
-                return UMFutures(proxies=proxies)
+                return DerivativesTradingUsdsFutures(config_rest_api=config)
             case AssetType.spot:
-                return Spot(proxies=proxies)
+                return Spot(config_rest_api=config)
             case _:
                 raise ValueError(f"{asset_type} is a wrong {AssetType}")
 
@@ -169,10 +199,10 @@ class CryptoDB(DuckDB):
     ):
         df = self.get_future_info(asset_type, from_local=False)
         if self.is_future_type(asset_type):
-            df = df[df["contractType"] == "PERPETUAL"][
+            df = df[df["contract_type"] == "PERPETUAL"][
                 [
                     "symbol",
-                    "contractType",
+                    "contract_type",
                     "deliveryDate",
                     "onboardDate",
                     "update_datetime",
@@ -183,10 +213,10 @@ class CryptoDB(DuckDB):
         else:
             # TODO spot 目前也走这里, 主要还是以合约标的为主
             df = self.get_future_info(AssetType.future_um, from_local=False)
-            df = df[df["contractType"] == "PERPETUAL"][
+            df = df[df["contract_type"] == "PERPETUAL"][
                 [
                     "symbol",
-                    "contractType",
+                    "contract_type",
                     "deliveryDate",
                     "onboardDate",
                     "update_datetime",
@@ -218,9 +248,19 @@ class CryptoDB(DuckDB):
                 for i, chunk in enumerate(chunks)
             ]
 
-            # 等待所有任务完成
-            for future in futures:
-                future.result()
+            # 等待所有任务完成，失败的任务记录错误但不中断其他任务
+            failed_workers = []
+            for i, future in enumerate(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"Worker_{i} failed: {e}")
+                    failed_workers.append(i)
+
+            if failed_workers:
+                logger.warning(f"Completed with {len(failed_workers)} failed workers: {failed_workers}")
+            else:
+                logger.success(f"All {len(futures)} workers completed successfully")
 
     def update_history_data(
         self,
@@ -288,81 +328,85 @@ class CryptoDB(DuckDB):
                 logger.warning(f"{symbol} is USDC, skip download.")
                 continue
 
-            # 增量更新逻辑：检查已有数据的最大时间
-            existing_df = None
-            if symbol in exist_files and not ignore_cache:
-                try:
-                    existing_df = pl.read_parquet(exist_files[symbol])
-                    # 根据数据类型获取时间列和最大时间
-                    time_column = {
-                        DataType.klines: "close_time",
-                        DataType.metrics: "create_time",
-                        DataType.fundingRate: "calc_time",
-                    }.get(data_type, "close_time")
+            try:
+                # 增量更新逻辑：检查已有数据的最大时间
+                existing_df = None
+                if symbol in exist_files and not ignore_cache:
+                    try:
+                        existing_df = pl.read_parquet(exist_files[symbol])
+                        # 根据数据类型获取时间列和最大时间
+                        time_column = {
+                            DataType.klines: "close_time",
+                            DataType.metrics: "create_time",
+                            DataType.fundingRate: "calc_time",
+                        }.get(data_type, "close_time")
 
-                    max_time = existing_df[time_column].max()
-                    if max_time:
-                        # 处理不同的时间类型
-                        if hasattr(max_time, "to_datetime"):
-                            max_time_dt = max_time.to_datetime()
-                        elif hasattr(max_time, "to_python"):
-                            max_time_dt = max_time.to_python()
-                        else:
-                            # 已经是 Python datetime
-                            max_time_dt = max_time
+                        max_time = existing_df[time_column].max()
+                        if max_time:
+                            # 处理不同的时间类型
+                            if hasattr(max_time, "to_datetime"):
+                                max_time_dt = max_time.to_datetime()
+                            elif hasattr(max_time, "to_python"):
+                                max_time_dt = max_time.to_python()
+                            else:
+                                # 已经是 Python datetime
+                                max_time_dt = max_time
 
-                        # 使用已有数据的最大时间作为新的起始时间
-                        _start = max(_start.replace(tzinfo=None), max_time_dt)
-                        _start = _start.replace(tzinfo=tz.tzutc())
+                            # 使用已有数据的最大时间作为新的起始时间
+                            _start = max(_start.replace(tzinfo=None), max_time_dt)
+                            _start = _start.replace(tzinfo=tz.tzutc())
 
-                    # 如果起始时间已经超过结束时间，跳过
-                    if _start.replace(tzinfo=None) >= _end.replace(tzinfo=None):
-                        logger.info(f"{symbol} already up-to-date (max: {_start}), skip.")
-                        continue
+                        # 如果起始时间已经超过结束时间，跳过
+                        if _start.replace(tzinfo=None) >= _end.replace(tzinfo=None):
+                            logger.info(f"{symbol} already up-to-date (max: {_start}), skip.")
+                            continue
 
-                    logger.info(f"{symbol} incremental update from {_start} to {_end}")
-                except Exception as e:
-                    logger.warning(f"{symbol} failed to read existing file: {e}, will re-download")
-                    existing_df = None
+                        logger.info(f"{symbol} incremental update from {_start} to {_end}")
+                    except Exception as e:
+                        logger.warning(f"{symbol} failed to read existing file: {e}, will re-download")
+                        existing_df = None
 
-            df = self.load_history_data(
-                symbol,
-                _start,
-                _end,
-                asset_type,
-                data_type,
-                timeframe,
-                do_filter_quote_volume_0,
-                httpx_proxies,
-            )
-            if data_type == DataType.klines:
-                df = df.filter(pl.col("open_time") < _end.replace(tzinfo=None))
-            elif data_type == DataType.fundingRate:
-                raise ValueError("fundingRate not support filter end time")
-            elif data_type == DataType.metrics:
-                df = df.filter(pl.col("create_time") < _end.replace(tzinfo=None))
+                df = self.load_history_data(
+                    symbol,
+                    _start,
+                    _end,
+                    asset_type,
+                    data_type,
+                    timeframe,
+                    do_filter_quote_volume_0,
+                    httpx_proxies,
+                )
+                if data_type == DataType.klines:
+                    df = df.filter(pl.col("open_time") < _end.replace(tzinfo=None))
+                elif data_type == DataType.fundingRate:
+                    raise ValueError("fundingRate not support filter end time")
+                elif data_type == DataType.metrics:
+                    df = df.filter(pl.col("create_time") < _end.replace(tzinfo=None))
 
-            if len(df) == 0:
-                if existing_df is not None:
-                    logger.info(f"{symbol} no new data, keep existing file")
+                if len(df) == 0:
+                    if existing_df is not None:
+                        logger.info(f"{symbol} no new data, keep existing file")
+                    else:
+                        logger.warning(
+                            f"{symbol} load df is empty, and skip save to parquet file"
+                        )
                 else:
-                    logger.warning(
-                        f"{symbol} load df is empty, and skip save to parquet file"
-                    )
-            else:
-                # 如果有已有数据，合并新旧数据
-                if existing_df is not None:
-                    df = pl.concat([existing_df, df])
-                    # 去重并保持顺序
-                    if data_type == DataType.klines:
-                        df = df.unique(subset=["open_time"], maintain_order=True)
-                    elif data_type == DataType.metrics:
-                        df = df.unique(subset=["create_time"], maintain_order=True)
-                    elif data_type == DataType.fundingRate:
-                        df = df.unique(subset=["calc_time"], maintain_order=True)
-                    logger.success(f"{symbol} merged, total rows: {len(df)}")
+                    # 如果有已有数据，合并新旧数据
+                    if existing_df is not None:
+                        df = pl.concat([existing_df, df])
+                        # 去重并保持顺序
+                        if data_type == DataType.klines:
+                            df = df.unique(subset=["open_time"], maintain_order=True)
+                        elif data_type == DataType.metrics:
+                            df = df.unique(subset=["create_time"], maintain_order=True)
+                        elif data_type == DataType.fundingRate:
+                            df = df.unique(subset=["calc_time"], maintain_order=True)
+                        logger.success(f"{symbol} merged, total rows: {len(df)}")
 
-                df.write_parquet(storage_path / f"{symbol}.parquet")
+                    df.write_parquet(storage_path / f"{symbol}.parquet")
+            except Exception as e:
+                logger.error(f"{symbol} failed to download: {e}")
+                continue
 
             pbar.set_description_str(
                 f"[Worker_{worker_id}] Total {total_len}", refresh=False
@@ -390,7 +434,7 @@ class CryptoDB(DuckDB):
             end=end,
             timeframe=timeframe,
             file_path=self.crypto_path.crypto,
-            proxies=self.requests_proxies,
+            proxies=self._convert_proxies_for_requests(self.requests_proxies),
         )
 
         start_async_download_files(
@@ -585,8 +629,9 @@ if __name__ == "__main__":
     db = CryptoDB(
         Path(r"/home/fangyang/DuckDB"),
         requests_proxies={
-            "http": "http://127.0.0.1:7890",
-            "https": "http://127.0.0.1:7890",
+            "host": "127.0.0.1",
+            "port": 7890,
+            "protocol": "http",
         },
     )
 
@@ -601,11 +646,11 @@ if __name__ == "__main__":
 
     db.update_history_data_parallel(
         start="2020-1-1",
-        end="2026-12-7",
+        end="2026-03-18",
         asset_type=AssetType.spot,
         data_type=DataType.klines,
         timeframe="1h",
-        httpx_proxies={"https://": "https://127.0.0.1:7890"},
+        httpx_proxies={"https://": "http://127.0.0.1:7890"},
         skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT", "BTCSTUSDT"],
         do_filter_quote_volume_0=True,
         if_skip_usdc=True,
