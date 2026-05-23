@@ -20,6 +20,7 @@ dependencies = [
     "loguru>=0.7.3",
     "mootdx>=0.11.7",
     "polars>=1.27.1",
+    "psycopg2-binary>=2.9.12",
     "pyarrow>=19.0.1",
     "python-binance>=1.0.28",
     "ray>=2.45.0",
