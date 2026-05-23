@@ -59,7 +59,7 @@ class CryptoDB(DuckDB):
         self, asset_type: AssetType
     ) -> list[str]:
         df = self.get_future_info(asset_type)
-        df = df[df["contract_type"] == "PERPETUAL"]
+        df = df[df["contract_type"].isin(["PERPETUAL", "TRADIFI_PERPETUAL"])]
         return df.symbol.to_list()
 
     @staticmethod
@@ -67,11 +67,8 @@ class CryptoDB(DuckDB):
         return asset_type == AssetType.future_um
 
     def get_future_info(self, asset_type: AssetType, from_local=True) -> pd.DataFrame:
-        if self.is_future_type(asset_type):
-            a1, a2 = asset_type.value.split("/")
-            file = self.crypto_path.info / f"{a2.upper()}{a1.capitalize()}.csv"
-        else:
-            file = self.crypto_path.info / f"{asset_type.value.capitalize()}.csv"
+        client = self.get_client(asset_type)
+        file = self.crypto_path.info / f"{client.__class__.__name__}.csv"
 
         if from_local:
             if file.exists():
@@ -199,7 +196,7 @@ class CryptoDB(DuckDB):
     ):
         df = self.get_future_info(asset_type, from_local=False)
         if self.is_future_type(asset_type):
-            df = df[df["contract_type"] == "PERPETUAL"][
+            df = df[df["contract_type"].isin(["PERPETUAL", "TRADIFI_PERPETUAL"])][
                 [
                     "symbol",
                     "contract_type",
@@ -213,7 +210,7 @@ class CryptoDB(DuckDB):
         else:
             # TODO spot 目前也走这里, 主要还是以合约标的为主
             df = self.get_future_info(AssetType.future_um, from_local=False)
-            df = df[df["contract_type"] == "PERPETUAL"][
+            df = df[df["contract_type"].isin(["PERPETUAL", "TRADIFI_PERPETUAL"])][
                 [
                     "symbol",
                     "contract_type",
@@ -627,7 +624,8 @@ class CryptoDB(DuckDB):
 
 if __name__ == "__main__":
     db = CryptoDB(
-        Path(r"/home/fangyang/DuckDB"),
+        # Path(r"/home/fangyang/DuckDB"),
+        Path(r"/share/DuckDB/"),
         requests_proxies={
             "host": "127.0.0.1",
             "port": 7890,
@@ -646,7 +644,7 @@ if __name__ == "__main__":
 
     db.update_history_data_parallel(
         start="2020-1-1",
-        end="2026-03-18",
+        end="2026-05-23",
         asset_type=AssetType.spot,
         data_type=DataType.klines,
         timeframe="1h",

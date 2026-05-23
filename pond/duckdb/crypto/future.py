@@ -68,7 +68,7 @@ def get_future_symbol_list(client: DerivativesTradingUsdsFutures) -> list[str]:
     df = get_future_info_df(client)
     # 新 SDK 使用 snake_case: contract_type
     return [
-        ss["symbol"] for _, ss in df.iterrows() if ss["contract_type"] == "PERPETUAL"
+        ss["symbol"] for _, ss in df.iterrows() if ss["contract_type"] in ["PERPETUAL", "TRADIFI_PERPETUAL"]
     ]
 
 
