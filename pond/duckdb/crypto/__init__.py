@@ -223,8 +223,10 @@ class CryptoDB(DuckDB):
             df = pd.concat([df, manual_df])
 
         df = df.sort_values(by="symbol").drop_duplicates(subset=["symbol"])
-        # 自动均分DataFrame，无需计算task_size
-        chunks = np.array_split(df, workers)
+        if workers is None:
+            workers = min(32, (os.cpu_count() or 1) + 4)
+        workers = max(1, min(int(workers), len(df) or 1))
+        chunks = [df.iloc[idxs] for idxs in np.array_split(np.arange(len(df)), workers)]
         with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = [
                 executor.submit(
@@ -645,8 +647,8 @@ if __name__ == "__main__":
     db.update_history_data_parallel(
         start="2020-1-1",
         end="2026-05-23",
-        asset_type=AssetType.spot,
-        data_type=DataType.klines,
+        asset_type=AssetType.future_um,
+        data_type=DataType.metrics,
         timeframe="1h",
         httpx_proxies={"https://": "http://127.0.0.1:7890"},
         skip_symbols=["ETHBTC", "BTCDOMUSDT", "USDCUSDT", "BTCSTUSDT"],
