@@ -290,43 +290,30 @@ def load_data_from_disk(
     dtypes: dict[str, Any] | None = None,
 ) -> pl.DataFrame | None:
     """
-    binance data start 2022-01.zip has csv header, need adjust to this in case of lack of data
-    for example lack of 2022-01-01 daily bar
+    Dynamically detect whether the CSV in the zip has a header row before parsing.
     """
     path = get_local_data_path(url, local_path)
 
     if path.exists():
         try:
-            if ("klines" in path.parts) and (
-                (int(path.stem.split("-")[2]) < 2022) or ("spot" in path.parts)
-            ):
-                df = (
-                    pl.read_csv(
-                        ZipFile(path).read(f"{path.stem}.csv"),
-                        dtypes=dtypes,
-                        # columns=list(dtypes.keys()) if dtypes else None,
-                        has_header=False,
-                    )
-                    # .with_columns(
-                    #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
-                    #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
-                    # )
-                    # .to_pandas()
-                )
-            else:
-                df = (
-                    pl.read_csv(
-                        ZipFile(path).read(f"{path.stem}.csv"),
-                        dtypes=dtypes,
-                        columns=list(dtypes.keys()) if dtypes else None,
-                        has_header=True,
-                    )
-                    # .with_columns(
-                    #     (pl.col("open_time") * 1e3).cast(pl.Datetime),
-                    #     (pl.col("close_time") * 1e3).cast(pl.Datetime),
-                    # )
-                    # .to_pandas()
-                )
+            raw_bytes = ZipFile(path).read(f"{path.stem}.csv")
+            expected_columns = list(dtypes.keys()) if dtypes else None
+            first_line = raw_bytes.splitlines()[0].decode("utf-8-sig").strip()
+            has_header = (
+                expected_columns is not None and first_line.split(",") == expected_columns
+            )
+
+            read_csv_kwargs = {
+                "dtypes": dtypes,
+                "has_header": has_header,
+            }
+            if expected_columns is not None:
+                if has_header:
+                    read_csv_kwargs["columns"] = expected_columns
+                else:
+                    read_csv_kwargs["new_columns"] = expected_columns
+
+            df = pl.read_csv(raw_bytes, **read_csv_kwargs)
         except Exception as e:
             logger.error(f"load_data_from_disk error: {e}")
             return None

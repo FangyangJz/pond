@@ -1,4 +1,5 @@
 import os
+import datetime as dt
 from pathlib import Path
 
 from pond.duckdb.crypto import CryptoDB, AssetType, DataType
@@ -12,9 +13,11 @@ db = CryptoDB(
         "protocol": "http",
     },
 )
+
+end_date = dt.datetime.now().strftime("%Y-%m-%d")
 db.update_history_data_parallel(
         start="2020-1-1",
-        end="2026-05-31",
+        end=end_date,
         asset_type=AssetType.future_um,
         data_type=DataType.metrics,
         timeframe="1d",
