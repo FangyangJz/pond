@@ -1,6 +1,25 @@
+import os
 from pathlib import Path
 from pond.binance_history.type import AssetType, DataType
 from pond.duckdb.crypto.const import timeframe_data_types_dict
+
+# .env 文件位置：pond/duckdb/crypto/.env，内容形如 DB_PATH=/home/fangyang/HDD_GT580/Duckdb/
+ENV_FILE = Path(__file__).parent / ".env"
+
+
+def get_db_path() -> Path:
+    """读取 DB_PATH，优先从 pond/duckdb/crypto/.env，其次环境变量 DB_PATH。"""
+    db_path: str | None = None
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and line.startswith("DB_PATH="):
+                db_path = line.split("=", 1)[1].strip().strip('"').strip("'")
+                break
+    db_path = db_path or os.environ.get("DB_PATH")
+    if not db_path:
+        raise ValueError(f"DB_PATH not found in {ENV_FILE} or environment")
+    return Path(db_path)
 
 
 class CryptoPath:

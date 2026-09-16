@@ -15,7 +15,6 @@ from pond.duckdb.crypto import AssetType, CryptoDB, DataType
 
 
 DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "XAUUSDT"]
-DEFAULT_DB_PATH = Path("/share/DuckDB")
 DEFAULT_PROXY_HOST = "127.0.0.1"
 DEFAULT_PROXY_PORT = 7890
 DEFAULT_PROXY_PROTOCOL = "http"
@@ -44,8 +43,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--db-path",
         type=Path,
-        default=DEFAULT_DB_PATH,
-        help="DuckDB 根目录，默认 /share/DuckDB",
+        default=None,
+        help="DuckDB 根目录，默认从 pond/duckdb/crypto/.env 的 DB_PATH 读取",
     )
     parser.add_argument(
         "--workers",

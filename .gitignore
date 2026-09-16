@@ -111,6 +111,8 @@ celerybeat.pid
 
 # Environments
 .env
+# 数据库连接配置（含密码）
+pond/duckdb/crypto/scripts/config.toml
 .venv
 env/
 venv/

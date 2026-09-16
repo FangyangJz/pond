@@ -1,12 +1,10 @@
 import os
 import datetime as dt
-from pathlib import Path
 
 from pond.duckdb.crypto import CryptoDB, AssetType, DataType
 
+# db_path 默认从 pond/duckdb/crypto/.env 的 DB_PATH 读取
 db = CryptoDB(
-    # Path(r"/home/fangyang/DuckDB"),
-    Path(r"/share/DuckDB/"),
     requests_proxies={
         "host": "127.0.0.1",
         "port": 7890,

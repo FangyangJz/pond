@@ -360,7 +360,10 @@ class SpotHelper:
 if __name__ == "__main__":
     import os
 
-    crypto_db = CryptoDB(Path(r"E:\DuckDB"))
+    # clickhouse 模块单独配置 DuckDB 路径（环境变量 CRYPTODB_PATH，默认 E:\DuckDB），不用 crypto/.env 的 DB_PATH
+    from pond.clickhouse import get_crypto_db_path
+
+    crypto_db = CryptoDB(get_crypto_db_path())
     password = os.environ.get("CLICKHOUSE_PWD")
     conn_str = f"clickhouse://default:{password}@localhost:8123/quant"
     native_conn_str = f"clickhouse+native://default:{password}@localhost:9000/quant?tcp_keepalive=true"

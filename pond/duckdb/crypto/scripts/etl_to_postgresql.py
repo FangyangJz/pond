@@ -7,7 +7,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 from pond.binance_history.type import AssetType, DataType
-from pond.duckdb.crypto.path import CryptoPath
+from pond.duckdb.crypto.path import CryptoPath, get_db_path
 from pond.utils.times import timeit_function_wrapper
 from pond.utils.file import load_config_dict
 
@@ -239,7 +239,8 @@ def upsert_rows(conn, table_name: str, rows, page_size: int = 5000):
 
 @timeit_function_wrapper
 def etl_all(interval: str = "1d", asset_type: AssetType = AssetType.spot):
-    crypto_path = CryptoPath(Path(r"/home/fangyang/DuckDB/crypto"))
+    # db_path 默认从 pond/duckdb/crypto/.env 的 DB_PATH 读取
+    crypto_path = CryptoPath(crypto_path=get_db_path() / "crypto")
 
     parquet_dir = crypto_path.get_base_path(asset_type, DataType.klines) / interval
     table_name = f"{contract_type_dict[asset_type]}_kline_{interval}"

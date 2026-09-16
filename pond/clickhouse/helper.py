@@ -941,7 +941,10 @@ class FuturesHelper:
 if __name__ == "__main__":
     import os
 
-    crypto_db = CryptoDB(Path(r"E:\DuckDB"))
+    # clickhouse 模块单独配置 DuckDB 路径（环境变量 CRYPTODB_PATH，默认 E:\DuckDB），不用 crypto/.env 的 DB_PATH
+    from pond.clickhouse import get_crypto_db_path
+
+    crypto_db = CryptoDB(get_crypto_db_path())
     host = os.environ.get("CLICKHOUSE_HOST").strip()
     password = os.environ.get("CLICKHOUSE_PWD").strip()
     conn_str = f"clickhouse://default:{password}@{host}:8123/quant"

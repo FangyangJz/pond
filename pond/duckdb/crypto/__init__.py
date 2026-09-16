@@ -21,7 +21,7 @@ from binance_common.configuration import ConfigurationRestAPI
 from pond.duckdb import DuckDB, DataFrameStrType, df_types
 from pond.binance_history.type import TIMEFRAMES, AssetType, DataType
 from pond.duckdb.crypto.const import timeframe_data_types_dict
-from pond.duckdb.crypto.path import CryptoPath
+from pond.duckdb.crypto.path import CryptoPath, get_db_path
 from pond.binance_history.utils import get_urls_by_xml_parse, load_data_from_disk
 from pond.binance_history.async_api import start_async_download_files
 
@@ -29,10 +29,12 @@ from pond.binance_history.async_api import start_async_download_files
 class CryptoDB(DuckDB):
     def __init__(
         self,
-        db_path: Path,
+        db_path: Path | None = None,
         requests_proxies: dict | None = None,
         df_type: DataFrameStrType = df_types.polars,
     ):
+        # 不传 db_path 时，从 pond/duckdb/crypto/.env 的 DB_PATH 读取
+        db_path = db_path or get_db_path()
         self.crypto_path = CryptoPath(crypto_path=db_path / "crypto")
         self.init_db_path = self.crypto_path.init_db_path
         self.requests_proxies = requests_proxies or {}
@@ -627,9 +629,8 @@ class CryptoDB(DuckDB):
 
 
 if __name__ == "__main__":
+    # db_path 默认从 pond/duckdb/crypto/.env 的 DB_PATH 读取
     db = CryptoDB(
-        # Path(r"/home/fangyang/DuckDB"),
-        Path(r"/share/DuckDB/"),
         requests_proxies={
             "host": "127.0.0.1",
             "port": 7890,
@@ -638,8 +639,6 @@ if __name__ == "__main__":
     )
 
     # db.compare_um_future_info_with_vision()
-
-    # db = CryptoDB(Path(r"/home/fangyang/zhitai5000/DuckDB/"))
 
     # db.update_future_info()
 

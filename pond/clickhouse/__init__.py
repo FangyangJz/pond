@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 from sqlalchemy import Column, MetaData
 import pandas as pd
 
@@ -5,6 +8,21 @@ from clickhouse_sqlalchemy import (
     get_declarative_base,
     types,
 )
+
+
+# clickhouse 模块默认的本地 DuckDB 路径（原硬编码路径）
+DEFAULT_CRYPTO_DB_PATH = Path(r"E:\DuckDB")
+
+
+def get_crypto_db_path() -> Path:
+    r"""clickhouse 模块使用的本地 DuckDB 路径。
+
+    通过环境变量 CRYPTODB_PATH 配置，默认 E:\DuckDB；
+    与 pond/duckdb/crypto/.env 的 DB_PATH 无关。
+    """
+    p = os.environ.get("CRYPTODB_PATH")
+    return Path(p) if p else DEFAULT_CRYPTO_DB_PATH
+
 
 metadata = MetaData()
 Base = get_declarative_base(metadata=metadata)

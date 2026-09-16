@@ -17,7 +17,7 @@
     python fetch_marketcap.py                    # 拉取今天
     python fetch_marketcap.py --force             # 强制重拉今天
     python fetch_marketcap.py --date 2026-01-01   # 拉取指定日期
-    python fetch_marketcap.py --db-path /share/DuckDB
+    python fetch_marketcap.py --db-path /share/DuckDB  # 覆盖 .env 里的 DB_PATH
 """
 
 import argparse
@@ -33,7 +33,7 @@ from tqdm import tqdm
 
 from pond.binance_history.type import AssetType
 from pond.duckdb.crypto import CryptoDB
-from pond.duckdb.crypto.path import CryptoPath
+from pond.duckdb.crypto.path import CryptoPath, get_db_path
 
 
 COINGECKO_API = "https://api.coingecko.com/api/v3"
@@ -232,13 +232,14 @@ def main():
     parser.add_argument(
         "--db-path",
         type=str,
-        default="/share/DuckDB",
-        help="DuckDB base path (default: /share/DuckDB)",
+        default=None,
+        help="DuckDB base path (default: DB_PATH from pond/duckdb/crypto/.env)",
     )
     args = parser.parse_args()
 
     # ── 路径 ──
-    crypto_path = CryptoPath(crypto_path=Path(args.db_path) / "crypto")
+    db_path = Path(args.db_path) if args.db_path else get_db_path()
+    crypto_path = CryptoPath(crypto_path=db_path / "crypto")
     register_marketcap_paths(crypto_path)
 
     date_tag = args.date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -265,7 +266,7 @@ def main():
 
     # ── 3. 获取 binance 标的列表并映射 ──
     logger.info("Resolving binance symbols to CoinGecko IDs...")
-    crypto_db = CryptoDB(Path(args.db_path))
+    crypto_db = CryptoDB(db_path)
     binance_symbols = crypto_db.get_local_future_perpetual_symbol_list(
         AssetType.future_um
     )
