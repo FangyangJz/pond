@@ -307,10 +307,10 @@ class CryptoDB(DuckDB):
             #     continue
 
             if self.is_future_type(asset_type):
-                delivery_date = parser.parse(row["deliveryDate"])
+                delivery_date = parser.parse(row["deliveryDate"]).replace(tzinfo=tz.tzutc())
                 # TUSDT onboardDate 2023-01-31, but real history data is 2023-02-01
-                onboard_date = parser.parse(
-                    row["onboardDate"]
+                onboard_date = (
+                    parser.parse(row["onboardDate"]).replace(tzinfo=tz.tzutc())
                 )  # + dt.timedelta(days=1)
                 _start = max(onboard_date, input_start)
                 _end = min(delivery_date, input_end)
@@ -386,7 +386,8 @@ class CryptoDB(DuckDB):
                     )
                     df = df.filter(pl.col("open_time") < _end.replace(tzinfo=None))
                 elif data_type == DataType.fundingRate:
-                    raise ValueError("fundingRate not support filter end time")
+                    # fundingRate 按 calc_time 过滤 (修复: 原代码直接 raise 导致无法下载)
+                    df = df.filter(pl.col("calc_time") < _end.replace(tzinfo=None))
                 elif data_type == DataType.metrics:
                     # 无数据文件时空 df 的 create_time 是 String，先转 Datetime 避免比较报错
                     df = df.with_columns(
