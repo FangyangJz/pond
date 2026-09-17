@@ -380,10 +380,18 @@ class CryptoDB(DuckDB):
                     httpx_proxies,
                 )
                 if data_type == DataType.klines:
+                    # 无数据文件时空 df 的 open_time 是 Int64，先转 Datetime 避免比较报错
+                    df = df.with_columns(
+                        pl.col("open_time").cast(pl.Datetime, strict=False)
+                    )
                     df = df.filter(pl.col("open_time") < _end.replace(tzinfo=None))
                 elif data_type == DataType.fundingRate:
                     raise ValueError("fundingRate not support filter end time")
                 elif data_type == DataType.metrics:
+                    # 无数据文件时空 df 的 create_time 是 String，先转 Datetime 避免比较报错
+                    df = df.with_columns(
+                        pl.col("create_time").cast(pl.Datetime, strict=False)
+                    )
                     df = df.filter(pl.col("create_time") < _end.replace(tzinfo=None))
 
                 if len(df) == 0:
